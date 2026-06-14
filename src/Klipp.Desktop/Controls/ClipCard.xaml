@@ -1,0 +1,91 @@
+﻿<UserControl
+    x:Class="Klipp.Desktop.Controls.ClipCard"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d">
+
+    <!-- Hela kortet — klickbart, mörk surface, subtil border -->
+    <Border Background="{StaticResource KlippSurfaceBrush}"
+            BorderBrush="{StaticResource KlippBorderBrush}"
+            BorderThickness="1"
+            CornerRadius="{StaticResource KlippRadiusMd}">
+
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />  <!-- Thumbnail -->
+                <RowDefinition Height="Auto" />  <!-- Caption -->
+            </Grid.RowDefinitions>
+
+            <!-- ============================================================ -->
+            <!-- Thumbnail-area (16:9 aspect, dummy mörk färg)               -->
+            <!-- ============================================================ -->
+            <Grid Grid.Row="0" Height="120">
+                <!-- Dummy bakgrund (representerar video-thumbnail) -->
+                <Rectangle Fill="{StaticResource KlippSurfaceElevatedBrush}" />
+
+                <!-- Play-knapp i mitten -->
+                <Border Width="40"
+                        Height="40"
+                        Background="{StaticResource KlippAccentBrush}"
+                        CornerRadius="20"
+                        HorizontalAlignment="Center"
+                        VerticalAlignment="Center">
+                    <TextBlock Text="&#x25B6;"
+                               Foreground="White"
+                               FontSize="14"
+                               HorizontalAlignment="Center"
+                               VerticalAlignment="Center"
+                               Margin="3,0,0,0" />
+                </Border>
+
+                <!-- "NY"-badge (bara på senaste klippet — visas via DependencyProperty senare) -->
+                <Border x:Name="NewBadge"
+                        Background="{StaticResource KlippAccentBrush}"
+                        CornerRadius="10"
+                        Padding="7,2,7,2"
+                        HorizontalAlignment="Left"
+                        VerticalAlignment="Top"
+                        Margin="8,8,0,0"
+                        Visibility="Collapsed">
+                    <TextBlock Text="NY"
+                               Foreground="White"
+                               FontSize="10"
+                               FontWeight="SemiBold" />
+                </Border>
+
+                <!-- Duration badge (nedre högra hörnet) -->
+                <Border Background="#B3000000"
+                        CornerRadius="3"
+                        Padding="6,2,6,2"
+                        HorizontalAlignment="Right"
+                        VerticalAlignment="Bottom"
+                        Margin="0,0,8,8">
+                    <TextBlock x:Name="DurationText"
+                               Text="0:30"
+                               Foreground="White"
+                               FontSize="11" />
+                </Border>
+            </Grid>
+
+            <!-- ============================================================ -->
+            <!-- Caption (titel + metadata)                                   -->
+            <!-- ============================================================ -->
+            <StackPanel Grid.Row="1"
+                        Padding="12,10,12,12"
+                        Spacing="2">
+                <TextBlock x:Name="TitleText"
+                           Text="Triple kill - Haven"
+                           Style="{StaticResource KlippBodyText}"
+                           FontWeight="SemiBold"
+                           FontSize="13"
+                           TextTrimming="CharacterEllipsis" />
+                <TextBlock x:Name="MetaText"
+                           Text="Valorant &#x2022; 5 min sedan"
+                           Style="{StaticResource KlippBodyTextSecondary}"
+                           FontSize="11" />
+            </StackPanel>
+        </Grid>
+    </Border>
+</UserControl>

@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "Klipp.Desktop (Package)": {
+      "commandName": "MsixPackage"
+    },
+    "Klipp.Desktop (Unpackaged)": {
+      "commandName": "Project"
+    }
+  }
+}

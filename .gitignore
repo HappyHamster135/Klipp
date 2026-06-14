@@ -1,0 +1,78 @@
+﻿# ============================================================
+# Klipp .gitignore
+# ============================================================
+
+# Build outputs
+[Bb]in/
+[Oo]bj/
+[Oo]ut/
+[Ll]og/
+[Ll]ogs/
+
+# NuGet
+*.nupkg
+*.snupkg
+.nuget/
+packages/
+**/packages/*
+!**/packages/build/
+*.nuget.props
+*.nuget.targets
+
+# Visual Studio
+.vs/
+*.user
+*.userosscache
+*.suo
+*.userprefs
+*.sln.docstates
+*.swp
+
+# JetBrains Rider
+.idea/
+*.sln.iml
+
+# VS Code
+.vscode/
+*.code-workspace
+
+# .NET Core
+project.lock.json
+project.fragment.lock.json
+artifacts/
+
+# Klipp-specifika filer (ska aldrig committas)
+*.raw
+*.mp4
+*.h264
+**/Klipp.Tests/TestResults/
+TestResults/
+
+# OS-genererade filer
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Backup-filer
+*.bak
+*.bak2
+*.backup
+*.tmp
+*.Backup.tmp
+
+# Personliga sln-backups vi gjorde
+Klipp.sln.bak
+Klipp.sln.bak2
+
+# Locally compiled WinUI artifacts
+*.appx
+*.appxbundle
+*.msix
+*.msixbundle
+AppPackages/
+BundleArtifacts/
+
+# Coverage
+coverage/
+*.coverage
+*.coveragexml

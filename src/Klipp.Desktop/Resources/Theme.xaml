@@ -1,0 +1,146 @@
+﻿<ResourceDictionary
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!-- ============================================================ -->
+    <!-- Klipp Design System                                          -->
+    <!-- Mörkt tema, Medal-inspirerat                                 -->
+    <!-- ============================================================ -->
+
+    <!-- ============================================================ -->
+    <!-- Färger (Colors)                                              -->
+    <!-- ============================================================ -->
+
+    <!-- Bakgrunder -->
+    <Color x:Key="KlippBackgroundColor">#0E0E12</Color>
+    <Color x:Key="KlippSurfaceColor">#1A1A22</Color>
+    <Color x:Key="KlippSurfaceElevatedColor">#252530</Color>
+    <Color x:Key="KlippTitleBarColor">#14141A</Color>
+
+    <!-- Ramar -->
+    <Color x:Key="KlippBorderColor">#33333F</Color>
+    <Color x:Key="KlippBorderSubtleColor">#1F1F28</Color>
+
+    <!-- Text -->
+    <Color x:Key="KlippTextPrimaryColor">#F0F0F5</Color>
+    <Color x:Key="KlippTextSecondaryColor">#B8B8C6</Color>
+    <Color x:Key="KlippTextMutedColor">#8E8E9C</Color>
+
+    <!-- Accent (purpur, Medal-inspirerad) -->
+    <Color x:Key="KlippAccentColor">#9D7AEA</Color>
+    <Color x:Key="KlippAccentHoverColor">#AE8FEF</Color>
+    <Color x:Key="KlippAccentPressedColor">#8C66E0</Color>
+
+    <!-- Semantic -->
+    <Color x:Key="KlippSuccessColor">#48C774</Color>
+    <Color x:Key="KlippDangerColor">#EF4444</Color>
+    <Color x:Key="KlippWarningColor">#F59E0B</Color>
+
+    <!-- ============================================================ -->
+    <!-- Borstar (Brushes) — för bindning i XAML                       -->
+    <!-- ============================================================ -->
+
+    <SolidColorBrush x:Key="KlippBackgroundBrush" Color="{StaticResource KlippBackgroundColor}" />
+    <SolidColorBrush x:Key="KlippSurfaceBrush" Color="{StaticResource KlippSurfaceColor}" />
+    <SolidColorBrush x:Key="KlippSurfaceElevatedBrush" Color="{StaticResource KlippSurfaceElevatedColor}" />
+    <SolidColorBrush x:Key="KlippTitleBarBrush" Color="{StaticResource KlippTitleBarColor}" />
+
+    <SolidColorBrush x:Key="KlippBorderBrush" Color="{StaticResource KlippBorderColor}" />
+    <SolidColorBrush x:Key="KlippBorderSubtleBrush" Color="{StaticResource KlippBorderSubtleColor}" />
+
+    <SolidColorBrush x:Key="KlippTextPrimaryBrush" Color="{StaticResource KlippTextPrimaryColor}" />
+    <SolidColorBrush x:Key="KlippTextSecondaryBrush" Color="{StaticResource KlippTextSecondaryColor}" />
+    <SolidColorBrush x:Key="KlippTextMutedBrush" Color="{StaticResource KlippTextMutedColor}" />
+
+    <SolidColorBrush x:Key="KlippAccentBrush" Color="{StaticResource KlippAccentColor}" />
+    <SolidColorBrush x:Key="KlippAccentHoverBrush" Color="{StaticResource KlippAccentHoverColor}" />
+    <SolidColorBrush x:Key="KlippAccentPressedBrush" Color="{StaticResource KlippAccentPressedColor}" />
+
+    <SolidColorBrush x:Key="KlippSuccessBrush" Color="{StaticResource KlippSuccessColor}" />
+    <SolidColorBrush x:Key="KlippDangerBrush" Color="{StaticResource KlippDangerColor}" />
+    <SolidColorBrush x:Key="KlippWarningBrush" Color="{StaticResource KlippWarningColor}" />
+
+    <!-- ============================================================ -->
+    <!-- Typografi                                                    -->
+    <!-- ============================================================ -->
+
+    <!-- Inter används som primärt typsnitt. Fallback till Segoe UI om Inter saknas. -->
+    <x:String x:Key="KlippFontFamilySans">Inter, Segoe UI Variable, Segoe UI</x:String>
+
+    <!-- JetBrains Mono för tidsstämplar och tekniska värden -->
+    <x:String x:Key="KlippFontFamilyMono">JetBrains Mono, Cascadia Mono, Consolas</x:String>
+
+    <!-- ============================================================ -->
+    <!-- Spacing (4px-grid)                                           -->
+    <!-- ============================================================ -->
+
+    <x:Double x:Key="KlippSpacingXs">4</x:Double>
+    <x:Double x:Key="KlippSpacingSm">8</x:Double>
+    <x:Double x:Key="KlippSpacingMd">12</x:Double>
+    <x:Double x:Key="KlippSpacingLg">16</x:Double>
+    <x:Double x:Key="KlippSpacingXl">24</x:Double>
+    <x:Double x:Key="KlippSpacingXxl">32</x:Double>
+
+    <!-- ============================================================ -->
+    <!-- Border radius                                                -->
+    <!-- ============================================================ -->
+
+    <CornerRadius x:Key="KlippRadiusSm">6</CornerRadius>
+    <CornerRadius x:Key="KlippRadiusMd">8</CornerRadius>
+    <CornerRadius x:Key="KlippRadiusLg">12</CornerRadius>
+    <CornerRadius x:Key="KlippRadiusXl">16</CornerRadius>
+    <CornerRadius x:Key="KlippRadiusPill">9999</CornerRadius>
+
+    <!-- ============================================================ -->
+    <!-- Text styles                                                  -->
+    <!-- ============================================================ -->
+
+    <!-- Titel (stort, för headers) -->
+    <Style x:Key="KlippHeadingLarge" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{StaticResource KlippFontFamilySans}" />
+        <Setter Property="FontSize" Value="22" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="Foreground" Value="{StaticResource KlippTextPrimaryBrush}" />
+    </Style>
+
+    <!-- Mellanrubrik -->
+    <Style x:Key="KlippHeadingMedium" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{StaticResource KlippFontFamilySans}" />
+        <Setter Property="FontSize" Value="18" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="Foreground" Value="{StaticResource KlippTextPrimaryBrush}" />
+    </Style>
+
+    <!-- Body text -->
+    <Style x:Key="KlippBodyText" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{StaticResource KlippFontFamilySans}" />
+        <Setter Property="FontSize" Value="14" />
+        <Setter Property="FontWeight" Value="Normal" />
+        <Setter Property="Foreground" Value="{StaticResource KlippTextPrimaryBrush}" />
+    </Style>
+
+    <!-- Sekundär text (mindre, dämpad) -->
+    <Style x:Key="KlippBodyTextSecondary" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{StaticResource KlippFontFamilySans}" />
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="FontWeight" Value="Normal" />
+        <Setter Property="Foreground" Value="{StaticResource KlippTextMutedBrush}" />
+    </Style>
+
+    <!-- Caption (väldigt liten, för labels och badges) -->
+    <Style x:Key="KlippCaption" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{StaticResource KlippFontFamilySans}" />
+        <Setter Property="FontSize" Value="11" />
+        <Setter Property="FontWeight" Value="Normal" />
+        <Setter Property="Foreground" Value="{StaticResource KlippTextMutedBrush}" />
+    </Style>
+
+    <!-- Mono (för tidsstämplar) -->
+    <Style x:Key="KlippMono" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{StaticResource KlippFontFamilyMono}" />
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="FontWeight" Value="Normal" />
+        <Setter Property="Foreground" Value="{StaticResource KlippTextPrimaryBrush}" />
+    </Style>
+
+</ResourceDictionary>
