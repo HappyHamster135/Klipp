@@ -1,6 +1,6 @@
 ﻿# Klipp
 
-A Medal-style screen clipping app for Windows. Built as a portfolio project to demonstrate modern .NET desktop development with low-level Windows API interop.
+Screen clipping app for Windows. Built as a portfolio project to demonstrate modern .NET desktop development with low-level Windows API interop.
 
 ## Features
 
