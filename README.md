@@ -65,7 +65,7 @@ Work in progress. Current functionality:
 ## Build
 
 ```bash
-git clone https://github.com/yourusername/Klipp.git
+git clone https://github.com/HappyHamster135/Klipp.git
 cd Klipp
 dotnet restore
 dotnet build
