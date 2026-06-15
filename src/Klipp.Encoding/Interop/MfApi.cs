@@ -40,6 +40,7 @@ internal static partial class MfApi
         uint cbMaxLength,
         [MarshalUsing(typeof(UniqueComInterfaceMarshaller<IMFMediaBuffer>))] out IMFMediaBuffer ppBuffer);
 
+
     /// <summary>
     /// MFTEnumEx — listar alla MFTs (Media Foundation Transforms) som matchar givna kriterier.
     /// För vår encoder söker vi efter category=VideoEncoder, input=NV12, output=H264.
