@@ -6,13 +6,14 @@ namespace Klipp.Desktop;
 
 /// <summary>
 /// View model för ett klipp i biblioteket. Implementerar INotifyPropertyChanged
-/// så att UI uppdateras automatiskt när properties ändras.
+/// så UI uppdateras automatiskt när properties ändras.
 /// </summary>
 public sealed class ClipViewModel : INotifyPropertyChanged
 {
     private string _title = string.Empty;
     private string _meta = string.Empty;
     private string _duration = string.Empty;
+    private string _filePath = string.Empty;
     private bool _isNew;
 
     public string Title
@@ -31,6 +32,13 @@ public sealed class ClipViewModel : INotifyPropertyChanged
     {
         get => _duration;
         set => SetField(ref _duration, value);
+    }
+
+    /// <summary>Full sökväg till klippets MP4-fil på disk.</summary>
+    public string FilePath
+    {
+        get => _filePath;
+        set => SetField(ref _filePath, value);
     }
 
     public bool IsNew

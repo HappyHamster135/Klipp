@@ -2,11 +2,8 @@
     x:Class="Klipp.Desktop.Controls.ClipCard"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
-    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-    mc:Ignorable="d">
+    PointerPressed="OnPointerPressed">
 
-    <!-- Hela kortet — klickbart, mörk surface, subtil border -->
     <Border Background="{StaticResource KlippSurfaceBrush}"
             BorderBrush="{StaticResource KlippBorderBrush}"
             BorderThickness="1"
@@ -14,18 +11,14 @@
 
         <Grid>
             <Grid.RowDefinitions>
-                <RowDefinition Height="Auto" />  <!-- Thumbnail -->
-                <RowDefinition Height="Auto" />  <!-- Caption -->
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
 
-            <!-- ============================================================ -->
-            <!-- Thumbnail-area (16:9 aspect, dummy mörk färg)               -->
-            <!-- ============================================================ -->
+            <!-- Thumbnail-area -->
             <Grid Grid.Row="0" Height="120">
-                <!-- Dummy bakgrund (representerar video-thumbnail) -->
                 <Rectangle Fill="{StaticResource KlippSurfaceElevatedBrush}" />
 
-                <!-- Play-knapp i mitten -->
                 <Border Width="40"
                         Height="40"
                         Background="{StaticResource KlippAccentBrush}"
@@ -40,7 +33,6 @@
                                Margin="3,0,0,0" />
                 </Border>
 
-                <!-- "NY"-badge (bara på senaste klippet — visas via DependencyProperty senare) -->
                 <Border x:Name="NewBadge"
                         Background="{StaticResource KlippAccentBrush}"
                         CornerRadius="10"
@@ -55,7 +47,6 @@
                                FontWeight="SemiBold" />
                 </Border>
 
-                <!-- Duration badge (nedre högra hörnet) -->
                 <Border Background="#B3000000"
                         CornerRadius="3"
                         Padding="6,2,6,2"
@@ -69,9 +60,7 @@
                 </Border>
             </Grid>
 
-            <!-- ============================================================ -->
-            <!-- Caption (titel + metadata)                                   -->
-            <!-- ============================================================ -->
+            <!-- Caption -->
             <StackPanel Grid.Row="1"
                         Padding="12,10,12,12"
                         Spacing="2">

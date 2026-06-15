@@ -6,7 +6,8 @@
   xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
   xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
   xmlns:systemai="http://schemas.microsoft.com/appx/manifest/systemai/windows10"
-  IgnorableNamespaces="uap rescap systemai">
+  xmlns:uap6="http://schemas.microsoft.com/appx/manifest/uap/windows10/6"
+  IgnorableNamespaces="uap rescap systemai uap6">
 
   <Identity
     Name="32848254-5c02-4888-a6dc-14f78cb62c16"
@@ -49,5 +50,9 @@
   <Capabilities>
     <rescap:Capability Name="runFullTrust" />
     <systemai:Capability Name="systemAIModels"/>
+    <uap:Capability Name="videosLibrary"/>
+    <uap6:Capability Name="graphicsCapture"/>
+    <DeviceCapability Name="webcam"/>
+    <DeviceCapability Name="microphone"/>
   </Capabilities>
 </Package>

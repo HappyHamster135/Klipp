@@ -15,9 +15,6 @@
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
-        <!-- ============================================================ -->
-        <!-- Custom Title Bar med kontroller                              -->
-        <!-- ============================================================ -->
         <Grid Grid.Row="0"
               Background="{StaticResource KlippTitleBarBrush}"
               Height="48"
@@ -28,7 +25,6 @@
                 <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
 
-            <!-- Logo + namn -->
             <StackPanel Grid.Column="0"
                         Orientation="Horizontal"
                         VerticalAlignment="Center"
@@ -43,13 +39,10 @@
                            VerticalAlignment="Center" />
             </StackPanel>
 
-            <!-- Recording-kontroller (höger sida) -->
             <StackPanel Grid.Column="2"
                         Orientation="Horizontal"
                         Spacing="8"
                         VerticalAlignment="Center">
-
-                <!-- Status-pill: visar buffert-status när inspelning körs -->
                 <Border x:Name="StatusPill"
                         Background="Transparent"
                         BorderBrush="{StaticResource KlippBorderBrush}"
@@ -73,7 +66,6 @@
                     </StackPanel>
                 </Border>
 
-                <!-- Spara klipp-knapp (bara aktiv när recording) -->
                 <Button x:Name="SaveClipButton"
                         Click="OnSaveClipClicked"
                         Content="Spara klipp"
@@ -86,7 +78,6 @@
                         FontSize="12"
                         IsEnabled="False" />
 
-                <!-- Start/Stop-knapp -->
                 <Button x:Name="RecordButton"
                         Click="OnRecordClicked"
                         Content="Spela in"
@@ -100,75 +91,82 @@
             </StackPanel>
         </Grid>
 
-        <!-- ============================================================ -->
-        <!-- Main Content                                                 -->
-        <!-- ============================================================ -->
-        <Grid Grid.Row="1" Padding="24">
-            <Grid.RowDefinitions>
-                <RowDefinition Height="Auto" />
-                <RowDefinition Height="*" />
-            </Grid.RowDefinitions>
+        <Grid Grid.Row="1">
 
-            <Grid Grid.Row="0" Margin="0,0,0,18">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="Auto" />
-                </Grid.ColumnDefinitions>
+            <Grid x:Name="LibraryView" Padding="24">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
 
-                <StackPanel Grid.Column="0" Spacing="2">
-                    <TextBlock Text="Mina klipp"
-                               Style="{StaticResource KlippHeadingMedium}" />
-                    <TextBlock x:Name="LibraryStatsText"
-                               Text="0 klipp"
-                               Style="{StaticResource KlippBodyTextSecondary}" />
-                </StackPanel>
+                <Grid Grid.Row="0" Margin="0,0,0,18">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel Grid.Column="0" Spacing="2">
+                        <TextBlock Text="Mina klipp"
+                                   Style="{StaticResource KlippHeadingMedium}" />
+                        <TextBlock x:Name="LibraryStatsText"
+                                   Text="0 klipp"
+                                   Style="{StaticResource KlippBodyTextSecondary}" />
+                    </StackPanel>
+                </Grid>
+
+                <Border x:Name="EmptyState"
+                        Grid.Row="1"
+                        Background="{StaticResource KlippSurfaceBrush}"
+                        BorderBrush="{StaticResource KlippBorderBrush}"
+                        BorderThickness="1"
+                        CornerRadius="{StaticResource KlippRadiusMd}"
+                        Padding="40"
+                        Visibility="Visible">
+                    <StackPanel HorizontalAlignment="Center"
+                                VerticalAlignment="Center"
+                                Spacing="8">
+                        <TextBlock Text="Inga klipp än"
+                                   Style="{StaticResource KlippBodyText}"
+                                   HorizontalAlignment="Center" />
+                        <TextBlock Text="Klicka 'Spela in' för att börja"
+                                   Style="{StaticResource KlippBodyTextSecondary}"
+                                   HorizontalAlignment="Center" />
+                    </StackPanel>
+                </Border>
+
+                <ScrollViewer x:Name="ClipsScroller"
+                              Grid.Row="1"
+                              VerticalScrollBarVisibility="Auto"
+                              HorizontalScrollBarVisibility="Disabled"
+                              Visibility="Collapsed">
+                    <ItemsRepeater ItemsSource="{x:Bind LibraryService.Clips, Mode=OneTime}">
+                        <ItemsRepeater.Layout>
+                            <UniformGridLayout MinItemWidth="220"
+                                               MinItemHeight="190"
+                                               MinRowSpacing="14"
+                                               MinColumnSpacing="14"
+                                               ItemsStretch="Fill" />
+                        </ItemsRepeater.Layout>
+                        <ItemsRepeater.ItemTemplate>
+                            <DataTemplate x:DataType="local:ClipViewModel">
+                                <controls:ClipCard ClipTitle="{x:Bind Title, Mode=OneWay}"
+                                                   ClipMeta="{x:Bind Meta, Mode=OneWay}"
+                                                   Duration="{x:Bind Duration, Mode=OneWay}"
+                                                   IsNew="{x:Bind IsNew, Mode=OneWay}"
+                                                   ClipFilePath="{x:Bind FilePath, Mode=OneWay}"
+                                                   Clicked="OnClipCardClicked" />
+                            </DataTemplate>
+                        </ItemsRepeater.ItemTemplate>
+                    </ItemsRepeater>
+                </ScrollViewer>
             </Grid>
 
-            <!-- Tomt-state om inga klipp finns -->
-            <Border x:Name="EmptyState"
-                    Grid.Row="1"
-                    Background="{StaticResource KlippSurfaceBrush}"
-                    BorderBrush="{StaticResource KlippBorderBrush}"
-                    BorderThickness="1"
-                    CornerRadius="{StaticResource KlippRadiusMd}"
-                    Padding="40"
-                    Visibility="Visible">
-                <StackPanel HorizontalAlignment="Center"
-                            VerticalAlignment="Center"
-                            Spacing="8">
-                    <TextBlock Text="Inga klipp än"
-                               Style="{StaticResource KlippBodyText}"
-                               HorizontalAlignment="Center" />
-                    <TextBlock Text="Klicka 'Spela in' för att börja"
-                               Style="{StaticResource KlippBodyTextSecondary}"
-                               HorizontalAlignment="Center" />
-                </StackPanel>
-            </Border>
-
-            <!-- Klipp-grid -->
-            <ScrollViewer x:Name="ClipsScroller"
-                          Grid.Row="1"
-                          VerticalScrollBarVisibility="Auto"
-                          HorizontalScrollBarVisibility="Disabled"
-                          Visibility="Collapsed">
-                <ItemsRepeater ItemsSource="{x:Bind LibraryService.Clips, Mode=OneTime}">
-                    <ItemsRepeater.Layout>
-                        <UniformGridLayout MinItemWidth="220"
-                                           MinItemHeight="190"
-                                           MinRowSpacing="14"
-                                           MinColumnSpacing="14"
-                                           ItemsStretch="Fill" />
-                    </ItemsRepeater.Layout>
-                    <ItemsRepeater.ItemTemplate>
-                        <DataTemplate x:DataType="local:ClipViewModel">
-                            <controls:ClipCard ClipTitle="{x:Bind Title, Mode=OneWay}"
-                                               ClipMeta="{x:Bind Meta, Mode=OneWay}"
-                                               Duration="{x:Bind Duration, Mode=OneWay}"
-                                               IsNew="{x:Bind IsNew, Mode=OneWay}" />
-                        </DataTemplate>
-                    </ItemsRepeater.ItemTemplate>
-                </ItemsRepeater>
-            </ScrollViewer>
+            <controls:ClipPlayerView x:Name="PlayerView"
+                                     Visibility="Collapsed"
+                                     BackRequested="OnPlayerBackRequested"
+                                     DeleteRequested="OnPlayerDeleteRequested"
+                                     PrevRequested="OnPlayerPrevRequested"
+                                     NextRequested="OnPlayerNextRequested" />
         </Grid>
     </Grid>
 </Window>

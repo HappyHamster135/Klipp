@@ -1,52 +1,69 @@
-﻿using Microsoft.UI.Xaml.Controls;
+﻿using System;
+using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Input;
 
 namespace Klipp.Desktop.Controls;
 
 /// <summary>
 /// Återanvändbart kort som visar ett enskilt klipp i biblioteket.
+/// Klickbart — exponerar Click-event som triggers när användaren klickar någonstans på kortet.
 /// </summary>
 public sealed partial class ClipCard : UserControl
 {
+    /// <summary>Triggas när användaren klickar på kortet.</summary>
+    public event EventHandler<ClipCardClickEventArgs>? Clicked;
+
+    /// <summary>
+    /// Filsökväg som identifierar vilket klipp kortet representerar.
+    /// Sätts via x:Bind från ClipViewModel.
+    /// </summary>
+    public string ClipFilePath { get; set; } = string.Empty;
+
     public ClipCard()
     {
         InitializeComponent();
     }
 
-    /// <summary>
-    /// Sätter klippets titel (t.ex. "Triple kill - Haven").
-    /// </summary>
     public string ClipTitle
     {
         get => TitleText.Text;
         set => TitleText.Text = value;
     }
 
-    /// <summary>
-    /// Sätter metadata-raden (t.ex. "Valorant • 5 min sedan").
-    /// </summary>
     public string ClipMeta
     {
         get => MetaText.Text;
         set => MetaText.Text = value;
     }
 
-    /// <summary>
-    /// Sätter längden som visas i nedre högra hörnet (t.ex. "0:30").
-    /// </summary>
     public string Duration
     {
         get => DurationText.Text;
         set => DurationText.Text = value;
     }
 
-    /// <summary>
-    /// Visar eller döljer "NY"-badge i övre vänstra hörnet.
-    /// </summary>
     public bool IsNew
     {
-        get => NewBadge.Visibility == Microsoft.UI.Xaml.Visibility.Visible;
-        set => NewBadge.Visibility = value
-            ? Microsoft.UI.Xaml.Visibility.Visible
-            : Microsoft.UI.Xaml.Visibility.Collapsed;
+        get => NewBadge.Visibility == Visibility.Visible;
+        set => NewBadge.Visibility = value ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    private void OnPointerPressed(object sender, PointerRoutedEventArgs e)
+    {
+        Clicked?.Invoke(this, new ClipCardClickEventArgs(ClipFilePath));
+    }
+}
+
+/// <summary>
+/// Event args för ClipCard.Clicked.
+/// </summary>
+public sealed class ClipCardClickEventArgs : EventArgs
+{
+    public string FilePath { get; }
+
+    public ClipCardClickEventArgs(string filePath)
+    {
+        FilePath = filePath;
     }
 }
