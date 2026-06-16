@@ -143,4 +143,50 @@
         <Setter Property="Foreground" Value="{StaticResource KlippTextPrimaryBrush}" />
     </Style>
 
+    <!-- ============================================================ -->
+    <!-- ComboBox-överstyrningar — matcha Klipps mörka tema            -->
+    <!-- Dessa nyckelnamn är WinUI:s inbyggda theme-resurser som       -->
+    <!-- ComboBox-mallen refererar. Genom att överstyra dem här slår   -->
+    <!-- de igenom på alla ComboBoxes, inklusive popup-listan.         -->
+    <!-- ============================================================ -->
+
+    <!-- Stängd ComboBox (vilolage) -->
+    <SolidColorBrush x:Key="ComboBoxBackground" Color="{StaticResource KlippSurfaceColor}" />
+    <SolidColorBrush x:Key="ComboBoxBackgroundPointerOver" Color="{StaticResource KlippSurfaceElevatedColor}" />
+    <SolidColorBrush x:Key="ComboBoxBackgroundPressed" Color="{StaticResource KlippSurfaceElevatedColor}" />
+    <SolidColorBrush x:Key="ComboBoxBackgroundDisabled" Color="{StaticResource KlippSurfaceColor}" />
+
+    <SolidColorBrush x:Key="ComboBoxForeground" Color="{StaticResource KlippTextPrimaryColor}" />
+    <SolidColorBrush x:Key="ComboBoxForegroundPointerOver" Color="{StaticResource KlippTextPrimaryColor}" />
+    <SolidColorBrush x:Key="ComboBoxForegroundPressed" Color="{StaticResource KlippTextPrimaryColor}" />
+
+    <SolidColorBrush x:Key="ComboBoxBorderBrush" Color="{StaticResource KlippBorderColor}" />
+    <SolidColorBrush x:Key="ComboBoxBorderBrushPointerOver" Color="{StaticResource KlippAccentColor}" />
+    <SolidColorBrush x:Key="ComboBoxBorderBrushPressed" Color="{StaticResource KlippAccentColor}" />
+
+    <!-- Dropdown-pilen -->
+    <SolidColorBrush x:Key="ComboBoxDropDownGlyphForeground" Color="{StaticResource KlippTextSecondaryColor}" />
+    <SolidColorBrush x:Key="ComboBoxEditableDropDownGlyphForeground" Color="{StaticResource KlippTextSecondaryColor}" />
+
+    <!-- Popup-listan (den som öppnas) -->
+    <SolidColorBrush x:Key="ComboBoxDropDownBackground" Color="{StaticResource KlippSurfaceElevatedColor}" />
+    <SolidColorBrush x:Key="ComboBoxDropDownForeground" Color="{StaticResource KlippTextPrimaryColor}" />
+    <SolidColorBrush x:Key="ComboBoxDropDownBorderBrush" Color="{StaticResource KlippBorderColor}" />
+
+    <!-- Items i popup-listan -->
+    <SolidColorBrush x:Key="ComboBoxItemForeground" Color="{StaticResource KlippTextPrimaryColor}" />
+    <SolidColorBrush x:Key="ComboBoxItemForegroundPointerOver" Color="{StaticResource KlippTextPrimaryColor}" />
+    <SolidColorBrush x:Key="ComboBoxItemForegroundPressed" Color="{StaticResource KlippTextPrimaryColor}" />
+    <SolidColorBrush x:Key="ComboBoxItemForegroundSelected" Color="{StaticResource KlippTextPrimaryColor}" />
+    <SolidColorBrush x:Key="ComboBoxItemForegroundSelectedPointerOver" Color="{StaticResource KlippTextPrimaryColor}" />
+
+    <SolidColorBrush x:Key="ComboBoxItemBackgroundPointerOver" Color="{StaticResource KlippSurfaceColor}" />
+    <SolidColorBrush x:Key="ComboBoxItemBackgroundPressed" Color="{StaticResource KlippBorderColor}" />
+    <SolidColorBrush x:Key="ComboBoxItemBackgroundSelected" Color="{StaticResource KlippAccentColor}" />
+    <SolidColorBrush x:Key="ComboBoxItemBackgroundSelectedPointerOver" Color="{StaticResource KlippAccentHoverColor}" />
+    <SolidColorBrush x:Key="ComboBoxItemBackgroundSelectedDisabled" Color="{StaticResource KlippSurfaceColor}" />
+
+    <!-- Accent-färgen som ComboBox använder för fokus-ring m.m. -->
+    <SolidColorBrush x:Key="ComboBoxItemPillFillBrush" Color="{StaticResource KlippAccentColor}" />
+
 </ResourceDictionary>

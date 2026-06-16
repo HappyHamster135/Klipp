@@ -1,4 +1,6 @@
 ﻿using System;
+using System.IO;
+
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
@@ -48,7 +50,42 @@ public sealed partial class ClipCard : UserControl
         get => NewBadge.Visibility == Visibility.Visible;
         set => NewBadge.Visibility = value ? Visibility.Visible : Visibility.Collapsed;
     }
+    private string _thumbnailPath = string.Empty;
 
+    /// <summary>
+    /// Sökväg till thumbnail-bild. Laddas via stream (undviker packaged-app
+    /// sandbox-problem med fil-URI:er).
+    /// </summary>
+    public string ThumbnailPath
+    {
+        get => _thumbnailPath;
+        set
+        {
+            _thumbnailPath = value;
+            _ = LoadThumbnailAsync(value);
+        }
+    }
+
+    private async System.Threading.Tasks.Task LoadThumbnailAsync(string path)
+    {
+        if (string.IsNullOrEmpty(path) || !System.IO.File.Exists(path))
+            return;
+
+        try
+        {
+            var bitmap = new Microsoft.UI.Xaml.Media.Imaging.BitmapImage();
+            using var stream = System.IO.File.OpenRead(path);
+            await bitmap.SetSourceAsync(stream.AsRandomAccessStream());
+
+            ThumbnailImage.Source = bitmap;
+            ThumbnailImage.Visibility = Visibility.Visible;
+            PlaceholderIcon.Visibility = Visibility.Collapsed;
+        }
+        catch
+        {
+            // Behåll placeholder-ikonen om bilden inte kan laddas
+        }
+    }
     private void OnPointerPressed(object sender, PointerRoutedEventArgs e)
     {
         Clicked?.Invoke(this, new ClipCardClickEventArgs(ClipFilePath));

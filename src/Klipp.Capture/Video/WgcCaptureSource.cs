@@ -158,9 +158,32 @@ public sealed class WgcCaptureSource : ICaptureSource<VideoFrame>
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        await foreach (var frame in _channel.Reader.ReadAllAsync(cancellationToken).ConfigureAwait(false))
+        // Vi läser via WaitToReadAsync + TryRead istället för ReadAllAsync.
+        // Det låter oss avsluta GRACIÖST vid cancellation utan att kasta en
+        // OperationCanceledException (man kan inte try/catch runt yield return,
+        // så vi fångar i en hjälpmetod istället).
+        while (await WaitToReadSafelyAsync(cancellationToken).ConfigureAwait(false))
         {
-            yield return frame;
+            while (_channel.Reader.TryRead(out var frame))
+            {
+                yield return frame;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Väntar på att fler frames finns att läsa. Returnerar false (istället för att
+    /// kasta) om token avbryts eller kanalen stängs — så att läs-loopen avslutas rent.
+    /// </summary>
+    private async Task<bool> WaitToReadSafelyAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            return await _channel.Reader.WaitToReadAsync(cancellationToken).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            return false;
         }
     }
 

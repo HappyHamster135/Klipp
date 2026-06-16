@@ -2,6 +2,7 @@
 using Klipp.Capture.Models;
 using Klipp.Capture.Video;
 using Klipp.Core.Models;
+using Klipp.Encoding.Clipping;
 using Klipp.Encoding.FFmpeg;
 using Klipp.Encoding.Video;
 
@@ -9,116 +10,121 @@ namespace Klipp.SmokeTest;
 
 internal static class Program
 {
-    [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
-    private static extern nint FindWindow(string? lpClassName, string? lpWindowName);
+    [DllImport("user32.dll")]
+    private static extern nint MonitorFromPoint(POINT pt, uint dwFlags);
 
-    private const int CaptureSeconds = 10;
+    [StructLayout(LayoutKind.Sequential)]
+    private struct POINT { public int x, y; }
+
+    private const uint MONITOR_DEFAULTTOPRIMARY = 0x00000001;
 
     private static async Task<int> Main()
     {
-        Console.WriteLine("Klipp Smoke Test — FFmpeg encoder end-to-end");
-        Console.WriteLine("=============================================");
-        Console.WriteLine("  Capture (Notepad) -> FFmpegH264Encoder -> MP4-fil");
+        Console.WriteLine("Klipp Smoke Test — Segment recorder + Clip extractor");
+        Console.WriteLine("====================================================");
         Console.WriteLine();
 
-        // Hitta Notepad
-        var hwnd = FindWindow("Notepad", null);
-        if (hwnd == nint.Zero)
-        {
-            Console.Error.WriteLine("FEL: Hittade inte Notepad. Starta Notepad och kor igen.");
-            return 1;
-        }
+        // Mappar
+        var localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+        var segmentDir = Path.Combine(localAppData, "Klipp", "segments");
+        var desktop = Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory);
+        var outputPath = Path.Combine(desktop, $"klipp_extracted_{DateTime.Now:yyyyMMdd_HHmmss}.mp4");
 
-        Console.WriteLine($"Notepad hittad — HWND: 0x{hwnd:X}");
+        Console.WriteLine($"Segment-mapp: {segmentDir}");
+        Console.WriteLine($"Output-klipp: {outputPath}");
         Console.WriteLine();
 
-        // Steg 1: Verifiera/ladda ner FFmpeg
-        var locator = new FFmpegLocator();
-        if (!locator.IsInstalled)
-        {
-            Console.WriteLine("FFmpeg ej installerat — laddar ner (~50 MB)...");
-            var progress = new Progress<double>(p =>
-            {
-                Console.Write($"\r  {p:P0} klart");
-            });
-            await locator.GetFFmpegPathAsync(progress);
-            Console.WriteLine();
-            Console.WriteLine($"FFmpeg installerat i: {locator.BinDirectory}");
-        }
-        else
-        {
-            Console.WriteLine($"FFmpeg redan installerat i: {locator.BinDirectory}");
-        }
-        Console.WriteLine();
-
-        // Steg 2: Bygg pipelinen
+        // Capture-mål: hela primary monitor
+        var hMonitor = MonitorFromPoint(new POINT { x = 0, y = 0 }, MONITOR_DEFAULTTOPRIMARY);
         var target = new CaptureTarget
         {
-            Kind = CaptureTargetKind.Window,
-            Handle = hwnd,
-            DisplayName = "Notepad"
+            Kind = CaptureTargetKind.Monitor,
+            Handle = hMonitor,
+            DisplayName = "Primary Monitor"
         };
 
-        // 30 FPS för rimlig prestanda
         var settings = RecordingSettings.Default1080p60 with { FrameRate = 30 };
+        var locator = new FFmpegLocator();
 
-        var desktop = Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory);
-        var outputPath = Path.Combine(desktop, $"klipp_ffmpeg_{DateTime.Now:yyyyMMdd_HHmmss}.mp4");
+        // === DEL 1: Starta segment-inspelning ===
+        var recorder = new FFmpegSegmentRecorder(locator)
+        {
+            SegmentDurationSeconds = 5,   // 5s per segment (för snabbare test)
+            MaxSegments = 12               // 60s buffer
+        };
+        recorder.SetSegmentDirectory(segmentDir);
+        await recorder.InitializeAsync(settings);
 
-        await using var encoder = new FFmpegH264Encoder(locator);
-        encoder.SetOutputPath(outputPath);
-        await encoder.InitializeAsync(settings);
+        await using var _ = recorder;
 
-        await using var captureSource = new WgcCaptureSource(target);
+        var captureSource = new WgcCaptureSource(target);
+        await using var __ = captureSource;
         await captureSource.StartAsync();
 
-        Console.WriteLine($"Spelar in {CaptureSeconds} sekunder...");
+        Console.WriteLine("Spelar in i 25 sekunder (~5 segment a 5s)...");
         Console.WriteLine();
 
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(25));
         var frameCount = 0;
-        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(CaptureSeconds));
 
         try
         {
             await foreach (var frame in captureSource.ReadSamplesAsync(cts.Token))
             {
                 frameCount++;
-
-                // Pipea frame direkt till FFmpeg (EncodeAsync returnerar inga samples,
-                // FFmpeg muxar direkt till filen)
-                await foreach (var _ in encoder.EncodeAsync(frame, cts.Token))
+                await foreach (var ___ in recorder.EncodeAsync(frame, cts.Token))
                 {
-                    // Ingen output att samla
+                    // FFmpeg muxar direkt
                 }
 
                 if (frameCount % 30 == 0)
-                    Console.WriteLine($"  {frameCount} frames pipade till FFmpeg");
+                {
+                    var segCount = Directory.GetFiles(segmentDir, "seg_*.mp4").Length;
+                    Console.WriteLine($"  {frameCount} frames, {segCount} segment(s) p\u00e5 disk");
+                }
             }
         }
-        catch (OperationCanceledException)
-        {
-            // Forvantat nar timeout gar ut
-        }
+        catch (OperationCanceledException) { /* timeout */ }
 
         Console.WriteLine();
-        Console.WriteLine("Avslutar inspelning...");
+        Console.WriteLine($"Inspelning klar. Stoppar capture...");
         await captureSource.StopAsync();
 
-        // Flusha FFmpeg — stänger stdin och väntar på MP4-finalisering
-        await foreach (var _ in encoder.FlushAsync())
+        Console.WriteLine($"Flushar FFmpeg (sista segmentet skrivs)...");
+        await foreach (var ___ in recorder.FlushAsync())
         {
-            // FFmpeg muxar fardigt
+            // FFmpeg avslutar sista segmentet
         }
 
-        // Verifiera filen
-        var fileInfo = new FileInfo(outputPath);
+        // === DEL 2: Visa vad vi har ===
+        var allSegments = new DirectoryInfo(segmentDir).GetFiles("seg_*.mp4")
+            .OrderBy(f => f.LastWriteTimeUtc).ToList();
+
         Console.WriteLine();
-        Console.WriteLine("OK!");
-        Console.WriteLine($"  Output: {outputPath}");
-        Console.WriteLine($"  Storlek: {fileInfo.Length / 1024.0 / 1024.0:F1} MB");
-        Console.WriteLine($"  Frames pipade: {frameCount}");
+        Console.WriteLine($"Segment p\u00e5 disk efter inspelning:");
+        foreach (var seg in allSegments)
+        {
+            Console.WriteLine($"  {seg.Name} - {seg.Length / 1024.0:F0} KB");
+        }
         Console.WriteLine();
-        Console.WriteLine("Dubbelklicka filen for att spela i Windows Media Player eller VLC.");
+
+        // === DEL 3: Extrahera senaste 10 sekunder ===
+        Console.WriteLine("Extraherar senaste 10 sekunder till en klipp-MP4...");
+        var extractor = new ClipExtractor(locator);
+        var result = await extractor.SaveLastSecondsAsync(
+            segmentDirectory: segmentDir,
+            outputPath: outputPath,
+            secondsToCapture: 10,
+            segmentDurationSeconds: 5);
+
+        Console.WriteLine();
+        Console.WriteLine($"OK!");
+        Console.WriteLine($"  Output: {result.OutputPath}");
+        Console.WriteLine($"  Segments anvanda: {result.SegmentsUsed}");
+        Console.WriteLine($"  Ungefarlig langd: {result.ApproximateDurationSeconds}s");
+        Console.WriteLine($"  Filstorlek: {result.FileSizeBytes / 1024.0 / 1024.0:F2} MB");
+        Console.WriteLine();
+        Console.WriteLine("Dubbelklicka klippet for att spela.");
 
         return 0;
     }

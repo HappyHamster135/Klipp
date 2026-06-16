@@ -13,6 +13,9 @@ namespace Klipp.Desktop.Services;
 /// </summary>
 public sealed class ClipLibraryService
 {
+    private readonly ThumbnailService _thumbnails = new();
+    private readonly MediaProbeService _probe = new();  
+
     /// <summary>Mapp där klipp sparas. Skapas automatiskt om den inte finns.</summary>
     public string ClipsDirectory { get; }
 
@@ -29,7 +32,7 @@ public sealed class ClipLibraryService
     /// <summary>
     /// Skannar klipp-mappen och laddar alla .mp4-filer som ClipViewModel-objekt.
     /// </summary>
-    public Task LoadFromDiskAsync()
+    public async Task LoadFromDiskAsync()
     {
         Clips.Clear();
 
@@ -40,10 +43,49 @@ public sealed class ClipLibraryService
 
         foreach (var file in files)
         {
-            Clips.Add(CreateViewModelFromFile(file, isNew: false));
+            var vm = CreateViewModelFromFile(file, isNew: false);
+            Clips.Add(vm);
         }
 
-        return Task.CompletedTask;
+        // Generera thumbnails i bakgrunden — blockerar inte UI:t.
+        // Korten uppdateras automatiskt via INotifyPropertyChanged när de blir klara.
+        foreach (var vm in Clips)
+        {
+            await GenerateThumbnailAsync(vm);
+            await GenerateDurationAsync(vm);
+        }
+    }
+
+    /// <summary>Genererar en thumbnail för ett klipp och uppdaterar dess ViewModel.</summary>
+    private async Task GenerateThumbnailAsync(ClipViewModel vm)
+    {
+        try
+        {
+            var thumbPath = await _thumbnails.GetOrCreateThumbnailAsync(vm.FilePath);
+            if (!string.IsNullOrEmpty(thumbPath))
+                vm.ThumbnailPath = thumbPath;
+        }
+        catch { /* fallback-ikon visas om det misslyckas */ }
+    }
+
+    /// <summary>Läser klippets varaktighet och uppdaterar dess ViewModel.</summary>
+    private async Task GenerateDurationAsync(ClipViewModel vm)
+    {
+        try
+        {
+            var duration = await _probe.GetDurationAsync(vm.FilePath);
+            if (duration is not null)
+                vm.Duration = FormatDuration(duration.Value);
+        }
+        catch { /* behåll "—" om det misslyckas */ }
+    }
+
+    private static string FormatDuration(TimeSpan d)
+    {
+        var totalSeconds = (int)Math.Round(d.TotalSeconds);
+        var minutes = totalSeconds / 60;
+        var seconds = totalSeconds % 60;
+        return $"{minutes}:{seconds:D2}";
     }
 
     /// <summary>
@@ -68,7 +110,12 @@ public sealed class ClipLibraryService
         foreach (var clip in Clips)
             clip.IsNew = false;
 
-        Clips.Insert(0, CreateViewModelFromFile(file, isNew: true));
+        var vm = CreateViewModelFromFile(file, isNew: true);
+        Clips.Insert(0, vm);
+
+        // Generera thumbnail + läs varaktighet i bakgrunden
+        _ = GenerateThumbnailAsync(vm);
+        _ = GenerateDurationAsync(vm);
     }
 
     private static ClipViewModel CreateViewModelFromFile(FileInfo file, bool isNew)
@@ -82,6 +129,7 @@ public sealed class ClipLibraryService
             Meta = $"{ageText} \u2022 {sizeMb:F1} MB",
             Duration = "—",
             FilePath = file.FullName,
+            ThumbnailPath = string.Empty,
             IsNew = isNew
         };
     }

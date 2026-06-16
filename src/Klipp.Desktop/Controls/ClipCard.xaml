@@ -16,10 +16,18 @@
             </Grid.RowDefinitions>
 
             <!-- Thumbnail-area -->
+            <!-- Thumbnail-area -->
             <Grid Grid.Row="0" Height="120">
                 <Rectangle Fill="{StaticResource KlippSurfaceElevatedBrush}" />
 
-                <Border Width="40"
+                <!-- Riktig thumbnail från videon (dold tills laddad) -->
+                <Image x:Name="ThumbnailImage"
+                       Stretch="UniformToFill"
+                       Visibility="Collapsed" />
+
+                <!-- Placeholder-ikon som visas innan thumbnail laddats -->
+                <Border x:Name="PlaceholderIcon"
+                        Width="40"
                         Height="40"
                         Background="{StaticResource KlippAccentBrush}"
                         CornerRadius="20"

@@ -43,6 +43,50 @@
                         Orientation="Horizontal"
                         Spacing="8"
                         VerticalAlignment="Center">
+
+                <!-- Lägesväljare -->
+                <ComboBox x:Name="ModeSelector"
+                          SelectionChanged="OnModeChanged"
+                          MinWidth="120"
+                          FontSize="12"
+                          VerticalAlignment="Center">
+                    <ComboBoxItem Content="Inspelning" IsSelected="True" />
+                    <ComboBoxItem Content="Klipp-läge" />
+                </ComboBox>
+
+                <!-- Klipplängd — syns bara i Klipp-läge -->
+                <ComboBox x:Name="ClipLengthSelector"
+                          SelectionChanged="OnClipLengthChanged"
+                          MinWidth="90"
+                          FontSize="12"
+                          VerticalAlignment="Center"
+                          Visibility="Collapsed">
+                    <ComboBoxItem Content="15s" />
+                    <ComboBoxItem Content="30s" IsSelected="True" />
+                    <ComboBoxItem Content="60s" />
+                    <ComboBoxItem Content="2 min" />
+                </ComboBox>
+
+                <!-- Hotkey-fält: visar nuvarande hotkey, klicka för att ändra -->
+                <Button x:Name="HotkeyButton"
+                        Click="OnHotkeyButtonClicked"
+                        Background="Transparent"
+                        BorderBrush="{StaticResource KlippBorderBrush}"
+                        BorderThickness="1"
+                        Foreground="{StaticResource KlippTextSecondaryBrush}"
+                        Padding="10,5,10,5"
+                        CornerRadius="6"
+                        FontSize="12"
+                        VerticalAlignment="Center"
+                        ToolTipService.ToolTip="Klicka och tryck en tangentkombination för att ändra spara-hotkey">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <TextBlock Text="&#x2328;" FontSize="13" VerticalAlignment="Center" />
+                        <TextBlock x:Name="HotkeyText"
+                                   Text="Ctrl + Shift + S"
+                                   VerticalAlignment="Center" />
+                    </StackPanel>
+                </Button>
+
                 <Border x:Name="StatusPill"
                         Background="Transparent"
                         BorderBrush="{StaticResource KlippBorderBrush}"
@@ -154,6 +198,7 @@
                                                    Duration="{x:Bind Duration, Mode=OneWay}"
                                                    IsNew="{x:Bind IsNew, Mode=OneWay}"
                                                    ClipFilePath="{x:Bind FilePath, Mode=OneWay}"
+                                                   ThumbnailPath="{x:Bind ThumbnailPath, Mode=OneWay}"
                                                    Clicked="OnClipCardClicked" />
                             </DataTemplate>
                         </ItemsRepeater.ItemTemplate>

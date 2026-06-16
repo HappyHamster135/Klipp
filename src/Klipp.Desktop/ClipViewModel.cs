@@ -14,6 +14,7 @@ public sealed class ClipViewModel : INotifyPropertyChanged
     private string _meta = string.Empty;
     private string _duration = string.Empty;
     private string _filePath = string.Empty;
+    private string _thumbnailPath = string.Empty;
     private bool _isNew;
 
     public string Title
@@ -40,7 +41,12 @@ public sealed class ClipViewModel : INotifyPropertyChanged
         get => _filePath;
         set => SetField(ref _filePath, value);
     }
-
+    /// <summary>Sökväg till thumbnail-bilden. Tom om ingen genererats än.</summary>
+    public string ThumbnailPath
+    {
+        get => _thumbnailPath;
+        set => SetField(ref _thumbnailPath, value);
+    }
     public bool IsNew
     {
         get => _isNew;
