@@ -639,7 +639,8 @@
             </Grid>
         </Grid>
 
-        <Grid x:Name="InlineFullscreenHost" Grid.RowSpan="2" Visibility="Collapsed" Canvas.ZIndex="10">
+        <Grid x:Name="InlineFullscreenHost" Grid.RowSpan="2" Visibility="Collapsed" Canvas.ZIndex="10"
+              PointerWheelChanged="OnInlinePreviewPointerWheelChanged">
             <Canvas x:Name="InlinePreviewCanvas" />
         </Grid>
 

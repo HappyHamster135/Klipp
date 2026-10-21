@@ -1,4 +1,5 @@
 using System;
+using System.Runtime.InteropServices;
 using Klipp.Desktop.Controls;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
@@ -61,6 +62,26 @@ public sealed partial class MainWindow
     private void OnInlinePreviewLayoutUpdated(object? sender, object args) => UpdateInlinePreviewBounds();
 
     private void OnInlinePreviewScrolled(object? sender, ScrollViewerViewChangedEventArgs args) => UpdateInlinePreviewBounds();
+
+    private void OnInlinePreviewPointerWheelChanged(object sender, PointerRoutedEventArgs args)
+    {
+        if (args.Handled || _hostedInlineCard is null || _fullscreenInlineCard is not null ||
+            (args.KeyModifiers & (Windows.System.VirtualKeyModifiers.Control | Windows.System.VirtualKeyModifiers.Shift)) != 0) return;
+        var properties = args.GetCurrentPoint(InlineFullscreenHost).Properties;
+        if (properties.IsHorizontalMouseWheel || properties.MouseWheelDelta == 0) return;
+        // The video no longer descends from the scroller. Keep its unhandled
+        // wheel gestures scrolling the library, using the Windows preference.
+        if (!GetInlineWheelScrollLines(0x0068, 0, out var lines, 0)) lines = 3;
+        if (lines == 0) return;
+        var distance = lines == uint.MaxValue ? Math.Max(16, ClipsScroller.ViewportHeight) : lines * 16d;
+        var offset = Math.Clamp(ClipsScroller.VerticalOffset - properties.MouseWheelDelta / 120d * distance,
+            0, ClipsScroller.ScrollableHeight);
+        args.Handled = ClipsScroller.ChangeView(null, offset, null, disableAnimation: true);
+    }
+
+    [DllImport("user32.dll", EntryPoint = "SystemParametersInfoW")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool GetInlineWheelScrollLines(uint action, uint parameter, out uint lines, uint flags);
 
     private void UpdateInlinePreviewBounds()
     {
