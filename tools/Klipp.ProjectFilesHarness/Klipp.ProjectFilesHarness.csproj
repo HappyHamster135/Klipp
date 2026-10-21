@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/Klipp.Core/Klipp.Core.csproj" />
+    <Compile Include="../../src/Klipp.Desktop/Models/EditorProject.cs" Link="Models/EditorProject.cs" />
+    <Compile Include="../../src/Klipp.Desktop/Models/EditorProjectEffectLayer.cs" Link="Models/EditorProjectEffectLayer.cs" />
+    <Compile Include="../../src/Klipp.Desktop/Models/EditorTextTypography.cs" Link="Models/EditorTextTypography.cs" />
+    <Compile Include="../../src/Klipp.Desktop/Models/SavedEditorProjectInfo.cs" Link="Models/SavedEditorProjectInfo.cs" />
+    <Compile Include="../../src/Klipp.Desktop/Services/EditorProjectService.cs" Link="Services/EditorProjectService.cs" />
+    <Compile Include="../../src/Klipp.Desktop/Services/RecordingBookmarkService.cs" Link="Services/RecordingBookmarkService.cs" />
+    <Compile Include="../../src/Klipp.Desktop/Services/EditorProjectBackupService.cs" Link="Services/EditorProjectBackupService.cs" />
+    <Compile Include="../../src/Klipp.Desktop/Services/EditorProjectFilesService.cs" Link="Services/EditorProjectFilesService.cs" />
+    <Compile Include="../../src/Klipp.Desktop/Services/EditorLookPresetService.cs" Link="Services/EditorLookPresetService.cs" />
+    <Compile Include="../../src/Klipp.Desktop/Services/EditorClipAttributesService.cs" Link="Services/EditorClipAttributesService.cs" />
+    <Compile Include="../../src/Klipp.Desktop/Services/EditorClipEffectWorkflowService.cs" Link="Services/EditorClipEffectWorkflowService.cs" />
+    <Compile Include="../../src/Klipp.Desktop/Services/EditorMotionTrackingService.cs" Link="Services/EditorMotionTrackingService.cs" />
+    <Compile Include="../../src/Klipp.Desktop/Services/EditorTimelineClipboardService.cs" Link="Services/EditorTimelineClipboardService.cs" />
+    <Compile Include="../../src/Klipp.Desktop/Services/EditorEffectRegionAnimationService.cs" Link="Services/EditorEffectRegionAnimationService.cs" />
+    <Compile Include="../../src/Klipp.Encoding/FFmpeg/FFmpegLocator.cs" Link="FFmpeg/FFmpegLocator.cs" />
+  </ItemGroup>
+</Project>

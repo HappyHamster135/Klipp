@@ -49,11 +49,11 @@ public static class RawFileReader
         var bytesRead = stream.Read(header);
 
         if (bytesRead < HeaderSize)
-            throw new InvalidDataException($"Filen är för kort för att vara en .raw-fil: {filePath}");
+            throw new InvalidDataException($"The file is too short to be a .raw file: {filePath}");
 
         var magic = BinaryPrimitives.ReadUInt32LittleEndian(header.Slice(0, 4));
         if (magic != Magic)
-            throw new InvalidDataException($"Filen har inte rätt KRAW-magic: {filePath}");
+            throw new InvalidDataException($"The file does not have a valid KRAW signature: {filePath}");
 
         return new RawFileMetadata(
             Width: BinaryPrimitives.ReadInt32LittleEndian(header.Slice(8, 4)),

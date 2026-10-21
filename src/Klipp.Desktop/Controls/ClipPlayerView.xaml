@@ -2,16 +2,55 @@
     x:Class="Klipp.Desktop.Controls.ClipPlayerView"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-    xmlns:webview2="using:Microsoft.UI.Xaml.Controls">
+    xmlns:controls="using:Klipp.Desktop.Controls">
 
-    <Grid Background="{StaticResource KlippBackgroundBrush}">
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="*" />
-        </Grid.RowDefinitions>
+    <controls:PlaybackCursorGrid x:Name="PlayerRoot"
+          Background="Black"
+          PointerMoved="OnPlayerPointerMoved"
+          PointerEntered="OnPlayerPointerMoved">
+        <Border Background="Black">
+            <MediaPlayerElement x:Name="NativePlayer"
+                                AutoPlay="True"
+                                AreTransportControlsEnabled="False"
+                                Stretch="Uniform"
+                                Tapped="OnPlayerTapped"
+                                DoubleTapped="OnPlayerDoubleTapped" />
+        </Border>
 
-        <!-- Header -->
-        <Grid Grid.Row="0" Padding="24,16,24,16">
+        <Button x:Name="CenterPlayButton"
+                Click="OnPlayPauseClicked"
+                AutomationProperties.Name="Play or pause clip"
+                HorizontalAlignment="Center"
+                VerticalAlignment="Center"
+                Width="48"
+                Height="48"
+                Background="{StaticResource KlippAccentBrush}"
+                BorderThickness="0"
+                CornerRadius="4"
+                Foreground="#101419"
+                Padding="0"
+                Opacity="0.96"
+                RenderTransformOrigin="0.5,0.5">
+            <Button.RenderTransform>
+                <ScaleTransform x:Name="CenterPlayButtonTransform" ScaleX="1" ScaleY="1" />
+            </Button.RenderTransform>
+            <TextBlock x:Name="CenterPlayIcon"
+                       Text="&#xE768;"
+                       FontFamily="Segoe MDL2 Assets"
+                       FontSize="16"
+                       Margin="2,0,0,0" />
+        </Button>
+
+        <!-- Header-overlay -->
+        <Grid x:Name="HeaderChrome"
+              VerticalAlignment="Top"
+              Padding="16,8">
+            <Grid.RenderTransform>
+                <TranslateTransform x:Name="HeaderChromeTransform" Y="0" />
+            </Grid.RenderTransform>
+            <Grid.Background>
+                <SolidColorBrush Color="{ThemeResource KlippTitleBarColor}" />
+            </Grid.Background>
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="*" />
@@ -24,94 +63,237 @@
                     BorderBrush="{StaticResource KlippBorderBrush}"
                     BorderThickness="1"
                     Foreground="{StaticResource KlippTextSecondaryBrush}"
-                    Padding="12,6,14,6"
-                    CornerRadius="6"
-                    FontSize="12">
-                <StackPanel Orientation="Horizontal" Spacing="6">
-                    <TextBlock Text="&#x2190;" FontSize="14" />
-                    <TextBlock Text="Bibliotek" />
+                    Padding="10,4"
+                    CornerRadius="4"
+                    FontSize="13" Height="32">
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <FontIcon Glyph="&#xE72B;" FontSize="16" />
+                    <TextBlock Text="Library" />
                 </StackPanel>
             </Button>
 
             <TextBlock Grid.Column="1"
                        x:Name="TitleText"
-                       Text="Klipp"
+                       Text="Clip"
                        Style="{StaticResource KlippHeadingMedium}"
                        Margin="16,0,16,0"
                        VerticalAlignment="Center"
                        TextTrimming="CharacterEllipsis" />
 
-            <StackPanel Grid.Column="2"
-                        Orientation="Horizontal"
-                        Spacing="8"
-                        VerticalAlignment="Center">
-                <Button Click="OnOpenFolderClicked"
-                        Content="Visa i mapp"
-                        Background="Transparent"
-                        Foreground="{StaticResource KlippTextSecondaryBrush}"
-                        BorderBrush="{StaticResource KlippBorderBrush}"
-                        BorderThickness="1"
-                        Padding="12,6,12,6"
-                        CornerRadius="6"
-                        FontSize="12" />
-                <Button Click="OnDeleteClicked"
-                        Content="Ta bort"
-                        Background="Transparent"
-                        Foreground="{StaticResource KlippDangerBrush}"
-                        BorderBrush="{StaticResource KlippBorderBrush}"
-                        BorderThickness="1"
-                        Padding="12,6,12,6"
-                        CornerRadius="6"
-                        FontSize="12" />
+            <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8">
+                <Button Click="OnTrimClicked" Height="32" Padding="10,4"
+                        AutomationProperties.Name="Edit clip" ToolTipService.ToolTip="Edit clip">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <FontIcon Glyph="&#xE70F;" FontSize="16" />
+                        <TextBlock Text="Edit clip" />
+                    </StackPanel>
+                </Button>
+                <Button Width="32" Height="32" Padding="0" AutomationProperties.Name="More clip actions">
+                    <FontIcon Glyph="&#xE712;" FontSize="16" />
+                    <Button.Flyout>
+                        <MenuFlyout>
+                            <MenuFlyoutItem Text="Show in folder" Click="OnOpenFolderClicked" />
+                            <MenuFlyoutItem Text="Rename" Click="OnRenameClicked" />
+                            <MenuFlyoutSeparator />
+                            <MenuFlyoutItem Text="Delete" Click="OnDeleteClicked" />
+                        </MenuFlyout>
+                    </Button.Flyout>
+                </Button>
             </StackPanel>
         </Grid>
 
-        <!-- Spelar-yta med pilar som overlay -->
-        <Grid Grid.Row="1" Margin="24,0,24,24">
-            <Border CornerRadius="{StaticResource KlippRadiusMd}"
-                    Background="Black">
-                <webview2:WebView2 x:Name="PlayerWebView" />
-            </Border>
+        <Grid x:Name="ControlsChrome"
+              VerticalAlignment="Bottom"
+              Padding="16,12">
+            <Grid.RenderTransform>
+                <TranslateTransform x:Name="ControlsChromeTransform" Y="0" />
+            </Grid.RenderTransform>
+            <Grid.Background>
+                <SolidColorBrush Color="#EE1C1F23" />
+            </Grid.Background>
 
-            <!-- Vänster pil -->
-            <Button x:Name="PrevButton"
-                    Click="OnPrevClicked"
-                    HorizontalAlignment="Left"
-                    VerticalAlignment="Center"
-                    Margin="16,0,0,0"
-                    Width="44"
-                    Height="44"
-                    Background="#A6000000"
-                    BorderThickness="0"
-                    CornerRadius="22"
-                    Foreground="White"
-                    FontSize="20"
-                    FontWeight="SemiBold"
-                    Padding="0">
-                <TextBlock Text="&#x2039;"
-                           FontSize="24"
-                           Margin="0,-4,0,0" />
-            </Button>
+            <StackPanel Spacing="12">
+                <Grid ColumnSpacing="12">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
 
-            <!-- Höger pil -->
-            <Button x:Name="NextButton"
-                    Click="OnNextClicked"
-                    HorizontalAlignment="Right"
-                    VerticalAlignment="Center"
-                    Margin="0,0,16,0"
-                    Width="44"
-                    Height="44"
-                    Background="#A6000000"
-                    BorderThickness="0"
-                    CornerRadius="22"
-                    Foreground="White"
-                    FontSize="20"
-                    FontWeight="SemiBold"
-                    Padding="0">
-                <TextBlock Text="&#x203A;"
-                           FontSize="24"
-                           Margin="0,-4,0,0" />
-            </Button>
+                    <TextBlock x:Name="CurrentTimeText"
+                               Grid.Column="0"
+                               Text="0:00"
+                               Foreground="{StaticResource KlippTextPrimaryBrush}"
+                               FontSize="12"
+                               FontWeight="SemiBold"
+                               VerticalAlignment="Center"
+                               MinWidth="42" />
+
+                    <Slider x:Name="ProgressSlider"
+                            Grid.Column="1"
+                            Minimum="0"
+                            Maximum="1"
+                            Value="0"
+                            Foreground="{StaticResource KlippAccentBrush}"
+                            Background="#55FFFFFF"
+                            AutomationProperties.Name="Clip position"
+                            VerticalAlignment="Center"
+                            ValueChanged="OnProgressValueChanged" />
+
+                    <TextBlock x:Name="TotalTimeText"
+                               Grid.Column="2"
+                               Text="0:00"
+                               Foreground="{StaticResource KlippTextSecondaryBrush}"
+                               FontSize="12"
+                               FontWeight="SemiBold"
+                               TextAlignment="Right"
+                               VerticalAlignment="Center"
+                               MinWidth="42" />
+                </Grid>
+
+                <Grid ColumnSpacing="12">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="120" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <Button x:Name="PlayPauseButton"
+                            Grid.Column="0"
+                            Click="OnPlayPauseClicked"
+                            AutomationProperties.Name="Play or pause clip"
+                            Width="32"
+                            Height="32"
+                            Background="{StaticResource KlippAccentBrush}"
+                            BorderThickness="0"
+                            CornerRadius="4"
+                            Foreground="#101419"
+                            Padding="0">
+                        <TextBlock x:Name="PlayPauseIcon"
+                                   Text="&#xE769;"
+                                   FontFamily="Segoe MDL2 Assets"
+                                   FontSize="16" />
+                    </Button>
+
+                    <Button Grid.Column="1"
+                            Click="OnBack10Clicked"
+                            AutomationProperties.Name="Back ten seconds"
+                            Width="32"
+                            Height="32"
+                            Background="Transparent"
+                            BorderThickness="0"
+                            Foreground="{StaticResource KlippTextPrimaryBrush}"
+                            Padding="0"
+                            VerticalAlignment="Center">
+                        <TextBlock Text="−10"
+                                   FontSize="12" />
+                    </Button>
+
+                    <Button Grid.Column="2"
+                            Click="OnForward10Clicked"
+                            AutomationProperties.Name="Forward ten seconds"
+                            Width="32"
+                            Height="32"
+                            Background="Transparent"
+                            BorderThickness="0"
+                            Foreground="{StaticResource KlippTextPrimaryBrush}"
+                            Padding="0"
+                            VerticalAlignment="Center">
+                        <TextBlock Text="+10"
+                                   FontSize="12" />
+                    </Button>
+
+                    <Button Grid.Column="3"
+                            Click="OnMuteClicked"
+                            AutomationProperties.Name="Mute or unmute clip"
+                            Width="32"
+                            Height="32"
+                            Background="Transparent"
+                            BorderThickness="0"
+                            Foreground="{StaticResource KlippTextPrimaryBrush}"
+                            Padding="0"
+                            VerticalAlignment="Center">
+                        <TextBlock x:Name="MuteIcon"
+                                   Text="&#xE995;"
+                                   FontFamily="Segoe MDL2 Assets"
+                                   FontSize="16" />
+                    </Button>
+
+                    <Slider x:Name="VolumeSlider"
+                            Grid.Column="4"
+                            Minimum="0"
+                            Maximum="100"
+                            Value="80"
+                            Foreground="{StaticResource KlippTextPrimaryBrush}"
+                            Background="#4DFFFFFF"
+                            AutomationProperties.Name="Clip volume"
+                            VerticalAlignment="Center"
+                            ValueChanged="OnVolumeValueChanged" />
+
+                    <Button Grid.Column="6"
+                            Click="OnFullscreenClicked"
+                            AutomationProperties.Name="Toggle fullscreen"
+                            Width="32"
+                            Height="32"
+                            Background="Transparent"
+                            BorderThickness="0"
+                            Foreground="{StaticResource KlippTextPrimaryBrush}"
+                            Padding="0"
+                            VerticalAlignment="Center">
+                        <TextBlock Text="&#xE740;"
+                                   FontFamily="Segoe MDL2 Assets"
+                                   FontSize="16" />
+                    </Button>
+                </Grid>
+            </StackPanel>
         </Grid>
-    </Grid>
+
+        <!-- Vänster pil -->
+        <Button x:Name="PrevButton"
+                Click="OnPrevClicked"
+                AutomationProperties.Name="Previous clip"
+                HorizontalAlignment="Left"
+                VerticalAlignment="Center"
+                Margin="18,0,0,0"
+                Width="32"
+                Height="32"
+                Background="#A6000000"
+                BorderThickness="0"
+                CornerRadius="4"
+                Foreground="{StaticResource KlippTextPrimaryBrush}"
+                FontSize="16"
+                FontWeight="SemiBold"
+                Padding="0">
+            <Button.RenderTransform>
+                <TranslateTransform x:Name="PrevButtonTransform" X="0" />
+            </Button.RenderTransform>
+            <TextBlock Text="&#xE76B;" FontFamily="Segoe MDL2 Assets" FontSize="16" />
+        </Button>
+
+        <!-- Höger pil -->
+        <Button x:Name="NextButton"
+                Click="OnNextClicked"
+                AutomationProperties.Name="Next clip"
+                HorizontalAlignment="Right"
+                VerticalAlignment="Center"
+                Margin="0,0,18,0"
+                Width="32"
+                Height="32"
+                Background="#A6000000"
+                BorderThickness="0"
+                CornerRadius="4"
+                Foreground="{StaticResource KlippTextPrimaryBrush}"
+                FontSize="16"
+                FontWeight="SemiBold"
+                Padding="0">
+            <Button.RenderTransform>
+                <TranslateTransform x:Name="NextButtonTransform" X="0" />
+            </Button.RenderTransform>
+            <TextBlock Text="&#xE76C;" FontFamily="Segoe MDL2 Assets" FontSize="16" />
+        </Button>
+    </controls:PlaybackCursorGrid>
 </UserControl>

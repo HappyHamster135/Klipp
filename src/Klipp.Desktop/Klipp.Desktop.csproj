@@ -2,21 +2,34 @@
 
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
-    <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
+    <TargetFramework>net10.0-windows10.0.22621.0</TargetFramework>
     <TargetPlatformMinVersion>10.0.17763.0</TargetPlatformMinVersion>
     <RootNamespace>Klipp.Desktop</RootNamespace>
+    <AssemblyTitle>Klipp</AssemblyTitle>
+    <Product>Klipp</Product>
+    <Version>1.0.5</Version>
+    <Description>Game capture and video editing</Description>
+    <DefaultLanguage>en-US</DefaultLanguage>
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>Assets\Klipp.ico</ApplicationIcon>
     <Platforms>x64;ARM64</Platforms>
     <RuntimeIdentifiers>win-x64;win-arm64</RuntimeIdentifiers>
     <PublishProfile>win-$(Platform).pubxml</PublishProfile>
     <UseWinUI>true</UseWinUI>
     <EnableMsixTooling>true</EnableMsixTooling>
+    <WindowsPackageType Condition="'$(WindowsPackageType)' == '' and '$(Configuration)' == 'Debug'">None</WindowsPackageType>
+    <WindowsPackageType Condition="'$(WindowsPackageType)' == ''">MSIX</WindowsPackageType>
+    <WindowsAppSdkBootstrapInitialize Condition="'$(WindowsPackageType)' == 'None'">false</WindowsAppSdkBootstrapInitialize>
+    <WindowsAppSdkIncludeVersionInfo Condition="'$(WindowsPackageType)' == 'None'">true</WindowsAppSdkIncludeVersionInfo>
+    <DefineConstants Condition="'$(WindowsPackageType)' == 'None'">$(DefineConstants);DISABLE_XAML_GENERATED_MAIN</DefineConstants>
     <Nullable>enable</Nullable>
     <LangVersion>latest</LangVersion>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <KlippDevSigningEnabled Condition="'$(KlippDevSigningEnabled)' == '' and '$(Configuration)' == 'Debug'">true</KlippDevSigningEnabled>
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Microsoft.Graphics.Win2D" Version="1.2.0" />
     <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.4022.49" />
     <PackageReference Include="Microsoft.WindowsAppSDK" Version="1.6.241114003" />
     <PackageReference Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.22621.756" />
@@ -29,13 +42,39 @@
     <ProjectReference Include="..\Klipp.Storage\Klipp.Storage.csproj" />
   </ItemGroup>
 
+  <ItemGroup Condition="'$(Platform)' == 'x64'">
+    <GameHookSource Include="..\Klipp.GameHook\**\*.cpp;..\Klipp.GameHook\**\*.c;..\Klipp.GameHook\**\*.h;..\Klipp.GameHook\build.ps1" />
+    <Content Include="..\Klipp.GameHook\bin\x64\Release\Klipp.GameHook.dll" Link="Klipp.GameHook.dll" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="..\Klipp.GameHook\third_party\minhook\LICENSE.txt" Link="MinHook.LICENSE.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <Target Name="BuildNativeGameHook" BeforeTargets="PrepareForBuild"
+          Condition="'$(OS)' == 'Windows_NT' and '$(Platform)' == 'x64'"
+          Inputs="@(GameHookSource)" Outputs="$(MSBuildProjectDirectory)\..\Klipp.GameHook\bin\x64\Release\Klipp.GameHook.dll">
+    <Exec Command="powershell -NoProfile -ExecutionPolicy Bypass -File &quot;$(MSBuildProjectDirectory)\..\Klipp.GameHook\build.ps1&quot;" />
+  </Target>
+
   <ItemGroup>
     <Content Include="Resources\WebPlayer\player.html">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
   </ItemGroup>
+  <ItemGroup Condition="'$(Platform)' == 'x64' or '$(Platform)' == 'ARM64'">
+    <AudioEffectsSource Include="..\Klipp.AudioEffects\AudioEffects.cpp;..\Klipp.AudioEffects\AudioEffects.def;..\Klipp.AudioEffects\build.ps1" />
+    <Content Include="..\Klipp.AudioEffects\bin\$(Platform)\Release\Klipp.AudioEffects.dll" Link="Klipp.AudioEffects.dll" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+  <Target Name="BuildNativeAudioEffects" BeforeTargets="PrepareForBuild"
+          Condition="'$(OS)' == 'Windows_NT' and ('$(Platform)' == 'x64' or '$(Platform)' == 'ARM64')"
+          Inputs="@(AudioEffectsSource)" Outputs="$(MSBuildProjectDirectory)\..\Klipp.AudioEffects\bin\$(Platform)\Release\Klipp.AudioEffects.dll">
+    <Exec Command="powershell -NoProfile -ExecutionPolicy Bypass -File &quot;$(MSBuildProjectDirectory)\..\Klipp.AudioEffects\build.ps1&quot; -Architecture &quot;$(Platform)&quot;" />
+  </Target>
   
   <ItemGroup>
+    <Content Include="Assets\Klipp.ico" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="Assets\KlippMark.svg" />
+    <Content Include="Assets\KlippAppIcon.svg" />
+    <Content Include="Assets\KlippMark.png" />
+    <Content Include="Assets\KlippAppIcon.png" />
     <Content Include="Assets\SplashScreen.scale-200.png" />
     <Content Include="Assets\LockScreenLogo.scale-200.png" />
     <Content Include="Assets\Square150x150Logo.scale-200.png" />
@@ -45,8 +84,9 @@
     <Content Include="Assets\Wide310x150Logo.scale-200.png" />
   </ItemGroup>
 
-  <ItemGroup>
+  <ItemGroup Condition="'$(WindowsPackageType)' != 'None'">
     <Manifest Include="$(ApplicationManifest)" />
+    <Compile Remove="Program.cs" />
   </ItemGroup>
 
   <ItemGroup Condition="'$(DisableMsixProjectCapabilityAddedByProject)'!='true' and '$(EnableMsixTooling)'=='true'">
@@ -60,8 +100,21 @@
   <PropertyGroup>
     <PublishReadyToRun Condition="'$(Configuration)' == 'Debug'">False</PublishReadyToRun>
     <PublishReadyToRun Condition="'$(Configuration)' != 'Debug'">True</PublishReadyToRun>
-    <PublishTrimmed Condition="'$(Configuration)' == 'Debug'">False</PublishTrimmed>
-    <PublishTrimmed Condition="'$(Configuration)' != 'Debug'">True</PublishTrimmed>
+    <PublishTrimmed>False</PublishTrimmed>
   </PropertyGroup>
+
+  <Target Name="DevSignKlippBinaries" AfterTargets="Build" Condition="'$(OS)' == 'Windows_NT' and '$(KlippDevSigningEnabled)' == 'true' and '$(GenerateAppxPackageOnBuild)' != 'true' and '$(PublishAppxPackage)' != 'true'">
+    <PropertyGroup>
+      <KlippDevSignScript>$(MSBuildProjectDirectory)\..\..\tools\DevSignKlipp.ps1</KlippDevSignScript>
+    </PropertyGroup>
+    <Exec Command="powershell -NoProfile -ExecutionPolicy Bypass -File &quot;$(KlippDevSignScript)&quot; -OutputDirectory &quot;$(TargetDir).&quot;" Condition="Exists('$(KlippDevSignScript)')" IgnoreExitCode="true" />
+  </Target>
+
+  <Target Name="DevSignKlippBinariesForMsix" BeforeTargets="_ComputeAppxPackagePayload" Condition="'$(OS)' == 'Windows_NT' and '$(KlippDevSigningEnabled)' == 'true' and ('$(GenerateAppxPackageOnBuild)' == 'true' or '$(PublishAppxPackage)' == 'true')">
+    <PropertyGroup>
+      <KlippDevSignScript>$(MSBuildProjectDirectory)\..\..\tools\DevSignKlipp.ps1</KlippDevSignScript>
+    </PropertyGroup>
+    <Exec Command="powershell -NoProfile -ExecutionPolicy Bypass -File &quot;$(KlippDevSignScript)&quot; -OutputDirectory &quot;$(TargetDir).&quot; -AdditionalDirectories &quot;$(IntermediateOutputPath).&quot;" Condition="Exists('$(KlippDevSignScript)')" IgnoreExitCode="true" />
+  </Target>
 
 </Project>

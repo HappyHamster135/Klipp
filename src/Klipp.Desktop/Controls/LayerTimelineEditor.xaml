@@ -1,0 +1,425 @@
+<UserControl
+    x:Class="Klipp.Desktop.Controls.LayerTimelineEditor"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    IsTabStop="True"
+    UseSystemFocusVisuals="True"
+    AutomationProperties.Name="Editor timeline"
+    AutomationProperties.HelpText="Drag the playhead cap or its vertical line to scrub. Click or drag anywhere in the time ruler to seek. Double-click video or audio to split at the clicked frame without moving the playhead. Alt plus double-click audio adds a volume point. Press S to split at the playhead, Delete to remove a selection. Drag clip edges to trim, drag the center to move. Drag empty track space to select clips; Control plus click adds to the selection. Right click a clip for editing actions. Control plus mouse wheel zooms; mouse wheel scrolls. Hold Alt while dragging to disable snapping."
+    KeyDown="OnTimelineKeyDown">
+
+    <Border x:Name="TimelineSurface"
+            MinHeight="144"
+            Background="{StaticResource KlippBackgroundBrush}"
+            BorderBrush="{StaticResource KlippBorderSubtleBrush}"
+            BorderThickness="1"
+            CornerRadius="4"
+            SizeChanged="OnTimelineSizeChanged"
+            PointerPressed="OnSurfacePointerPressed"
+            PointerMoved="OnSurfacePointerMoved"
+            PointerReleased="OnSurfacePointerReleased"
+            PointerCanceled="OnSurfacePointerCanceled"
+            PointerExited="OnSurfacePointerExited"
+            PointerCaptureLost="OnSurfacePointerCaptureLost"
+            PointerWheelChanged="OnTimelinePointerWheelChanged"
+            AllowDrop="True"
+            DragOver="OnTimelineDragOver"
+            DragLeave="OnTimelineDragLeave"
+            Drop="OnTimelineDrop">
+        <Canvas x:Name="TimelineCanvas"
+                MinHeight="144">
+            <Canvas x:Name="TicksCanvas" />
+
+            <Border x:Name="EffectsGroupHeader"
+                    Background="Transparent"
+                    BorderBrush="{StaticResource KlippBorderSubtleBrush}"
+                    BorderThickness="0,0,0,1" />
+            <TextBlock x:Name="EffectsGroupLabel"
+                       Text="EFFECTS"
+                       Foreground="{StaticResource KlippTextMutedBrush}"
+                       FontSize="9"
+                       FontWeight="Bold" />
+
+            <Border x:Name="MediaGroupHeader"
+                    Background="Transparent"
+                    BorderBrush="{StaticResource KlippBorderSubtleBrush}"
+                    BorderThickness="0,0,0,1" />
+            <TextBlock x:Name="MediaGroupLabel"
+                       Text="MEDIA"
+                       Foreground="{StaticResource KlippTextMutedBrush}"
+                       FontSize="9"
+                       FontWeight="Bold" />
+
+            <Border x:Name="VfxRow"
+                    Background="#1B1D20"
+                    BorderBrush="{StaticResource KlippBorderSubtleBrush}"
+                    BorderThickness="0,0,0,1" />
+            <Border x:Name="TextRow"
+                    Background="#202226"
+                    BorderBrush="{StaticResource KlippBorderSubtleBrush}"
+                    BorderThickness="0,0,0,1" />
+            <Border x:Name="SubtitleRow"
+                    Background="#1B1D20"
+                    BorderBrush="{StaticResource KlippBorderSubtleBrush}"
+                    BorderThickness="0,0,0,1" />
+            <Border x:Name="ElementRow"
+                    Background="#202226"
+                    BorderBrush="{StaticResource KlippBorderSubtleBrush}"
+                    BorderThickness="0,0,0,1" />
+            <Border x:Name="VideoRow"
+                    Background="#1B1D20"
+                    BorderBrush="{StaticResource KlippBorderSubtleBrush}"
+                    BorderThickness="0,0,0,1" />
+            <Canvas x:Name="TrackRowsCanvas" />
+            <Border x:Name="OverlayRow"
+                    Background="#202226"
+                    BorderBrush="{StaticResource KlippBorderSubtleBrush}"
+                    BorderThickness="0,0,0,1" />
+            <Border x:Name="AudioRow"
+                    Background="#1B1D20" />
+            <Border x:Name="AudioTracksRow"
+                    Background="#202226"
+                    BorderBrush="{StaticResource KlippBorderSubtleBrush}"
+                    BorderThickness="0,1,0,0"
+                    Visibility="Collapsed" />
+
+            <TextBlock x:Name="VfxLabel"
+                       Text="VFX"
+                       Foreground="{StaticResource KlippTextMutedBrush}"
+                       FontSize="11"
+                       FontWeight="SemiBold" />
+            <TextBlock x:Name="TextLabel"
+                       Text="Text"
+                       Foreground="{StaticResource KlippTextMutedBrush}"
+                       FontSize="11"
+                       FontWeight="SemiBold" />
+            <TextBlock x:Name="SubtitleLabel"
+                       Text="Subtitles"
+                       Foreground="{StaticResource KlippTextMutedBrush}"
+                       FontSize="11"
+                       FontWeight="SemiBold" />
+            <TextBlock x:Name="ElementLabel"
+                       Text="Elements"
+                       Foreground="{StaticResource KlippTextMutedBrush}"
+                       FontSize="11"
+                       FontWeight="SemiBold" />
+            <TextBlock x:Name="VideoLabel"
+                       Text="Video"
+                       Foreground="{StaticResource KlippTextMutedBrush}"
+                       FontSize="11"
+                       FontWeight="SemiBold" />
+            <TextBlock x:Name="OverlayLabel"
+                       Text="B-roll"
+                       Foreground="{StaticResource KlippTextMutedBrush}"
+                       FontSize="11"
+                       FontWeight="SemiBold" />
+            <TextBlock x:Name="AudioLabel"
+                       Text="Clip audio"
+                       Foreground="{StaticResource KlippTextMutedBrush}"
+                       FontSize="11"
+                       FontWeight="SemiBold" />
+            <TextBlock x:Name="AudioTracksLabel"
+                       Text="Audio"
+                       Foreground="{StaticResource KlippTextMutedBrush}"
+                       FontSize="11"
+                       FontWeight="SemiBold"
+                       Visibility="Collapsed" />
+
+            <Border x:Name="VideoBlock"
+                    Background="#0B0B0F"
+                    BorderBrush="{StaticResource KlippBorderBrush}"
+                    BorderThickness="1"
+                    CornerRadius="4"
+                    PointerPressed="OnTrimBlockPointerPressed">
+                <Grid Padding="10,0">
+                    <StackPanel Orientation="Horizontal"
+                                Spacing="7"
+                                VerticalAlignment="Center">
+                        <TextBlock Text="&#xE714;"
+                                   FontFamily="Segoe MDL2 Assets"
+                                   FontSize="13"
+                                   Foreground="White" />
+                        <TextBlock Text="clip"
+                                   Foreground="{StaticResource KlippTextPrimaryBrush}"
+                                   FontSize="12"
+                                   FontWeight="SemiBold" />
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <Image x:Name="AudioWaveform"
+                   Stretch="Fill"
+                   Opacity="0.55"
+                   IsHitTestVisible="False"
+                   Visibility="Collapsed" />
+
+            <Border x:Name="AudioBlock"
+                    Background="#23362F"
+                    BorderBrush="#538072"
+                    BorderThickness="1"
+                    CornerRadius="4"
+                    PointerPressed="OnTrimBlockPointerPressed">
+                <Grid Padding="10,0">
+                    <StackPanel Orientation="Horizontal"
+                                Spacing="7"
+                                VerticalAlignment="Center">
+                        <TextBlock Text="&#xE767;"
+                                   FontFamily="Segoe MDL2 Assets"
+                                   FontSize="13"
+                                   Foreground="White" />
+                        <TextBlock Text="audio"
+                                   Foreground="{StaticResource KlippTextPrimaryBrush}"
+                                   FontSize="12"
+                                   FontWeight="SemiBold" />
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <Border x:Name="VfxBlock"
+                    Background="#30443B"
+                    BorderBrush="#789D88"
+                    BorderThickness="1"
+                    CornerRadius="4"
+                    PointerPressed="OnLayerBlockPointerPressed">
+                <Grid Padding="10,0">
+                    <StackPanel Orientation="Horizontal"
+                                Spacing="7"
+                                VerticalAlignment="Center">
+                        <TextBlock Text="&#xE945;"
+                                   FontFamily="Segoe MDL2 Assets"
+                                   FontSize="13"
+                                   Foreground="White" />
+                        <TextBlock x:Name="VfxBlockText"
+                                   Text="VFX"
+                                   Foreground="White"
+                                   FontSize="12"
+                                   FontWeight="SemiBold"
+                                   TextTrimming="CharacterEllipsis" />
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <Border x:Name="TextBlockClip"
+                    Background="#304052"
+                    BorderBrush="#8198AE"
+                    BorderThickness="1"
+                    CornerRadius="4"
+                    PointerPressed="OnLayerBlockPointerPressed">
+                <Grid Padding="10,0">
+                    <StackPanel Orientation="Horizontal"
+                                Spacing="7"
+                                VerticalAlignment="Center">
+                        <TextBlock Text="A"
+                                   FontFamily="Georgia"
+                                   FontSize="13"
+                                   FontWeight="Bold"
+                                   Foreground="White" />
+                        <TextBlock x:Name="TextBlockText"
+                                   Text="Text"
+                                   Foreground="White"
+                                   FontSize="12"
+                                   FontWeight="SemiBold"
+                                   TextTrimming="CharacterEllipsis" />
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <Border x:Name="SubtitleBlock"
+                    Background="#433A4B"
+                    BorderBrush="#9B8AA8"
+                    BorderThickness="1"
+                    CornerRadius="4"
+                    PointerPressed="OnLayerBlockPointerPressed">
+                <Grid Padding="10,0">
+                    <StackPanel Orientation="Horizontal"
+                                Spacing="7"
+                                VerticalAlignment="Center">
+                        <TextBlock Text="&#xE8FF;"
+                                   FontFamily="Segoe MDL2 Assets"
+                                   FontSize="13"
+                                   Foreground="White" />
+                        <TextBlock x:Name="SubtitleBlockText"
+                                   Text="Subtitle"
+                                   Foreground="White"
+                                   FontSize="12"
+                                   FontWeight="SemiBold"
+                                   TextTrimming="CharacterEllipsis" />
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <Border x:Name="ElementBlock"
+                    Background="#4A4033"
+                    BorderBrush="#A4967B"
+                    BorderThickness="1"
+                    CornerRadius="4"
+                    PointerPressed="OnLayerBlockPointerPressed">
+                <Grid Padding="10,0">
+                    <StackPanel Orientation="Horizontal"
+                                Spacing="7"
+                                VerticalAlignment="Center">
+                        <TextBlock Text="&#xE7C3;"
+                                   FontFamily="Segoe MDL2 Assets"
+                                   FontSize="13"
+                                   Foreground="White" />
+                        <TextBlock x:Name="ElementBlockText"
+                                   Text="Element"
+                                   Foreground="White"
+                                   FontSize="12"
+                                   FontWeight="SemiBold"
+                                   TextTrimming="CharacterEllipsis" />
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <Canvas x:Name="SubtitleSegmentsCanvas"
+                    IsHitTestVisible="False" />
+
+            <Canvas x:Name="GraphicSegmentsCanvas"
+                    IsHitTestVisible="True" />
+
+            <Canvas x:Name="EffectLayersCanvas"
+                    IsHitTestVisible="True" />
+
+            <Canvas x:Name="LinkedAudioClipsCanvas"
+                    IsHitTestVisible="True" />
+
+            <Canvas x:Name="AudioTrackSegmentsCanvas"
+                    IsHitTestVisible="True" />
+            <Canvas x:Name="AudioAutomationCanvas" />
+
+            <Canvas x:Name="MediaClipsCanvas"
+                    IsHitTestVisible="True" />
+
+            <Canvas x:Name="TransitionHandlesCanvas"
+                    IsHitTestVisible="True" />
+
+            <Canvas x:Name="MarkerCanvas"
+                    IsHitTestVisible="True" />
+
+            <Border x:Name="DropTargetHighlight"
+                    IsHitTestVisible="False"
+                    Background="#2739A5C9"
+                    BorderBrush="{StaticResource KlippAccentBrush}"
+                    BorderThickness="2"
+                    CornerRadius="4"
+                    Visibility="Collapsed" />
+            <Border x:Name="InsertionGuide"
+                    Width="3"
+                    IsHitTestVisible="False"
+                    Background="{StaticResource KlippAccentBrush}"
+                    Visibility="Collapsed" />
+
+            <Border x:Name="TrimStartThumb"
+                    Width="14"
+                    Height="34"
+                    Background="{StaticResource KlippAccentBrush}"
+                    BorderBrush="White"
+                    BorderThickness="2"
+                    CornerRadius="4"
+                    PointerPressed="OnTrimStartThumbPointerPressed" />
+            <Border x:Name="TrimEndThumb"
+                    Width="14"
+                    Height="34"
+                    Background="{StaticResource KlippAccentBrush}"
+                    BorderBrush="White"
+                    BorderThickness="2"
+                    CornerRadius="4"
+                    PointerPressed="OnTrimEndThumbPointerPressed" />
+
+            <Border x:Name="HoverGuide"
+                    Width="1"
+                    IsHitTestVisible="False"
+                    Background="{StaticResource KlippAccentBrush}"
+                    Opacity="0.75"
+                    Visibility="Collapsed" />
+            <Border x:Name="HoverTimeBadge"
+                    Width="96"
+                    Height="22"
+                    PointerPressed="OnHoverTimeBadgePointerPressed"
+                    AutomationProperties.Name="Drag this time box to scrub the timeline"
+                    ToolTipService.ToolTip="Drag anywhere in this time box to scrub"
+                    Background="#D90B0B0F"
+                    BorderBrush="{StaticResource KlippAccentBrush}"
+                    BorderThickness="1"
+                    CornerRadius="4"
+                    Visibility="Collapsed">
+                <TextBlock x:Name="HoverTimeText"
+                           Text="0:00"
+                           HorizontalAlignment="Center"
+                           VerticalAlignment="Center"
+                           FontSize="10"
+                           FontFamily="{StaticResource KlippFontFamilyMono}"
+                           Foreground="{StaticResource KlippTextPrimaryBrush}" />
+            </Border>
+
+            <Border x:Name="SnapGuide"
+                    Width="2"
+                    IsHitTestVisible="False"
+                    Background="#FBBF24"
+                    Opacity="0.95"
+                    Visibility="Collapsed" />
+            <Border x:Name="SnapTimeBadge"
+                    Width="124"
+                    Height="22"
+                    IsHitTestVisible="False"
+                    Background="#E60B0B0F"
+                    BorderBrush="#FBBF24"
+                    BorderThickness="1"
+                    CornerRadius="4"
+                    Visibility="Collapsed">
+                <TextBlock x:Name="SnapTimeText"
+                           Text="Snap 0:00"
+                           HorizontalAlignment="Center"
+                           VerticalAlignment="Center"
+                           FontSize="10"
+                           FontFamily="{StaticResource KlippFontFamilyMono}"
+                           Foreground="{StaticResource KlippTextPrimaryBrush}" />
+            </Border>
+
+            <Border x:Name="PlayheadLine"
+                    Width="2"
+                    IsHitTestVisible="False"
+                    Background="White"
+                    Opacity="0.9" />
+            <Border x:Name="PlayheadCap"
+                    Width="14"
+                    Height="14"
+                    IsHitTestVisible="False"
+                    Background="White"
+                    CornerRadius="4" />
+            <Border x:Name="PlayheadStemHitArea"
+                    Width="10"
+                    Background="Transparent"
+                    PointerPressed="OnPlayheadPointerPressed"
+                    AutomationProperties.AccessibilityView="Raw"
+                    ToolTipService.ToolTip="Drag the playhead to scrub" />
+            <Border x:Name="PlayheadCapHitArea"
+                    Width="24"
+                    Height="30"
+                    Background="Transparent"
+                    PointerPressed="OnPlayheadPointerPressed"
+                    AutomationProperties.AccessibilityView="Raw"
+                    ToolTipService.ToolTip="Drag the playhead to scrub" />
+            <Border x:Name="MarqueeBox"
+                    Visibility="Collapsed"
+                    IsHitTestVisible="False"
+                    BorderBrush="{StaticResource KlippAccentBrush}"
+                    BorderThickness="1"
+                    Background="#2039A5C9" />
+            <Border x:Name="DragFeedbackBadge"
+                    Width="360" Height="50" Padding="8,5"
+                    IsHitTestVisible="False" Visibility="Collapsed"
+                    Background="{StaticResource KlippSurfaceElevatedBrush}"
+                    BorderBrush="{StaticResource KlippBorderBrush}"
+                    BorderThickness="1" CornerRadius="4">
+                <StackPanel Spacing="2">
+                    <TextBlock x:Name="DragFeedbackPrimaryText" FontFamily="{StaticResource KlippFontFamilyMono}"
+                               FontSize="11" Foreground="{StaticResource KlippTextPrimaryBrush}" TextTrimming="CharacterEllipsis" />
+                    <TextBlock x:Name="DragFeedbackDetailText" FontFamily="{StaticResource KlippFontFamilyMono}"
+                               FontSize="10" Foreground="{StaticResource KlippTextSecondaryBrush}" TextTrimming="CharacterEllipsis" />
+                </StackPanel>
+            </Border>
+        </Canvas>
+    </Border>
+</UserControl>

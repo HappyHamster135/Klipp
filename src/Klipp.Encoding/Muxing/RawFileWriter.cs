@@ -43,7 +43,7 @@ public sealed class RawFileWriter : IMp4Writer
     public async Task InitializeAsync(string outputPath, RecordingSettings settings, CancellationToken cancellationToken = default)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
-        if (_initialized) throw new InvalidOperationException("Writer är redan initialiserad.");
+        if (_initialized) throw new InvalidOperationException("The writer is already initialized.");
 
         ArgumentException.ThrowIfNullOrWhiteSpace(outputPath);
         ArgumentNullException.ThrowIfNull(settings);
@@ -70,8 +70,8 @@ public sealed class RawFileWriter : IMp4Writer
     public async Task WriteSampleAsync(EncodedSample sample, CancellationToken cancellationToken = default)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
-        if (!_initialized) throw new InvalidOperationException("Anropa InitializeAsync först.");
-        if (_finalized) throw new InvalidOperationException("Writer är redan finalized.");
+        if (!_initialized) throw new InvalidOperationException("Call InitializeAsync first.");
+        if (_finalized) throw new InvalidOperationException("The writer has already been finalized.");
 
         // Vi sparar bara video för nu (audio ignoreras)
         if (sample.Type != SampleType.Video) return;
@@ -84,7 +84,7 @@ public sealed class RawFileWriter : IMp4Writer
     public async Task FinalizeAsync(CancellationToken cancellationToken = default)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
-        if (!_initialized) throw new InvalidOperationException("Anropa InitializeAsync först.");
+        if (!_initialized) throw new InvalidOperationException("Call InitializeAsync first.");
         if (_finalized) return;
 
         // Gå tillbaka och uppdatera frame count i headern

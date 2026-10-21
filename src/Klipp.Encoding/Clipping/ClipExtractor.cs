@@ -40,7 +40,7 @@ public sealed class ClipExtractor
         CancellationToken cancellationToken = default)
     {
         if (!Directory.Exists(segmentDirectory))
-            throw new DirectoryNotFoundException($"Segment-mapp finns inte: {segmentDirectory}");
+            throw new DirectoryNotFoundException($"The segment folder does not exist: {segmentDirectory}");
 
         var ffmpegPath = await _locator.GetFFmpegPathAsync(progress: null, cancellationToken)
             .ConfigureAwait(false);
@@ -48,12 +48,22 @@ public sealed class ClipExtractor
         // Hitta alla segment, sortera efter modification time (äldsta först)
         var segments = new DirectoryInfo(segmentDirectory)
             .GetFiles("seg_*.mp4")
-            .Where(f => f.Length > 0)
             .OrderBy(f => f.LastWriteTimeUtc)
             .ToList();
 
+        // FFmpeg skriver moov-atomen först när ett segment stängs. Den nyaste filen
+        // kan därför vara halvskriven medan övervakningen kör, så vi använder bara
+        // segment som hunnit rotera klart.
+        if (segments.Count > 1)
+            segments.RemoveAt(segments.Count - 1);
+
+        // Exclude the actual open segment before filtering tiny files. A newly
+        // rotated MP4 can contain only its 48-byte header; filtering it first
+        // would discard the newest completed segment instead and age the clip.
+        segments = segments.Where(segment => segment.Length > 1024).ToList();
+
         if (segments.Count == 0)
-            throw new InvalidOperationException("Inga segment hittades — har inspelning startats?");
+            throw new InvalidOperationException("No completed segments were found. Wait a moment and try again.");
 
         // Räkna hur många segment vi behöver. Rundat uppåt så vi får MINST det begärda.
         var segmentsNeeded = (int)Math.Ceiling((double)secondsToCapture / segmentDurationSeconds);
@@ -77,7 +87,9 @@ public sealed class ClipExtractor
                 .ConfigureAwait(false);
 
             // Kör ffmpeg concat
-            var args = $"-f concat -safe 0 -i \"{concatListPath}\" -c copy -y \"{outputPath}\"";
+            // Explicitly keep every audio stream. FFmpeg's automatic selection
+            // would retain only the default playback mix and discard the stems.
+            var args = $"-f concat -safe 0 -i \"{concatListPath}\" -map 0:v:0 -map 0:a? -c copy -movflags +faststart -y \"{outputPath}\"";
 
             var psi = new ProcessStartInfo
             {
@@ -90,7 +102,7 @@ public sealed class ClipExtractor
             };
 
             using var process = Process.Start(psi)
-                ?? throw new InvalidOperationException("Kunde inte starta ffmpeg.exe");
+                ?? throw new InvalidOperationException("Could not start ffmpeg.exe.");
 
             // Konsumera output så pipen inte fylls
             var stderrTask = process.StandardError.ReadToEndAsync(cancellationToken);
@@ -101,10 +113,10 @@ public sealed class ClipExtractor
 
             if (process.ExitCode != 0)
                 throw new InvalidOperationException(
-                    $"FFmpeg concat misslyckades (exit code {process.ExitCode}). Stderr:\n{stderr}");
+                    $"FFmpeg concatenation failed (exit code {process.ExitCode}). Stderr:\n{stderr}");
 
             if (!File.Exists(outputPath))
-                throw new InvalidOperationException("FFmpeg skapade ingen output-fil.");
+                throw new InvalidOperationException("FFmpeg did not create an output file.");
 
             var outputInfo = new FileInfo(outputPath);
 

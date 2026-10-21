@@ -1,4 +1,4 @@
-﻿<Window
+<Window
     x:Class="Klipp.Desktop.MainWindow"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
@@ -9,77 +9,209 @@
     mc:Ignorable="d"
     Title="Klipp">
 
-    <Grid Background="{StaticResource KlippBackgroundBrush}">
+    <Grid x:Name="AppRoot"
+          Background="{StaticResource KlippWindowBackgroundBrush}">
+        <Grid.Resources>
+            <DataTemplate x:Key="CaptureAudioMeterTemplate" x:DataType="local:CaptureAudioMeterRow">
+                <Grid ColumnSpacing="8" Margin="0,6">
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="94" /><ColumnDefinition Width="*" /><ColumnDefinition Width="64" /></Grid.ColumnDefinitions>
+                    <TextBlock Text="{x:Bind Name}" FontSize="12" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                    <ProgressBar Grid.Column="1" Value="{x:Bind Level, Mode=OneWay}" Foreground="{x:Bind LevelBrush, Mode=OneWay}" Minimum="0" Maximum="100" Height="6" VerticalAlignment="Center" IsIndeterminate="False" AutomationProperties.Name="{x:Bind Name}" />
+                    <TextBlock Grid.Column="2" Text="{x:Bind Status, Mode=OneWay}" FontSize="11" HorizontalAlignment="Right" VerticalAlignment="Center" Foreground="{StaticResource KlippTextSecondaryBrush}" />
+                </Grid>
+            </DataTemplate>
+        </Grid.Resources>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
-        <Grid Grid.Row="0"
+        <Grid x:Name="TopBar"
+              SizeChanged="OnTopBarSizeChanged"
+              Grid.Row="0"
               Background="{StaticResource KlippTitleBarBrush}"
-              Height="48"
-              Padding="16,0,16,0">
+              Height="88"
+              Padding="16,0,16,8">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="48" />
+                <RowDefinition Height="32" />
+            </Grid.RowDefinitions>
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
 
-            <StackPanel Grid.Column="0"
+            <!-- VÄNSTER: logo + kontroller -->
+            <StackPanel x:Name="CaptureModeControls" Grid.Column="0"
                         Orientation="Horizontal"
                         VerticalAlignment="Center"
-                        Spacing="10">
-                <Border Width="20"
-                        Height="20"
-                        Background="{StaticResource KlippAccentBrush}"
-                        CornerRadius="5" />
-                <TextBlock Text="Klipp"
-                           Style="{StaticResource KlippBodyText}"
-                           FontWeight="SemiBold"
-                           VerticalAlignment="Center" />
-            </StackPanel>
+                        Spacing="16">
 
-            <StackPanel Grid.Column="2"
-                        Orientation="Horizontal"
-                        Spacing="8"
-                        VerticalAlignment="Center">
+                <!-- Logo / meny -->
+                <Button x:Name="MenuButton"
+                        Click="OnMenuButtonClicked"
+                        Background="{StaticResource KlippSurfaceBrush}"
+                        BorderBrush="{StaticResource KlippBorderBrush}"
+                        BorderThickness="1"
+                        Foreground="{StaticResource KlippTextPrimaryBrush}"
+                        Padding="10,4"
+                        CornerRadius="4"
+                        MinHeight="32"
+                        ToolTipService.ToolTip="Open menu"
+                        AutomationProperties.Name="Open settings" Height="32">
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Spacing="8">
+                        <controls:KlippBrandMark Width="24"
+                                                Height="24"
+                                                Fill="{StaticResource KlippAccentBrush}"
+                                                VerticalAlignment="Center" />
+                        <TextBlock x:Name="MenuBrandText" Text="Klipp"
+                                   Style="{StaticResource KlippBodyText}"
+                                   FontWeight="SemiBold"
+                                   FontSize="15"
+                                   VerticalAlignment="Center" />
+                        <TextBlock Text="&#xE700;"
+                                   FontFamily="Segoe MDL2 Assets"
+                                   FontSize="16"
+                                   Foreground="{StaticResource KlippTextSecondaryBrush}"
+                                   VerticalAlignment="Center"
+                                   Margin="2,0,0,0" />
+                    </StackPanel>
+                </Button>
+
+                <!-- Avdelare -->
+                <Rectangle Width="1" Height="24" Fill="{StaticResource KlippBorderBrush}" />
 
                 <!-- Lägesväljare -->
-                <ComboBox x:Name="ModeSelector"
-                          SelectionChanged="OnModeChanged"
-                          MinWidth="120"
-                          FontSize="12"
-                          VerticalAlignment="Center">
-                    <ComboBoxItem Content="Inspelning" IsSelected="True" />
-                    <ComboBoxItem Content="Klipp-läge" />
-                </ComboBox>
+                <Border x:Name="ModeSegment"
+                        Background="{StaticResource KlippSurfaceBrush}"
+                        BorderBrush="{StaticResource KlippBorderBrush}"
+                        BorderThickness="1"
+                        CornerRadius="4"
+                        Padding="2"
+                        VerticalAlignment="Center">
+                    <StackPanel Orientation="Horizontal" Spacing="2">
+                        <Button x:Name="RecordingModeButton"
+                                Click="OnRecordingModeClicked"
+                                Background="Transparent"
+                                BorderThickness="0"
+                                Padding="10,4"
+                                CornerRadius="4"
+                                RenderTransformOrigin="0.5,0.5"
+                                ToolTipService.ToolTip="Start and stop a recording" Height="32">
+                            <Button.RenderTransform>
+                                <ScaleTransform x:Name="RecordingModeScale" ScaleX="1" ScaleY="1" />
+                            </Button.RenderTransform>
+                            <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                <Ellipse x:Name="RecordingModeDot"
+                                         Width="7"
+                                         Height="7"
+                                         Fill="{StaticResource KlippTextMutedBrush}"
+                                         VerticalAlignment="Center" />
+                                <TextBlock x:Name="RecordingModeText"
+                                           Text="Record"
+                                           FontFamily="{StaticResource KlippFontFamilySans}"
+                                           FontSize="13"
+                                           VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Button>
+
+                        <Button x:Name="ClipModeButton"
+                                Click="OnClipModeClicked"
+                                Background="Transparent"
+                                BorderThickness="0"
+                                Padding="10,4"
+                                CornerRadius="4"
+                                RenderTransformOrigin="0.5,0.5"
+                                ToolTipService.ToolTip="Keep a rolling buffer to save the last few seconds" Height="32">
+                            <Button.RenderTransform>
+                                <ScaleTransform x:Name="ClipModeScale" ScaleX="1" ScaleY="1" />
+                            </Button.RenderTransform>
+                            <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                <Ellipse x:Name="ClipModeDot"
+                                         Width="7"
+                                         Height="7"
+                                         Fill="{StaticResource KlippTextMutedBrush}"
+                                         VerticalAlignment="Center" />
+                                <TextBlock x:Name="ClipModeText"
+                                           Text="Instant clips"
+                                           FontFamily="{StaticResource KlippFontFamilySans}"
+                                           FontSize="13"
+                                           VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Button>
+                    </StackPanel>
+                </Border>
+
+                <Button x:Name="CaptureSourceButton" Height="38" Width="216" Padding="10,3"
+                        Background="{StaticResource KlippSurfaceBrush}" BorderBrush="{StaticResource KlippBorderBrush}"
+                        BorderThickness="1" CornerRadius="4" VerticalAlignment="Center" IsEnabled="False"
+                        AutomationProperties.Name="Choose the window or display to capture">
+                    <Button.Flyout>
+                        <Flyout Placement="Bottom" Opening="OnCaptureSourceFlyoutOpening">
+                            <StackPanel Width="340" Spacing="10">
+                                <Grid><TextBlock Text="Capture source" FontSize="15" FontWeight="SemiBold"/>
+                                    <Button Content="Refresh" HorizontalAlignment="Right" Height="28" FontSize="11"
+                                            Click="OnRefreshCaptureSourcesClicked" AutomationProperties.Name="Refresh capture windows"/>
+                                </Grid>
+                                <Button x:Name="AutomaticCaptureSourceChoice" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch"
+                                        Padding="10,8" Click="OnAutomaticCaptureSourceClicked">
+                                    <StackPanel Spacing="2"><TextBlock Text="Automatic game" FontWeight="SemiBold" FontSize="12"/>
+                                        <TextBlock Text="Find a game and keep it selected when you Alt-Tab." FontSize="11" TextWrapping="Wrap" Foreground="{StaticResource KlippTextSecondaryBrush}"/>
+                                    </StackPanel>
+                                </Button>
+                                <ScrollViewer MaxHeight="340" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                                    <StackPanel Spacing="8">
+                                        <TextBlock Text="Desktop displays" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource KlippTextSecondaryBrush}"/>
+                                        <StackPanel x:Name="CaptureDisplayChoices" Spacing="4"/>
+                                        <TextBlock Text="Specific windows" FontSize="11" FontWeight="SemiBold" Margin="0,6,0,0" Foreground="{StaticResource KlippTextSecondaryBrush}"/>
+                                        <StackPanel x:Name="CaptureWindowChoices" Spacing="4"/>
+                                    </StackPanel>
+                                </ScrollViewer>
+                                <Button x:Name="RememberCaptureGameButton" Content="Remember this window as a game" Visibility="Collapsed"
+                                        HorizontalAlignment="Stretch" Height="32" FontSize="11" Click="OnRememberCaptureGameClicked"/>
+                                <TextBlock x:Name="CaptureSourceFlyoutHint" Text="Switching sources starts a fresh instant-clip buffer. Manual recordings keep their source until stopped."
+                                           FontSize="11" TextWrapping="Wrap" Foreground="{StaticResource KlippTextMutedBrush}"/>
+                            </StackPanel>
+                        </Flyout>
+                    </Button.Flyout>
+                    <Grid ColumnSpacing="8">
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="16"/><ColumnDefinition Width="*"/><ColumnDefinition Width="10"/></Grid.ColumnDefinitions>
+                        <FontIcon x:Name="CaptureSourceIcon" Glyph="&#xE7F4;" FontSize="14" VerticalAlignment="Center"/>
+                        <StackPanel Grid.Column="1" Spacing="0" VerticalAlignment="Center">
+                            <TextBlock x:Name="CaptureSourceNameText" Text="Finding capture sources…" FontSize="12" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
+                            <TextBlock x:Name="CaptureSourceModeText" Text="Automatic game" FontSize="10" Foreground="{StaticResource KlippTextSecondaryBrush}" TextTrimming="CharacterEllipsis"/>
+                        </StackPanel>
+                        <FontIcon Grid.Column="2" Glyph="&#xE70D;" FontSize="10" VerticalAlignment="Center"/>
+                    </Grid>
+                </Button>
 
                 <!-- Klipplängd — syns bara i Klipp-läge -->
                 <ComboBox x:Name="ClipLengthSelector"
                           SelectionChanged="OnClipLengthChanged"
-                          MinWidth="90"
-                          FontSize="12"
+                          MinWidth="80"
+                          FontSize="13"
                           VerticalAlignment="Center"
-                          Visibility="Collapsed">
+                          Visibility="Visible">
                     <ComboBoxItem Content="15s" />
                     <ComboBoxItem Content="30s" IsSelected="True" />
                     <ComboBoxItem Content="60s" />
                     <ComboBoxItem Content="2 min" />
                 </ComboBox>
 
-                <!-- Hotkey-fält: visar nuvarande hotkey, klicka för att ändra -->
+                <!-- Hotkey -->
                 <Button x:Name="HotkeyButton"
                         Click="OnHotkeyButtonClicked"
                         Background="Transparent"
                         BorderBrush="{StaticResource KlippBorderBrush}"
                         BorderThickness="1"
                         Foreground="{StaticResource KlippTextSecondaryBrush}"
-                        Padding="10,5,10,5"
-                        CornerRadius="6"
+                        Padding="10,4"
+                        CornerRadius="4"
                         FontSize="12"
                         VerticalAlignment="Center"
-                        ToolTipService.ToolTip="Klicka och tryck en tangentkombination för att ändra spara-hotkey">
-                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        ToolTipService.ToolTip="Save an instant clip or start / stop recording. Click to change the shortcut." Height="32">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
                         <TextBlock Text="&#x2328;" FontSize="13" VerticalAlignment="Center" />
                         <TextBlock x:Name="HotkeyText"
                                    Text="Ctrl + Shift + S"
@@ -87,94 +219,367 @@
                     </StackPanel>
                 </Button>
 
+            </StackPanel>
+
+            <!-- HÖGER: status + åtgärdsknappar -->
+            <StackPanel x:Name="CaptureActionControls" Grid.Column="2"
+                        Orientation="Horizontal"
+                        Spacing="8"
+                        VerticalAlignment="Center">
+
+
+
+
+
+                <Button x:Name="SaveClipButton"
+                        Click="OnSaveClipClicked"
+                        Content="Save clip"
+                        Background="Transparent"
+                        Foreground="{StaticResource KlippTextSecondaryBrush}"
+                        BorderBrush="{StaticResource KlippBorderBrush}"
+                        BorderThickness="1"
+                        Padding="10,4"
+                        CornerRadius="4"
+                        FontSize="13"
+                        IsEnabled="False"
+                        RenderTransformOrigin="0.5,0.5" Height="32">
+                    <Button.RenderTransform>
+                        <ScaleTransform x:Name="SaveClipButtonScale" ScaleX="1" ScaleY="1" />
+                    </Button.RenderTransform>
+                </Button>
+
+                <Button x:Name="RecordButton"
+                        Click="OnRecordClicked"
+                        Content="Start capture"
+                        Background="{StaticResource KlippAccentBrush}"
+                        Foreground="#101419"
+                        BorderThickness="0"
+                        Padding="10,4"
+                        CornerRadius="4"
+                        FontSize="13"
+                        FontWeight="SemiBold"
+                        RenderTransformOrigin="0.5,0.5" Height="32">
+                    <Button.RenderTransform>
+                        <ScaleTransform x:Name="RecordButtonScale" ScaleX="1" ScaleY="1" />
+                    </Button.RenderTransform>
+                </Button>
+            </StackPanel>
+
+            <StackPanel x:Name="CaptureStatusControls" Grid.Row="1" Grid.ColumnSpan="3"
+                        Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
                 <Border x:Name="StatusPill"
                         Background="Transparent"
                         BorderBrush="{StaticResource KlippBorderBrush}"
                         BorderThickness="1"
-                        CornerRadius="12"
-                        Padding="10,4,12,4"
+                        CornerRadius="4"
+                        Padding="12,4"
+                        Height="32"
                         VerticalAlignment="Center">
-                    <StackPanel Orientation="Horizontal"
-                                Spacing="8"
-                                VerticalAlignment="Center">
+                    <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
                         <Ellipse x:Name="StatusDot"
                                  Width="8"
                                  Height="8"
                                  Fill="{StaticResource KlippTextMutedBrush}"
-                                 VerticalAlignment="Center" />
+                                 VerticalAlignment="Center"
+                                 RenderTransformOrigin="0.5,0.5">
+                            <Ellipse.RenderTransform>
+                                <ScaleTransform x:Name="StatusDotScale" ScaleX="1" ScaleY="1" />
+                            </Ellipse.RenderTransform>
+                        </Ellipse>
                         <TextBlock x:Name="StatusText"
-                                   Text="Inte aktiv"
+                                   Text="Instant clips paused"
                                    Style="{StaticResource KlippBodyTextSecondary}"
                                    Foreground="{StaticResource KlippTextSecondaryBrush}"
                                    VerticalAlignment="Center" />
                     </StackPanel>
                 </Border>
-
-                <Button x:Name="SaveClipButton"
-                        Click="OnSaveClipClicked"
-                        Content="Spara klipp"
+                <Button x:Name="CaptureHealthButton"
                         Background="Transparent"
-                        Foreground="{StaticResource KlippTextSecondaryBrush}"
                         BorderBrush="{StaticResource KlippBorderBrush}"
                         BorderThickness="1"
-                        Padding="12,5,12,5"
-                        CornerRadius="6"
-                        FontSize="12"
-                        IsEnabled="False" />
+                        Foreground="{StaticResource KlippTextSecondaryBrush}"
+                        Padding="10,4"
+                        CornerRadius="4"
+                        VerticalAlignment="Center"
+                        ToolTipService.ToolTip="Capture status"
+                        AutomationProperties.Name="Capture status" Height="32">
+                    <Button.Flyout>
+                        <Flyout Placement="BottomEdgeAlignedRight">
+                            <StackPanel Width="320" Spacing="12">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="Capture status"
+                                               FontSize="17"
+                                               FontWeight="SemiBold"
+                                               Foreground="{StaticResource KlippTextPrimaryBrush}" />
+                                    <Ellipse x:Name="CaptureHealthDetailDot"
+                                             Grid.Column="1"
+                                             Width="10"
+                                             Height="10"
+                                             VerticalAlignment="Center"
+                                             Fill="{StaticResource KlippSuccessBrush}" />
+                                </Grid>
 
-                <Button x:Name="RecordButton"
-                        Click="OnRecordClicked"
-                        Content="Spela in"
-                        Background="{StaticResource KlippAccentBrush}"
-                        Foreground="White"
-                        BorderThickness="0"
-                        Padding="14,5,14,5"
-                        CornerRadius="6"
-                        FontSize="12"
-                        FontWeight="SemiBold" />
+                                <Grid RowSpacing="8" ColumnSpacing="12">
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                    </Grid.RowDefinitions>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="82" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="Capture" Style="{StaticResource KlippBodyTextSecondary}" />
+                                    <TextBlock x:Name="CaptureHealthStateText"
+                                               Grid.Column="1"
+                                               Text="Paused"
+                                               Foreground="{StaticResource KlippTextPrimaryBrush}"
+                                               TextWrapping="Wrap" />
+                                    <TextBlock Grid.Row="1" Text="Frames" Style="{StaticResource KlippBodyTextSecondary}" />
+                                    <TextBlock x:Name="CaptureHealthFramesText"
+                                               Grid.Row="1"
+                                               Grid.Column="1"
+                                               Text="-"
+                                               FontFamily="{StaticResource KlippFontFamilyMono}"
+                                               Foreground="{StaticResource KlippTextPrimaryBrush}"
+                                               TextWrapping="Wrap" />
+                                    <TextBlock Grid.Row="2" Text="Encoder" Style="{StaticResource KlippBodyTextSecondary}" />
+                                    <TextBlock x:Name="CaptureHealthEncoderText"
+                                               Grid.Row="2"
+                                               Grid.Column="1"
+                                               Text="CPU x264"
+                                               Foreground="{StaticResource KlippTextPrimaryBrush}"
+                                               TextWrapping="Wrap" />
+                                    <TextBlock Grid.Row="3" Text="Audio" Style="{StaticResource KlippBodyTextSecondary}" />
+                                    <TextBlock x:Name="CaptureHealthAudioText"
+                                               Grid.Row="3"
+                                               Grid.Column="1"
+                                               Text="Checked when capture starts"
+                                               Foreground="{StaticResource KlippTextPrimaryBrush}"
+                                               TextWrapping="Wrap" />
+                                    <TextBlock Grid.Row="4" Text="Storage" Style="{StaticResource KlippBodyTextSecondary}" />
+                                    <TextBlock x:Name="CaptureHealthStorageText"
+                                               Grid.Row="4"
+                                               Grid.Column="1"
+                                               Text="Checking…"
+                                               Foreground="{StaticResource KlippTextPrimaryBrush}"
+                                               TextWrapping="Wrap" />
+                                </Grid>
+
+                                <Border x:Name="CaptureHealthWarningBorder"
+                                        Background="#22F59E0B"
+                                        BorderBrush="#88F59E0B"
+                                        BorderThickness="1"
+                                        CornerRadius="4"
+                                        Padding="10,8"
+                                        Visibility="Collapsed">
+                                    <TextBlock x:Name="CaptureHealthWarningText"
+                                               TextWrapping="Wrap"
+                                               Foreground="{StaticResource KlippTextPrimaryBrush}" />
+                                </Border>
+                            </StackPanel>
+                        </Flyout>
+                    </Button.Flyout>
+                    <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                        <Ellipse x:Name="CaptureHealthSummaryDot"
+                                 Width="7"
+                                 Height="7"
+                                 Fill="{StaticResource KlippSuccessBrush}" />
+                        <TextBlock x:Name="CaptureHealthSummaryText"
+                                   Text="Disk --"
+                                   FontFamily="{StaticResource KlippFontFamilyMono}"
+                                   FontSize="12"
+                                   VerticalAlignment="Center" />
+                    </StackPanel>
+                </Button>
+                <Button x:Name="RecordingBookmarkButton" Click="OnRecordingBookmarkClicked" Height="32" Padding="10,4" Visibility="Collapsed" AutomationProperties.Name="Mark a highlight in this recording">
+                    <StackPanel Orientation="Horizontal" Spacing="7">
+                        <FontIcon Glyph="&#xE7C1;" FontSize="13" />
+                        <TextBlock x:Name="RecordingBookmarkLabel" Text="Mark highlight" FontSize="12" />
+                    </StackPanel>
+                </Button>
+                <Button x:Name="CaptureMixerButton" Height="32" Padding="10,4" Visibility="Collapsed" ToolTipService.ToolTip="Live audio levels" AutomationProperties.Name="Live audio levels">
+                    <Button.Flyout>
+                        <Flyout Opened="OnCaptureMixerOpened" Closed="OnCaptureMixerClosed">
+                            <StackPanel MinWidth="310" MaxWidth="380" Spacing="8">
+                                <TextBlock Text="Recording levels" FontWeight="SemiBold" />
+                                <ItemsControl ItemsSource="{x:Bind CaptureAudioMeters}" ItemTemplate="{StaticResource CaptureAudioMeterTemplate}" />
+                                <TextBlock x:Name="CaptureMixerStatusText" Text="Start capture to see live recording levels." FontSize="12" TextWrapping="Wrap" Foreground="{StaticResource KlippTextSecondaryBrush}" />
+                            </StackPanel>
+                        </Flyout>
+                    </Button.Flyout>
+                    <StackPanel Orientation="Horizontal" Spacing="7"><FontIcon Glyph="&#xE767;" FontSize="13" /><TextBlock x:Name="CaptureMixerLabel" Text="Audio" FontSize="12" /></StackPanel>
+                </Button>
+                <TextBlock x:Name="AudioReconnectStatusText" Visibility="Collapsed" MaxWidth="180" FontSize="12" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" Foreground="{StaticResource KlippTextSecondaryBrush}" AutomationProperties.LiveSetting="Polite" />
             </StackPanel>
         </Grid>
 
+        <!-- Hårfin linje under topbaren (försvinner när topbaren göms i spelaren) -->
+        <Rectangle Grid.Row="0"
+                   Height="1"
+                   VerticalAlignment="Bottom"
+                   IsHitTestVisible="False"
+                   Fill="{StaticResource KlippBorderSubtleBrush}" />
+
         <Grid Grid.Row="1">
 
-            <Grid x:Name="LibraryView" Padding="24">
+            <Grid x:Name="LibraryView" Padding="24,20,24,24">
+                <Grid.RenderTransform>
+                    <TranslateTransform x:Name="LibraryViewTransform" Y="0" />
+                </Grid.RenderTransform>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="*" />
                 </Grid.RowDefinitions>
 
-                <Grid Grid.Row="0" Margin="0,0,0,18">
+                <Grid Grid.Row="0" Margin="0,0,0,16">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
-
-                    <StackPanel Grid.Column="0" Spacing="2">
-                        <TextBlock Text="Mina klipp"
-                                   Style="{StaticResource KlippHeadingMedium}" />
-                        <TextBlock x:Name="LibraryStatsText"
-                                   Text="0 klipp"
-                                   Style="{StaticResource KlippBodyTextSecondary}" />
+                    <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
+                        <TextBlock Text="Library" Style="{StaticResource KlippHeadingLarge}" />
+                        <TextBlock x:Name="LibraryStatsText" Text="0 clips"
+                                   Style="{StaticResource KlippBodyTextSecondary}" VerticalAlignment="Center" />
+                    </StackPanel>
+                    <Button Grid.Column="1" Click="OnOpenClipsFolderClicked" Height="32"
+                            Padding="10,4" Foreground="{StaticResource KlippTextSecondaryBrush}"
+                            ToolTipService.ToolTip="Open the folder containing your clips">
+                        <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                            <FontIcon Glyph="&#xE8B7;" FontSize="16" />
+                            <TextBlock Text="Open folder" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Button>
+                    <Grid Grid.Row="1" Grid.ColumnSpan="2" ColumnSpacing="8" Margin="0,16,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="2*" MinWidth="160" />
+                            <ColumnDefinition Width="*" MinWidth="120" />
+                            <ColumnDefinition Width="1.2*" MinWidth="144" />
+                            <ColumnDefinition Width="1.2*" MinWidth="144" />
+                        </Grid.ColumnDefinitions>
+                        <TextBox x:Name="LibrarySearchBox" Grid.Column="0" Height="32"
+                                 HorizontalAlignment="Stretch" PlaceholderText="Search clips"
+                                 AutomationProperties.Name="Search clips" TextChanged="OnLibrarySearchTextChanged" />
+                        <ComboBox x:Name="LibraryScopeSelector" Grid.Column="1" Height="32"
+                                  HorizontalAlignment="Stretch" AutomationProperties.Name="Show clips"
+                                  SelectionChanged="OnLibraryFilterChanged">
+                            <ComboBoxItem Content="All clips" Tag="All" IsSelected="True" />
+                            <ComboBoxItem Content="Favorites" Tag="Favorites" />
+                        </ComboBox>
+                        <ComboBox x:Name="LibraryCollectionSelector" Grid.Column="2" Height="32"
+                                  HorizontalAlignment="Stretch" AutomationProperties.Name="Collection"
+                                  SelectionChanged="OnLibraryFilterChanged">
+                            <ComboBoxItem Content="All collections" Tag="" IsSelected="True" />
+                        </ComboBox>
+                        <ComboBox x:Name="LibrarySortSelector" Grid.Column="3" Height="32"
+                                  HorizontalAlignment="Stretch" AutomationProperties.Name="Sort clips"
+                                  SelectionChanged="OnLibrarySortChanged">
+                            <ComboBoxItem Content="Newest first" Tag="Newest" IsSelected="True" />
+                            <ComboBoxItem Content="Oldest first" Tag="Oldest" />
+                            <ComboBoxItem Content="Largest first" Tag="Largest" />
+                            <ComboBoxItem Content="Smallest first" Tag="Smallest" />
+                            <ComboBoxItem Content="Name A–Z" Tag="Name" />
+                            <ComboBoxItem Content="Favorites first" Tag="Favorites" />
+                        </ComboBox>
+                    </Grid>
+                    <StackPanel Grid.Row="2" Grid.ColumnSpan="2">
+                    <InfoBar x:Name="RecordingRecoveryInfoBar" IsOpen="False" Visibility="Collapsed" Margin="0,12,0,0" Closed="OnLibraryNoticeClosed" Severity="Warning" Title="Unfinished recording" IsClosable="True">
+                        <InfoBar.ActionButton>
+                            <Button Content="Review" Click="OnReviewRecordingRecoveryClicked" />
+                        </InfoBar.ActionButton>
+                    </InfoBar>
+                    <InfoBar x:Name="CaptureSafetyInfoBar" IsOpen="False" Visibility="Collapsed" Margin="0,12,0,0" Closed="OnLibraryNoticeClosed" Severity="Warning" IsClosable="True" />
                     </StackPanel>
                 </Grid>
 
                 <Border x:Name="EmptyState"
                         Grid.Row="1"
                         Background="{StaticResource KlippSurfaceBrush}"
-                        BorderBrush="{StaticResource KlippBorderBrush}"
+                        BorderBrush="{StaticResource KlippBorderSubtleBrush}"
                         BorderThickness="1"
-                        CornerRadius="{StaticResource KlippRadiusMd}"
+                        CornerRadius="{StaticResource KlippRadiusLg}"
                         Padding="40"
                         Visibility="Visible">
                     <StackPanel HorizontalAlignment="Center"
                                 VerticalAlignment="Center"
-                                Spacing="8">
-                        <TextBlock Text="Inga klipp än"
-                                   Style="{StaticResource KlippBodyText}"
-                                   HorizontalAlignment="Center" />
-                        <TextBlock Text="Klicka 'Spela in' för att börja"
-                                   Style="{StaticResource KlippBodyTextSecondary}"
-                                   HorizontalAlignment="Center" />
+                                MaxWidth="360"
+                                Spacing="16">
+                        <Border Width="64"
+                                Height="64"
+                                CornerRadius="4"
+                                HorizontalAlignment="Center"
+                                Background="{StaticResource KlippAccentFaintBrush}"
+                                BorderBrush="{StaticResource KlippAccentSoftBrush}"
+                                BorderThickness="1">
+                            <TextBlock Text="&#xE714;"
+                                       FontFamily="Segoe MDL2 Assets"
+                                       FontSize="16"
+                                       Foreground="{StaticResource KlippAccentBrush}"
+                                       HorizontalAlignment="Center"
+                                       VerticalAlignment="Center" />
+                        </Border>
+                        <StackPanel Spacing="8">
+                            <TextBlock Text="No clips yet"
+                                       Style="{StaticResource KlippHeadingMedium}"
+                                       HorizontalAlignment="Center" />
+                            <TextBlock Text="Start a recording, or turn on instant clips and press Save clip to keep the last few seconds."
+                                       Style="{StaticResource KlippBodyTextSecondary}"
+                                       FontSize="13"
+                                       TextAlignment="Center"
+                                       TextWrapping="Wrap"
+                                       HorizontalAlignment="Center" />
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+
+                <Border x:Name="NoMatchesState"
+                        Grid.Row="1"
+                        Background="{StaticResource KlippSurfaceBrush}"
+                        BorderBrush="{StaticResource KlippBorderSubtleBrush}"
+                        BorderThickness="1"
+                        CornerRadius="{StaticResource KlippRadiusLg}"
+                        Padding="36"
+                        Visibility="Collapsed">
+                    <StackPanel HorizontalAlignment="Center"
+                                VerticalAlignment="Center"
+                                MaxWidth="340"
+                                Spacing="12">
+                        <Border Width="54"
+                                Height="54"
+                                CornerRadius="4"
+                                HorizontalAlignment="Center"
+                                Background="{StaticResource KlippAccentFaintBrush}"
+                                BorderBrush="{StaticResource KlippBorderBrush}"
+                                BorderThickness="1">
+                            <TextBlock Text="&#xE721;"
+                                       FontFamily="Segoe MDL2 Assets"
+                                       FontSize="16"
+                                       Foreground="{StaticResource KlippAccentBrush}"
+                                       HorizontalAlignment="Center"
+                                       VerticalAlignment="Center" />
+                        </Border>
+                        <StackPanel Spacing="4">
+                            <TextBlock Text="No matching clips"
+                                       Style="{StaticResource KlippHeadingMedium}"
+                                       HorizontalAlignment="Center" />
+                            <TextBlock Text="Try a different search or collection."
+                                       Style="{StaticResource KlippBodyTextSecondary}"
+                                       FontSize="13"
+                                       TextAlignment="Center"
+                                       TextWrapping="Wrap"
+                                       HorizontalAlignment="Center" />
+                        </StackPanel>
                     </StackPanel>
                 </Border>
 
@@ -183,12 +588,11 @@
                               VerticalScrollBarVisibility="Auto"
                               HorizontalScrollBarVisibility="Disabled"
                               Visibility="Collapsed">
-                    <ItemsRepeater ItemsSource="{x:Bind LibraryService.Clips, Mode=OneTime}">
+                    <ItemsRepeater ItemsSource="{x:Bind VisibleClips, Mode=OneTime}">
                         <ItemsRepeater.Layout>
-                            <UniformGridLayout MinItemWidth="220"
-                                               MinItemHeight="190"
-                                               MinRowSpacing="14"
-                                               MinColumnSpacing="14"
+                            <UniformGridLayout MinItemWidth="272"
+                                               MinRowSpacing="16"
+                                               MinColumnSpacing="16"
                                                ItemsStretch="Fill" />
                         </ItemsRepeater.Layout>
                         <ItemsRepeater.ItemTemplate>
@@ -197,8 +601,20 @@
                                                    ClipMeta="{x:Bind Meta, Mode=OneWay}"
                                                    Duration="{x:Bind Duration, Mode=OneWay}"
                                                    IsNew="{x:Bind IsNew, Mode=OneWay}"
+                                                   IsFavorite="{x:Bind IsFavorite, Mode=OneWay}"
+                                                   ClipOrganization="{x:Bind OrganizationText, Mode=OneWay}"
                                                    ClipFilePath="{x:Bind FilePath, Mode=OneWay}"
                                                    ThumbnailPath="{x:Bind ThumbnailPath, Mode=OneWay}"
+                                                   OpenFolderRequested="OnClipCardOpenFolderRequested"
+                                                   EditRequested="OnClipCardEditRequested"
+                                                   FavoriteRequested="OnClipCardFavoriteRequested"
+                                                   OrganizeRequested="OnClipCardOrganizeRequested"
+                                                   RenameRequested="OnClipCardRenameRequested"
+                                                   DeleteRequested="OnClipCardDeleteRequested"
+                                                   FullscreenRequested="OnClipCardFullscreenRequested"
+                                                   FullscreenExitRequested="OnClipCardFullscreenExitRequested"
+                                                   PreviewStarting="OnClipCardPreviewStarting"
+                                                   PreviewStopped="OnClipCardPreviewStopped"
                                                    Clicked="OnClipCardClicked" />
                             </DataTemplate>
                         </ItemsRepeater.ItemTemplate>
@@ -206,12 +622,728 @@
                 </ScrollViewer>
             </Grid>
 
-            <controls:ClipPlayerView x:Name="PlayerView"
-                                     Visibility="Collapsed"
-                                     BackRequested="OnPlayerBackRequested"
-                                     DeleteRequested="OnPlayerDeleteRequested"
-                                     PrevRequested="OnPlayerPrevRequested"
-                                     NextRequested="OnPlayerNextRequested" />
+            <Grid x:Name="PlayerHost"
+                  Opacity="0"
+                  Visibility="Collapsed">
+                <Grid.RenderTransform>
+                    <TranslateTransform x:Name="PlayerViewTransform" Y="0" />
+                </Grid.RenderTransform>
+            </Grid>
+
+            <Grid x:Name="EditorHost"
+                  Opacity="0"
+                  Visibility="Collapsed">
+                <Grid.RenderTransform>
+                    <TranslateTransform x:Name="EditorViewTransform" Y="0" />
+                </Grid.RenderTransform>
+            </Grid>
+        </Grid>
+
+        <Grid x:Name="InlineFullscreenHost" Grid.RowSpan="2" Visibility="Collapsed" Canvas.ZIndex="10">
+            <Canvas x:Name="InlinePreviewCanvas" />
+        </Grid>
+
+        <Grid x:Name="SideMenuOverlay" Grid.RowSpan="2" Visibility="Collapsed" Canvas.ZIndex="20" SizeChanged="OnSettingsOverlaySizeChanged">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition x:Name="SettingsDrawerColumn" Width="720" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+            <Border x:Name="SideMenuPanel" Grid.Column="0" Background="{StaticResource KlippSurfaceBrush}" BorderBrush="{StaticResource KlippBorderBrush}" BorderThickness="0,0,1,0" Opacity="0">
+                <Border.Resources>
+                    <Style x:Key="SettingsNavigationButtonStyle" TargetType="Button" BasedOn="{StaticResource KlippBaseButtonStyle}">
+                        <Setter Property="FontSize" Value="13" />
+                        <Setter Property="HorizontalAlignment" Value="Stretch" />
+                        <Setter Property="HorizontalContentAlignment" Value="Left" />
+                        <Setter Property="Background" Value="Transparent" />
+                        <Setter Property="Foreground" Value="{StaticResource KlippTextSecondaryBrush}" />
+                        <Setter Property="BorderThickness" Value="0" />
+                        <Setter Property="CornerRadius" Value="4" />
+                        <Setter Property="Padding" Value="12,8" />
+                        <Setter Property="MinHeight" Value="36" />
+                    </Style>
+                    <Style x:Key="SettingsCardStyle" TargetType="Border">
+                        <Setter Property="Background" Value="{StaticResource KlippBackgroundBrush}" />
+                        <Setter Property="BorderBrush" Value="{StaticResource KlippBorderBrush}" />
+                        <Setter Property="BorderThickness" Value="1" />
+                        <Setter Property="CornerRadius" Value="5" />
+                        <Setter Property="Padding" Value="16" />
+                    </Style>
+                </Border.Resources>
+                <Border.RenderTransform>
+                    <TranslateTransform x:Name="SideMenuPanelTransform" X="-720" />
+                </Border.RenderTransform>
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+                    <Grid Padding="20,16" BorderBrush="{StaticResource KlippBorderBrush}" BorderThickness="0,0,0,1" ColumnSpacing="16">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="Settings" FontSize="18" FontWeight="SemiBold" Foreground="{StaticResource KlippTextPrimaryBrush}" VerticalAlignment="Center" />
+                        <Button Grid.Column="1" Click="OnCloseSideMenuClicked" Width="32" Height="32" Padding="0" Background="Transparent" BorderThickness="0" AutomationProperties.Name="Close settings" ToolTipService.ToolTip="Close settings (Esc)">
+                            <FontIcon Glyph="&#xE711;" FontSize="13" />
+                        </Button>
+                    </Grid>
+                    <Grid Grid.Row="1">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition x:Name="SettingsNavigationColumn" Width="154" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Border BorderBrush="{StaticResource KlippBorderBrush}" BorderThickness="0,0,1,0" Padding="12,20,12,12">
+                            <StackPanel Spacing="4">
+                                <Button x:Name="SettingsCaptureNavButton" Tag="capture" Content="Capture" Click="OnSettingsPageClicked" Style="{StaticResource SettingsNavigationButtonStyle}" />
+                                <Button x:Name="SettingsAudioNavButton" Tag="audio" Content="Audio" Click="OnSettingsPageClicked" Style="{StaticResource SettingsNavigationButtonStyle}" />
+                                <Button x:Name="SettingsStorageNavButton" Tag="storage" Content="Storage" Click="OnSettingsPageClicked" Style="{StaticResource SettingsNavigationButtonStyle}" />
+                                <Button x:Name="SettingsShortcutsNavButton" Tag="shortcuts" Content="Shortcuts" Click="OnSettingsPageClicked" Style="{StaticResource SettingsNavigationButtonStyle}" />
+                                <Button x:Name="SettingsNotificationsNavButton" Tag="notifications" Content="Notifications" Click="OnSettingsPageClicked" Style="{StaticResource SettingsNavigationButtonStyle}" />
+                                <Border Height="1" Background="{StaticResource KlippBorderBrush}" Margin="8,12" />
+                                <Button Content="Back to library" Click="OnSideMenuLibraryClicked" Style="{StaticResource SettingsNavigationButtonStyle}" FontSize="12" />
+                            </StackPanel>
+                        </Border>
+                        <Grid Grid.Column="1">
+                            <ScrollViewer x:Name="SettingsCapturePage" Visibility="Visible" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                                <StackPanel Spacing="20" Padding="24,20,24,24">
+                                    <StackPanel Spacing="5">
+                                        <TextBlock Text="Capture" FontSize="22" FontWeight="SemiBold" Foreground="{StaticResource KlippTextPrimaryBrush}" />
+                                        <TextBlock Text="Choose what to record and how your videos are saved." Style="{StaticResource KlippBodyTextSecondary}" TextWrapping="Wrap" />
+                                    </StackPanel>
+                                    <Border Style="{StaticResource SettingsCardStyle}">
+                                        <StackPanel Spacing="16">
+                                            <StackPanel Spacing="7">
+                                                <TextBlock Text="Capture source" Style="{StaticResource KlippBodyText}" FontWeight="SemiBold" />
+                                                <ComboBox x:Name="SettingsSourceModeSelector" SelectionChanged="OnSettingsSourceModeChanged" HorizontalAlignment="Stretch" AutomationProperties.Name="Capture source mode">
+                                                    <ComboBoxItem Content="Automatic — detect a game" Tag="auto" IsSelected="True" />
+                                                    <ComboBoxItem Content="Desktop — a selected display" Tag="desktop" />
+                                                    <ComboBoxItem Content="Window — a selected application" Tag="window" />
+                                                </ComboBox>
+                                                <TextBlock x:Name="SettingsSourceNameText" Text="Automatic game capture" Style="{StaticResource KlippBodyText}" TextWrapping="Wrap" />
+                                                <TextBlock x:Name="SettingsSourceDetailText" Text="Choose a display or window from the source picker in the main toolbar." Style="{StaticResource KlippBodyTextSecondary}" TextWrapping="Wrap" />
+                                                <TextBlock Text="Manual recordings keep the same source until you stop. Source changes apply to the next recording." Style="{StaticResource KlippBodyTextSecondary}" TextWrapping="Wrap" />
+                                            </StackPanel>
+                                            <Grid ColumnSpacing="20">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                </Grid.ColumnDefinitions>
+                                                <StackPanel Spacing="3" VerticalAlignment="Center">
+                                                    <TextBlock Text="Detect games automatically" Style="{StaticResource KlippBodyText}" FontWeight="SemiBold" TextWrapping="Wrap" />
+                                                    <TextBlock Text="While instant clips are enabled, find games and keep them selected when you switch apps. Remember unsupported games from Capture source in the toolbar." Style="{StaticResource KlippBodyTextSecondary}" TextWrapping="Wrap" />
+                                                </StackPanel>
+                                                <ToggleSwitch x:Name="SettingsAutoDetectGamesToggle" Grid.Column="1" Toggled="OnSettingsAutoDetectGamesToggled" MinWidth="44" Width="44" HorizontalAlignment="Right" OnContent="" OffContent="" VerticalAlignment="Center" AutomationProperties.Name="Detect games automatically" />
+                                            </Grid>
+                                        </StackPanel>
+                                    </Border>
+                                    <Border Style="{StaticResource SettingsCardStyle}">
+                                        <StackPanel Spacing="12">
+                                            <Grid ColumnSpacing="20">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                </Grid.ColumnDefinitions>
+                                                <StackPanel Spacing="3" VerticalAlignment="Center">
+                                                    <TextBlock Text="Exclusive fullscreen · DirectX 11" Style="{StaticResource KlippBodyText}" FontWeight="SemiBold" TextWrapping="Wrap" />
+                                                    <TextBlock Text="In supported x64 DirectX 11 SDR games, use clean game capture to show popups above exclusive fullscreen and keep them out of saved video." Style="{StaticResource KlippBodyTextSecondary}" TextWrapping="Wrap" />
+                                                </StackPanel>
+                                                <ToggleSwitch x:Name="SettingsExclusiveGameCaptureToggle" Grid.Column="1" Toggled="OnSettingsExclusiveGameCaptureToggled" MinWidth="44" Width="44" HorizontalAlignment="Right" OnContent="" OffContent="" VerticalAlignment="Center" AutomationProperties.Name="Exclusive fullscreen DirectX 11 game capture" />
+                                            </Grid>
+                                            <TextBlock Text="Other games and capture modes use normal capture. Changes apply when capture next starts; restart instant clips to use the change now." Style="{StaticResource KlippBodyTextSecondary}" TextWrapping="Wrap" />
+                                        </StackPanel>
+                                    </Border>
+                                    <Border Background="{StaticResource KlippSurfaceElevatedBrush}" BorderBrush="{StaticResource KlippBorderBrush}" BorderThickness="1" CornerRadius="4" Padding="12">
+                                        <StackPanel Spacing="8">
+                                            <Grid ColumnSpacing="12">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                </Grid.ColumnDefinitions>
+                                                <StackPanel Grid.Column="0" Spacing="4">
+                                                    <TextBlock Text="Recommended for your computer" Style="{StaticResource KlippBodyText}" FontWeight="SemiBold" />
+                                                    <TextBlock x:Name="RecommendedCaptureText" Text="Calculating…" Style="{StaticResource KlippBodyTextSecondary}" TextWrapping="Wrap" />
+                                                </StackPanel>
+                                                <Button Grid.Column="1" Content="Apply" Click="OnApplyRecommendedCaptureClicked" VerticalAlignment="Center" Padding="10,4" CornerRadius="4" Height="32" />
+                                            </Grid>
+                                            <TextBlock x:Name="RecommendedCaptureReasonText" Text="A balanced profile for reliable capture on your computer." Style="{StaticResource KlippBodyTextSecondary}" TextWrapping="Wrap" />
+                                        </StackPanel>
+                                    </Border>
+                                    <StackPanel Spacing="8">
+                                        <TextBlock Text="Capture profile" Style="{StaticResource KlippBodyText}" FontWeight="SemiBold" />
+                                        <ComboBox x:Name="CaptureProfileSelector" SelectionChanged="OnCaptureProfileChanged" HorizontalAlignment="Stretch">
+                                            <ComboBoxItem Content="Recommended — matched to your computer" Tag="recommended" />
+                                            <ComboBoxItem Content="Eco - 540p, 15 fps, 5 Mbps" Tag="eco" />
+                                            <ComboBoxItem Content="Balanced — 720p, 24 fps, 8 Mbps" Tag="balanced" />
+                                            <ComboBoxItem Content="Quality — 1080p, 30 fps, 16 Mbps" Tag="quality" />
+                                            <ComboBoxItem Content="Smooth — 1080p, 60 fps, 24 Mbps" Tag="smooth" />
+                                            <ComboBoxItem Content="Custom — use the settings below" Tag="custom" IsSelected="True" />
+                                        </ComboBox>
+                                        <TextBlock Text="Profiles set resolution, frame rate and bitrate together. You can adjust each value below." Style="{StaticResource KlippBodyTextSecondary}" TextWrapping="Wrap" />
+                                    </StackPanel>
+                                    <Expander Header="Advanced video settings" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch">
+                                        <StackPanel Spacing="16" Padding="0,8,0,0">
+                                            <StackPanel Spacing="7">
+                                                <TextBlock Text="Recording encoder" Style="{StaticResource KlippBodyText}" FontWeight="SemiBold" />
+                                                <ComboBox x:Name="SettingsEncoderModeSelector" HorizontalAlignment="Stretch" SelectionChanged="OnCaptureEncoderChanged" AutomationProperties.Name="Recording encoder">
+                                                    <ComboBoxItem Content="Automatic · prefer GPU" Tag="auto" />
+                                                    <ComboBoxItem Content="CPU · software encoding" Tag="cpu" />
+                                                    <ComboBoxItem Content="NVIDIA GPU" Tag="nvenc" />
+                                                    <ComboBoxItem Content="Intel GPU" Tag="qsv" />
+                                                    <ComboBoxItem Content="AMD GPU" Tag="amf" />
+                                                </ComboBox>
+                                                <TextBlock Text="Automatic tests your GPU once and uses a working encoder. The CPU is used if GPU encoding is unavailable. Changes apply to the next capture." Style="{StaticResource KlippBodyTextSecondary}" TextWrapping="Wrap" />
+                                                <TextBlock x:Name="SettingsEncoderStatusText" Style="{StaticResource KlippBodyTextSecondary}" TextWrapping="Wrap" />
+                                            </StackPanel>
+                                            <StackPanel Spacing="8">
+                                                <TextBlock Text="Resolution" Style="{StaticResource KlippBodyText}" FontWeight="SemiBold" />
+                                                <ComboBox x:Name="ResolutionSelector" SelectionChanged="OnResolutionChanged" HorizontalAlignment="Stretch">
+                                                    <ComboBoxItem Content="Native — match the display" Tag="Native" IsSelected="True" />
+                                                    <ComboBoxItem Content="1080p maximum — smaller files" Tag="1080p" />
+                                                    <ComboBoxItem Content="720p maximum — lighter capture" Tag="720p" />
+                                                    <ComboBoxItem Content="540p maximum — minimum load" Tag="540p" />
+                                                </ComboBox>
+                                                <TextBlock Text="Lower resolution uses fewer resources and produces smaller files." Style="{StaticResource KlippBodyTextSecondary}" TextWrapping="Wrap" />
+                                            </StackPanel>
+                                            <StackPanel Spacing="8">
+                                                <TextBlock Text="Frame rate" Style="{StaticResource KlippBodyText}" FontWeight="SemiBold" />
+                                                <ComboBox x:Name="FrameRateSelector" SelectionChanged="OnFrameRateChanged" HorizontalAlignment="Stretch">
+                                                    <ComboBoxItem Content="15 fps - eco" Tag="15" />
+                                                    <ComboBoxItem Content="24 fps — light capture" Tag="24" />
+                                                    <ComboBoxItem Content="30 fps — recommended" Tag="30" IsSelected="True" />
+                                                    <ComboBoxItem Content="60 fps — smoother motion" Tag="60" />
+                                                </ComboBox>
+                                                <TextBlock Text="Higher frame rates produce smoother motion and use more resources." Style="{StaticResource KlippBodyTextSecondary}" TextWrapping="Wrap" />
+                                            </StackPanel>
+                                            <StackPanel Spacing="8">
+                                                <TextBlock Text="Bitrate" Style="{StaticResource KlippBodyText}" FontWeight="SemiBold" />
+                                                <ComboBox x:Name="BitrateSelector" SelectionChanged="OnBitrateChanged" HorizontalAlignment="Stretch">
+                                                    <ComboBoxItem Content="5 Mbps - eco" Tag="5" />
+                                                    <ComboBoxItem Content="8 Mbps — smaller files" Tag="8" />
+                                                    <ComboBoxItem Content="16 Mbps - 1080p standard" Tag="16" IsSelected="True" />
+                                                    <ComboBoxItem Content="24 Mbps - 1440p/native" Tag="24" />
+                                                    <ComboBoxItem Content="35 Mbps — extra detail" Tag="35" />
+                                                </ComboBox>
+                                                <TextBlock Text="Higher bitrate retains more detail and creates larger files." Style="{StaticResource KlippBodyTextSecondary}" TextWrapping="Wrap" />
+                                            </StackPanel>
+                                        </StackPanel>
+                                    </Expander>
+                                    <Expander Header="Application profiles" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch">
+                                        <Border Background="{StaticResource KlippSurfaceElevatedBrush}" BorderBrush="{StaticResource KlippBorderBrush}" BorderThickness="1" CornerRadius="4" Padding="12">
+                                            <StackPanel Spacing="8">
+                                                <Grid ColumnSpacing="12">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="Auto" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <StackPanel Grid.Column="0" Spacing="4">
+                                                        <TextBlock Text="Application profiles" Style="{StaticResource KlippBodyText}" FontWeight="SemiBold" />
+                                                        <TextBlock x:Name="CaptureApplicationSummaryText" Text="No application profiles saved" Style="{StaticResource KlippBodyTextSecondary}" TextWrapping="Wrap" />
+                                                    </StackPanel>
+                                                    <ToggleSwitch x:Name="AutoCaptureApplicationProfileToggle" Grid.Column="1" Toggled="OnAutoCaptureApplicationProfileToggled" OnContent="On" OffContent="Off" VerticalAlignment="Center" />
+                                                </Grid>
+                                                <ComboBox x:Name="CaptureApplicationSelector" DisplayMemberPath="DisplayName" HorizontalAlignment="Stretch" PlaceholderText="Choose an open game or application" />
+                                                <Grid ColumnSpacing="8">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="*" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <Button Grid.Column="0" Click="OnSaveCaptureApplicationProfileClicked" HorizontalAlignment="Stretch" Padding="10,4" CornerRadius="4" Height="32">
+                                                        <TextBlock Text="Save for app" TextWrapping="Wrap" TextAlignment="Center" />
+                                                    </Button>
+                                                    <Button Grid.Column="1" Click="OnRemoveCaptureApplicationProfileClicked" HorizontalAlignment="Stretch" Padding="10,4" CornerRadius="4" Background="Transparent" BorderBrush="{StaticResource KlippBorderBrush}" BorderThickness="1" Height="32">
+                                                        <TextBlock Text="Remove profile" TextWrapping="Wrap" TextAlignment="Center" />
+                                                    </Button>
+                                                </Grid>
+                                                <TextBlock Text="A saved profile applies when its application is active as capture starts." Style="{StaticResource KlippBodyTextSecondary}" TextWrapping="Wrap" />
+                                            </StackPanel>
+                                        </Border>
+                                    </Expander>
+                                    <Border Style="{StaticResource SettingsCardStyle}">
+                                        <StackPanel Spacing="16">
+                                            <StackPanel Spacing="12">
+                                                <TextBlock Text="Instant clips" Style="{StaticResource KlippBodyText}" FontWeight="SemiBold" />
+                                                <ComboBox x:Name="DrawerClipLengthSelector" SelectionChanged="OnDrawerClipLengthChanged" HorizontalAlignment="Stretch">
+                                                    <ComboBoxItem Content="15 seconds" Tag="15" />
+                                                    <ComboBoxItem Content="30 seconds" Tag="30" IsSelected="True" />
+                                                    <ComboBoxItem Content="60 seconds" Tag="60" />
+                                                    <ComboBoxItem Content="2 minutes" Tag="120" />
+                                                </ComboBox>
+                                                <Grid ColumnSpacing="12">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="Auto" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <StackPanel Grid.Column="0" Spacing="2" VerticalAlignment="Center">
+                                                        <TextBlock Text="Start instant clips automatically" Style="{StaticResource KlippBodyText}" FontWeight="SemiBold" />
+                                                        <TextBlock Text="Begin buffering when Klipp opens." Style="{StaticResource KlippBodyTextSecondary}" TextWrapping="Wrap" />
+                                                    </StackPanel>
+                                                    <ToggleSwitch x:Name="AutoStartClipModeToggle" Grid.Column="1" Toggled="OnAutoStartClipModeToggled" OnContent="On" OffContent="Off" Foreground="{StaticResource KlippTextPrimaryBrush}" VerticalAlignment="Center" />
+                                                </Grid>
+                                            </StackPanel>
+                                        </StackPanel>
+                                    </Border>
+                                    <Border Style="{StaticResource SettingsCardStyle}">
+                                        <StackPanel Spacing="16">
+                                            <Grid ColumnSpacing="20">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                </Grid.ColumnDefinitions>
+                                                <StackPanel Spacing="3" VerticalAlignment="Center">
+                                                    <TextBlock Text="Include the mouse pointer" Style="{StaticResource KlippBodyText}" FontWeight="SemiBold" TextWrapping="Wrap" />
+                                                    <TextBlock Text="Show your cursor in recordings and instant clips." Style="{StaticResource KlippBodyTextSecondary}" TextWrapping="Wrap" />
+                                                </StackPanel>
+                                                <ToggleSwitch x:Name="SettingsCaptureCursorToggle" Grid.Column="1" Toggled="OnSettingsCaptureOptionToggled" MinWidth="44" Width="44" HorizontalAlignment="Right" OnContent="" OffContent="" VerticalAlignment="Center" AutomationProperties.Name="Include the mouse pointer" />
+                                            </Grid>
+                                            <StackPanel Spacing="12">
+                                                <Grid ColumnSpacing="12">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="Auto" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <StackPanel Grid.Column="0" Spacing="2" VerticalAlignment="Center">
+                                                        <TextBlock Text="Hide the Windows capture border" Style="{StaticResource KlippBodyText}" FontWeight="SemiBold" />
+                                                        <TextBlock Text="Request capture without a visible border." Style="{StaticResource KlippBodyTextSecondary}" TextWrapping="Wrap" />
+                                                    </StackPanel>
+                                                    <ToggleSwitch x:Name="HideCaptureBorderToggle" Grid.Column="1" Toggled="OnHideCaptureBorderToggled" OnContent="On" OffContent="Off" Foreground="{StaticResource KlippTextPrimaryBrush}" VerticalAlignment="Center" />
+                                                </Grid>
+                                                <TextBlock Text="Windows may keep the border visible depending on system permissions." Style="{StaticResource KlippBodyTextSecondary}" TextWrapping="Wrap" />
+                                            </StackPanel>
+                                        </StackPanel>
+                                    </Border>
+                                </StackPanel>
+                            </ScrollViewer>
+                            <ScrollViewer x:Name="SettingsAudioPage" Visibility="Collapsed" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                                <StackPanel Spacing="20" Padding="24,20,24,24">
+                                    <StackPanel Spacing="5">
+                                        <TextBlock Text="Audio" FontSize="22" FontWeight="SemiBold" Foreground="{StaticResource KlippTextPrimaryBrush}" />
+                                        <TextBlock Text="Choose the sound included in your clips and check your devices before recording." Style="{StaticResource KlippBodyTextSecondary}" TextWrapping="Wrap" />
+                                    </StackPanel>
+                                    <Border Style="{StaticResource SettingsCardStyle}">
+                                        <StackPanel Spacing="10">
+                                            <TextBlock x:Name="SettingsAudioSummaryText" Text="Audio changes apply when capture next starts." Style="{StaticResource KlippBodyTextSecondary}" TextWrapping="Wrap" />
+                                            <Button x:Name="SettingsApplyAudioButton" Content="Apply to instant clips" Click="OnSettingsApplyAudioClicked" HorizontalAlignment="Left" Height="32" Padding="12,4" IsEnabled="False" />
+                                            <TextBlock x:Name="SettingsAudioApplyStatus" Visibility="Collapsed" Style="{StaticResource KlippBodyTextSecondary}" TextWrapping="Wrap" AutomationProperties.LiveSetting="Polite" />
+                                            <TextBlock Text="Restarts capture and clears the current rolling buffer. Manual recordings use the new devices next time." Style="{StaticResource KlippBodyTextSecondary}" TextWrapping="Wrap" />
+                                        </StackPanel>
+                                    </Border>
+                                    <Border x:Name="SettingsLiveAudioMetersCard" Style="{StaticResource SettingsCardStyle}" Visibility="Collapsed">
+                                        <StackPanel Spacing="8">
+                                            <TextBlock Text="Live recording levels" Style="{StaticResource KlippBodyText}" FontWeight="SemiBold" />
+                                            <ItemsControl ItemsSource="{x:Bind CaptureAudioMeters}" ItemTemplate="{StaticResource CaptureAudioMeterTemplate}" />
+                                            <TextBlock Text="Levels appear while capture is running. Clipping warnings stay visible briefly so loud peaks are easy to spot." Style="{StaticResource KlippBodyTextSecondary}" TextWrapping="Wrap" />
+                                        </StackPanel>
+                                    </Border>
+                                    <Border Style="{StaticResource SettingsCardStyle}">
+                                        <StackPanel Spacing="12">
+                                            <ComboBox x:Name="SettingsAudioCaptureModeSelector" Header="Audio source" HorizontalAlignment="Stretch" SelectionChanged="OnAudioCaptureModeChanged" AutomationProperties.Name="Audio source">
+                                                <ComboBoxItem Content="Desktop audio · all apps" Tag="desktop" />
+                                                <ComboBoxItem Content="Game only · separate app tracks" Tag="game" />
+                                            </ComboBox>
+                                            <TextBlock x:Name="SettingsAppAudioSupportText" Style="{StaticResource KlippBodyTextSecondary}" TextWrapping="Wrap" />
+                                            <StackPanel x:Name="SettingsGameAudioAppPanel" Spacing="7" Visibility="Collapsed">
+                                                <ComboBox x:Name="SettingsGameAudioAppSelector" Header="Game audio app" HorizontalAlignment="Stretch" SelectionChanged="OnAudioAppSelectionChanged" AutomationProperties.Name="Game audio app" />
+                                                <TextBlock Text="Follow the captured window, or choose an app when recording a whole display." Style="{StaticResource KlippBodyTextSecondary}" TextWrapping="Wrap" />
+                                            </StackPanel>
+                                        </StackPanel>
+                                    </Border>
+                                    <Border Style="{StaticResource SettingsCardStyle}">
+                                        <StackPanel Spacing="16">
+                                            <Grid ColumnSpacing="20">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                </Grid.ColumnDefinitions>
+                                                <StackPanel Spacing="3" VerticalAlignment="Center">
+                                                    <TextBlock x:Name="SettingsMainAudioTitle" Text="Record desktop audio" Style="{StaticResource KlippBodyText}" FontWeight="SemiBold" TextWrapping="Wrap" />
+                                                    <TextBlock x:Name="SettingsMainAudioDescription" Text="Include sound from all apps on the selected output." Style="{StaticResource KlippBodyTextSecondary}" TextWrapping="Wrap" />
+                                                </StackPanel>
+                                                <ToggleSwitch x:Name="SettingsSystemAudioToggle" Grid.Column="1" Toggled="OnSettingsCaptureOptionToggled" MinWidth="44" Width="44" HorizontalAlignment="Right" OnContent="" OffContent="" VerticalAlignment="Center" AutomationProperties.Name="Record system audio" />
+                                            </Grid>
+                                            <StackPanel x:Name="SettingsDesktopAudioDevicePanel" Spacing="7">
+                                                <TextBlock Text="Game / system audio device" Style="{StaticResource KlippBodyText}" FontWeight="SemiBold" />
+                                                <ComboBox x:Name="SettingsSystemAudioDeviceSelector" HorizontalAlignment="Stretch" SelectionChanged="OnSettingsAudioDeviceChanged" AutomationProperties.Name="Game and system audio device" />
+                                                <TextBlock x:Name="SettingsSystemAudioDeviceHint" Style="{StaticResource KlippBodyTextSecondary}" TextWrapping="Wrap" />
+                                            </StackPanel>
+                                            <Grid ColumnSpacing="12">
+                                                <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                                <TextBlock Text="Recording level" Style="{StaticResource KlippBodyText}" />
+                                                <TextBlock x:Name="SettingsSystemAudioGainText" Grid.Column="1" Text="100%" Style="{StaticResource KlippBodyTextSecondary}" />
+                                            </Grid>
+                                            <Slider x:Name="SettingsSystemAudioGainSlider" Minimum="0" Maximum="200" StepFrequency="1" Value="100" ValueChanged="OnSettingsAudioGainChanged" AutomationProperties.Name="System audio recording level" />
+                                            <StackPanel x:Name="SettingsDesktopAudioTestPanel" Orientation="Horizontal" Spacing="8">
+                                                <Button x:Name="SettingsTestOutputButton" Content="Play test sound" Click="OnSettingsPlayTestSoundClicked" Height="32" Padding="12,4" />
+                                                <Button x:Name="SettingsTestSystemLevelButton" Content="Check audio level" Click="OnSettingsCheckSystemLevelClicked" Height="32" Padding="12,4" />
+                                            </StackPanel>
+                                            <TextBlock x:Name="SettingsDesktopAudioTestNote" Text="The test sound can be included if you are recording this output." Style="{StaticResource KlippBodyTextSecondary}" TextWrapping="Wrap" />
+                                        </StackPanel>
+                                    </Border>
+                                    <Border Style="{StaticResource SettingsCardStyle}">
+                                        <StackPanel Spacing="16">
+                                            <Grid ColumnSpacing="20">
+                                                <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                                <StackPanel Spacing="3" VerticalAlignment="Center">
+                                                    <TextBlock Text="Record microphone" Style="{StaticResource KlippBodyText}" FontWeight="SemiBold" />
+                                                    <TextBlock Text="Save your voice separately from game audio. Adjust each track independently in the editor; normal playback includes both." Style="{StaticResource KlippBodyTextSecondary}" TextWrapping="Wrap" />
+                                                </StackPanel>
+                                                <ToggleSwitch x:Name="SettingsMicrophoneToggle" Grid.Column="1" Toggled="OnSettingsMicrophoneToggled" MinWidth="44" Width="44" HorizontalAlignment="Right" OnContent="" OffContent="" VerticalAlignment="Center" AutomationProperties.Name="Record microphone" />
+                                            </Grid>
+                                            <StackPanel Spacing="7">
+                                                <TextBlock Text="Microphone device" Style="{StaticResource KlippBodyText}" FontWeight="SemiBold" />
+                                                <ComboBox x:Name="SettingsMicrophoneDeviceSelector" HorizontalAlignment="Stretch" SelectionChanged="OnSettingsAudioDeviceChanged" AutomationProperties.Name="Microphone device" />
+                                                <TextBlock x:Name="SettingsMicrophoneDeviceHint" Style="{StaticResource KlippBodyTextSecondary}" TextWrapping="Wrap" />
+                                            </StackPanel>
+                                            <Grid ColumnSpacing="12">
+                                                <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                                <TextBlock Text="Recording level" Style="{StaticResource KlippBodyText}" />
+                                                <TextBlock x:Name="SettingsMicrophoneGainText" Grid.Column="1" Text="100%" Style="{StaticResource KlippBodyTextSecondary}" />
+                                            </Grid>
+                                            <Slider x:Name="SettingsMicrophoneGainSlider" Minimum="0" Maximum="200" StepFrequency="1" Value="100" ValueChanged="OnSettingsAudioGainChanged" AutomationProperties.Name="Microphone recording level" />
+                                            <Button x:Name="SettingsTestMicrophoneButton" Content="Test microphone" Click="OnSettingsCheckMicrophoneLevelClicked" HorizontalAlignment="Left" Height="32" Padding="12,4" />
+                                        </StackPanel>
+                                    </Border>
+                                    <Border x:Name="SettingsSeparateAppsCard" Style="{StaticResource SettingsCardStyle}" Visibility="Collapsed">
+                                        <StackPanel Spacing="16">
+                                            <TextBlock Text="Separate app tracks" Style="{StaticResource KlippBodyText}" FontWeight="SemiBold" />
+                                            <TextBlock Text="Each selected app gets its own editor track. Choose different apps for game, Discord and music." Style="{StaticResource KlippBodyTextSecondary}" TextWrapping="Wrap" />
+                                            <Grid ColumnSpacing="12">
+                                                <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                                <ComboBox x:Name="SettingsDiscordAppSelector" Header="Discord app" HorizontalAlignment="Stretch" SelectionChanged="OnAudioAppSelectionChanged" AutomationProperties.Name="Discord audio app" />
+                                                <ToggleSwitch x:Name="SettingsDiscordAudioToggle" Grid.Column="1" Toggled="OnExtraAudioSourceToggled" MinWidth="44" Width="44" OnContent="" OffContent="" VerticalAlignment="Center" AutomationProperties.Name="Record Discord separately" />
+                                            </Grid>
+                                            <Slider x:Name="SettingsDiscordGainSlider" Header="Discord recording level · 100%" Minimum="0" Maximum="200" StepFrequency="1" Value="100" ValueChanged="OnExtraAudioGainChanged" AutomationProperties.Name="Discord recording level" />
+                                            <Grid ColumnSpacing="12">
+                                                <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                                <ComboBox x:Name="SettingsMusicAppSelector" Header="Music app" HorizontalAlignment="Stretch" SelectionChanged="OnAudioAppSelectionChanged" AutomationProperties.Name="Music audio app" />
+                                                <ToggleSwitch x:Name="SettingsMusicAudioToggle" Grid.Column="1" Toggled="OnExtraAudioSourceToggled" MinWidth="44" Width="44" OnContent="" OffContent="" VerticalAlignment="Center" AutomationProperties.Name="Record music separately" />
+                                            </Grid>
+                                            <Slider x:Name="SettingsMusicGainSlider" Header="Music recording level · 100%" Minimum="0" Maximum="200" StepFrequency="1" Value="100" ValueChanged="OnExtraAudioGainChanged" AutomationProperties.Name="Music recording level" />
+                                            <Button Content="Refresh apps" Click="OnRefreshAudioAppsClicked" HorizontalAlignment="Left" Height="32" Padding="12,4" />
+                                            <TextBlock x:Name="SettingsAudioRoutingStatusText" Style="{StaticResource KlippBodyTextSecondary}" TextWrapping="Wrap" AutomationProperties.LiveSetting="Polite" />
+                                        </StackPanel>
+                                    </Border>
+                                    <Border Style="{StaticResource SettingsCardStyle}">
+                                        <Grid ColumnSpacing="16">
+                                            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                            <StackPanel Spacing="4">
+                                                <TextBlock Text="Protect audio peaks" Style="{StaticResource KlippBodyText}" FontWeight="SemiBold" />
+                                                <TextBlock Text="A limiter protects each recorded track and the playback mix from loud peaks. Lower the recording level if the meters show clipping." Style="{StaticResource KlippBodyTextSecondary}" TextWrapping="Wrap" />
+                                            </StackPanel>
+                                            <ToggleSwitch x:Name="SettingsAudioLimiterToggle" Grid.Column="1" Toggled="OnAudioLimiterToggled" MinWidth="44" Width="44" OnContent="" OffContent="" VerticalAlignment="Center" AutomationProperties.Name="Protect recording audio peaks" />
+                                        </Grid>
+                                    </Border>
+                                    <Border Style="{StaticResource SettingsCardStyle}">
+                                        <StackPanel Spacing="12">
+                                            <Grid ColumnSpacing="12">
+                                                <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                                <TextBlock x:Name="SettingsAudioTestTitle" Text="Device check" Style="{StaticResource KlippBodyText}" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                                <Button x:Name="SettingsStopAudioTestButton" Grid.Column="1" Content="Stop test" Click="OnSettingsStopAudioTestClicked" Height="28" Padding="10,2" IsEnabled="False" />
+                                            </Grid>
+                                            <ProgressBar x:Name="SettingsAudioLevelMeter" Minimum="0" Maximum="100" Value="0" IsIndeterminate="False" Height="6" Foreground="{StaticResource KlippAccentBrush}" AutomationProperties.Name="Audio test level" />
+                                            <TextBlock x:Name="SettingsAudioTestStatus" Text="Play a test sound or start a level check. Microphone testing starts only when you choose it." Style="{StaticResource KlippBodyTextSecondary}" TextWrapping="Wrap" />
+                                            <Button x:Name="SettingsDeviceCheckPlaySoundButton" Content="Play test sound" Click="OnSettingsPlayTestSoundClicked" HorizontalAlignment="Left" Height="32" Padding="12,4" />
+                                            <TextBlock Text="Level checks stop after 15 seconds or when you leave Audio settings. No test audio is saved." Style="{StaticResource KlippBodyTextSecondary}" TextWrapping="Wrap" />
+                                        </StackPanel>
+                                    </Border>
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <Button x:Name="SettingsRefreshAudioDevicesButton" Content="Refresh devices" Click="OnSettingsRefreshAudioDevicesClicked" Height="32" Padding="12,4" />
+                                        <Button Content="Windows sound settings" Click="OnSettingsWindowsSoundClicked" Height="32" Padding="12,4" />
+                                    </StackPanel>
+                                    <TextBlock Text="These choices affect Klipp recordings. Your Windows default devices stay unchanged." Style="{StaticResource KlippBodyTextSecondary}" TextWrapping="Wrap" />
+                                    <TextBlock Text="Devices reconnect automatically during recording. A selected device waits for that same device to return; Windows default follows your current default. Other audio keeps recording while a device is unavailable." Style="{StaticResource KlippBodyTextSecondary}" TextWrapping="Wrap" />
+                                </StackPanel>
+                            </ScrollViewer>
+                            <ScrollViewer x:Name="SettingsStoragePage" Visibility="Collapsed" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                                <StackPanel Spacing="20" Padding="24,20,24,24">
+                                    <StackPanel Spacing="5">
+                                        <TextBlock Text="Storage" FontSize="22" FontWeight="SemiBold" Foreground="{StaticResource KlippTextPrimaryBrush}" />
+                                        <TextBlock Text="Manage your library, generated previews and optional cleanup." Style="{StaticResource KlippBodyTextSecondary}" TextWrapping="Wrap" />
+                                    </StackPanel>
+                                    <Border Style="{StaticResource SettingsCardStyle}">
+                                        <Grid ColumnSpacing="16">
+                                            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                            <StackPanel Spacing="4">
+                                                <TextBlock Text="Low-disk protection" Style="{StaticResource KlippBodyText}" FontWeight="SemiBold" />
+                                                <TextBlock Text="Finish recordings before space runs out, with room reserved for saving. Instant clips save the latest available clip and stop buffering." Style="{StaticResource KlippBodyTextSecondary}" TextWrapping="Wrap" />
+                                            </StackPanel>
+                                            <ToggleSwitch x:Name="SettingsLowDiskProtectionToggle" Grid.Column="1" Toggled="OnLowDiskProtectionToggled" MinWidth="44" Width="44" OnContent="" OffContent="" VerticalAlignment="Center" AutomationProperties.Name="Low-disk protection" />
+                                        </Grid>
+                                    </Border>
+                                    <Border Style="{StaticResource SettingsCardStyle}">
+                                        <Grid ColumnSpacing="12">
+                                            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                            <StackPanel Spacing="4">
+                                                <TextBlock Text="Recording recovery" Style="{StaticResource KlippBodyText}" FontWeight="SemiBold" />
+                                                <TextBlock x:Name="RecordingRecoveryStatusText" Text="Checking unfinished recordings…" Style="{StaticResource KlippBodyTextSecondary}" TextWrapping="Wrap" />
+                                            </StackPanel>
+                                            <Button x:Name="ReviewRecordingRecoveryButton" Grid.Column="1" Content="Review" Click="OnReviewRecordingRecoveryClicked" IsEnabled="False" Height="32" Padding="12,4" VerticalAlignment="Center" />
+                                        </Grid>
+                                    </Border>
+                                    <StackPanel Spacing="12">
+                                        <Border Background="{StaticResource KlippBackgroundBrush}" BorderBrush="{StaticResource KlippBorderBrush}" BorderThickness="1" CornerRadius="4" Padding="12">
+                                            <Grid ColumnSpacing="12">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                </Grid.ColumnDefinitions>
+                                                <StackPanel Grid.Column="0" Spacing="4">
+                                                    <TextBlock Text="Clips folder" Style="{StaticResource KlippBodyText}" FontWeight="SemiBold" />
+                                                    <TextBlock x:Name="StorageSummaryText" Text="0 clips • 0 MB" Style="{StaticResource KlippBodyTextSecondary}" TextWrapping="Wrap" />
+                                                    <TextBlock x:Name="StoragePathText" Text="Videos\Klipp" Style="{StaticResource KlippBodyTextSecondary}" FontSize="12" Opacity="0.86" TextTrimming="CharacterEllipsis" TextWrapping="Wrap" />
+                                                </StackPanel>
+                                                <StackPanel Grid.Column="1" Spacing="8" VerticalAlignment="Center">
+                                                    <Button Click="OnOpenClipsFolderClicked" Background="Transparent" BorderBrush="{StaticResource KlippBorderBrush}" BorderThickness="1" Foreground="{StaticResource KlippTextSecondaryBrush}" Padding="10,4" CornerRadius="4" ToolTipService.ToolTip="Open clips folder" Height="32">
+                                                        <StackPanel Orientation="Horizontal" Spacing="8">
+                                                            <TextBlock Text="&#xE8B7;" FontFamily="Segoe MDL2 Assets" FontSize="16" />
+                                                            <TextBlock Text="Open" />
+                                                        </StackPanel>
+                                                    </Button>
+                                                    <Button Click="OnChangeClipsFolderClicked" Background="{StaticResource KlippAccentBrush}" BorderThickness="0" Foreground="#101419" Padding="10,4" CornerRadius="4" ToolTipService.ToolTip="Choose a folder for new clips" Height="32">
+                                                        <StackPanel Orientation="Horizontal" Spacing="8">
+                                                            <TextBlock Text="&#xE8DA;" FontFamily="Segoe MDL2 Assets" FontSize="16" />
+                                                            <TextBlock Text="Change" />
+                                                        </StackPanel>
+                                                    </Button>
+                                                </StackPanel>
+                                            </Grid>
+                                        </Border>
+                                        <Button Click="OnResetClipsFolderClicked" HorizontalAlignment="Left" Background="Transparent" BorderThickness="0" Foreground="{StaticResource KlippTextSecondaryBrush}" Padding="10,4" Content="Reset to Videos\Klipp" ToolTipService.ToolTip="Restore the default folder" Height="32" />
+                                        <TextBlock Text="New clips save to this folder. Existing files stay in their current location." Style="{StaticResource KlippBodyTextSecondary}" TextWrapping="Wrap" />
+                                        <Border Background="{StaticResource KlippBackgroundBrush}" BorderBrush="{StaticResource KlippBorderBrush}" BorderThickness="1" CornerRadius="4" Padding="12">
+                                            <StackPanel Spacing="8">
+                                                <Grid ColumnSpacing="12">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="Auto" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <StackPanel Grid.Column="0" Spacing="4">
+                                                        <TextBlock Text="Preview cache" Style="{StaticResource KlippBodyText}" FontWeight="SemiBold" />
+                                                        <TextBlock x:Name="CacheUsageText" Text="Calculating cache…" Style="{StaticResource KlippBodyTextSecondary}" TextWrapping="Wrap" />
+                                                    </StackPanel>
+                                                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                                        <Button Click="OnRefreshCacheDiagnosticsClicked" Width="32" Height="32" Padding="0" CornerRadius="4" AutomationProperties.Name="Refresh cache and performance status" ToolTipService.ToolTip="Refresh cache and performance status">
+                                                            <FontIcon Glyph="&#xE72C;" FontSize="13" />
+                                                        </Button>
+                                                        <Button x:Name="ClearCacheButton" Click="OnClearCacheClicked" VerticalAlignment="Center" Padding="10,4" CornerRadius="4" AutomationProperties.Name="Clear preview cache" ToolTipService.ToolTip="Remove generated proxies, thumbnails, waveforms and timeline previews" Height="32">
+                                                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                                                <FontIcon Glyph="&#xE74D;" FontSize="12" />
+                                                                <TextBlock Text="Clear" />
+                                                            </StackPanel>
+                                                        </Button>
+                                                    </StackPanel>
+                                                </Grid>
+                                                <Grid ColumnSpacing="12">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="Auto" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <ComboBox x:Name="CacheBudgetSelector" Grid.Column="0" SelectionChanged="OnCacheBudgetChanged" HorizontalAlignment="Stretch">
+                                                        <ComboBoxItem Content="512 MB" Tag="512" />
+                                                        <ComboBoxItem Content="1 GB" Tag="1024" />
+                                                        <ComboBoxItem Content="2 GB" Tag="2048" />
+                                                        <ComboBoxItem Content="4 GB" Tag="4096" IsSelected="True" />
+                                                        <ComboBoxItem Content="8 GB" Tag="8192" />
+                                                    </ComboBox>
+                                                    <ToggleSwitch x:Name="AutoCleanCacheToggle" Grid.Column="1" Toggled="OnAutoCleanCacheToggled" OnContent="Auto" OffContent="Manual" VerticalAlignment="Center" />
+                                                </Grid>
+                                                <Rectangle Height="1" Fill="{StaticResource KlippBorderBrush}" Opacity="0.7" />
+                                                <StackPanel Spacing="4">
+                                                    <TextBlock Text="Background activity" Style="{StaticResource KlippBodyText}" FontWeight="SemiBold" />
+                                                    <TextBlock x:Name="CacheWorkStatusText" Text="No preview jobs yet" Style="{StaticResource KlippBodyTextSecondary}" TextWrapping="Wrap" AutomationProperties.LiveSetting="Polite" />
+                                                    <TextBlock x:Name="AppPerformanceText" Text="Calculating memory use…" Style="{StaticResource KlippBodyTextSecondary}" TextWrapping="Wrap" />
+                                                </StackPanel>
+                                                <TextBlock Text="Clearing the cache removes generated previews. Your clips, projects and exports stay available." Style="{StaticResource KlippBodyTextSecondary}" TextWrapping="Wrap" />
+                                            </StackPanel>
+                                        </Border>
+                                        <Border Background="{StaticResource KlippBackgroundBrush}" BorderBrush="{StaticResource KlippBorderBrush}" BorderThickness="1" CornerRadius="4" Padding="12">
+                                            <StackPanel Spacing="8">
+                                                <Grid ColumnSpacing="12">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="Auto" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <StackPanel Grid.Column="0" Spacing="4">
+                                                        <TextBlock Text="Original clips" Style="{StaticResource KlippBodyText}" FontWeight="SemiBold" />
+                                                        <TextBlock Text="Optional cleanup for older clips" Style="{StaticResource KlippBodyTextSecondary}" TextWrapping="Wrap" />
+                                                    </StackPanel>
+                                                    <ToggleSwitch x:Name="OriginalClipRetentionToggle" Grid.Column="1" Toggled="OnOriginalClipRetentionToggled" OnContent="Auto" OffContent="Off" VerticalAlignment="Center" AutomationProperties.Name="Automatic original clip cleanup" />
+                                                </Grid>
+                                                <Grid ColumnSpacing="8">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="Auto" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <ComboBox x:Name="OriginalClipRetentionDaysSelector" Grid.Column="0" SelectionChanged="OnOriginalClipRetentionDaysChanged" HorizontalAlignment="Stretch" AutomationProperties.Name="Keep original clips for at least">
+                                                        <ComboBoxItem Content="7 days" Tag="7" />
+                                                        <ComboBoxItem Content="30 days" Tag="30" />
+                                                        <ComboBoxItem Content="60 days" Tag="60" />
+                                                        <ComboBoxItem Content="90 days" Tag="90" IsSelected="True" />
+                                                        <ComboBoxItem Content="180 days" Tag="180" />
+                                                        <ComboBoxItem Content="1 year" Tag="365" />
+                                                    </ComboBox>
+                                                    <Button x:Name="RunOriginalClipRetentionButton" Grid.Column="1" Click="OnRunOriginalClipRetentionClicked" Padding="10,4" CornerRadius="4" AutomationProperties.Name="Review and clean up older original clips" ToolTipService.ToolTip="Review older clips eligible for the Recycle Bin" Height="32">
+                                                        <StackPanel Orientation="Horizontal" Spacing="8">
+                                                            <FontIcon Glyph="&#xE74D;" FontSize="12" />
+                                                            <TextBlock Text="Review now" />
+                                                        </StackPanel>
+                                                    </Button>
+                                                </Grid>
+                                                <TextBlock x:Name="OriginalClipRetentionStatusText" Text="Checking library…" Style="{StaticResource KlippBodyTextSecondary}" TextWrapping="Wrap" AutomationProperties.LiveSetting="Polite" />
+                                                <TextBlock Text="Files move to the Recycle Bin. Favorites, project media and the 20 most recent clips are kept." Style="{StaticResource KlippBodyTextSecondary}" TextWrapping="Wrap" />
+                                            </StackPanel>
+                                        </Border>
+                                    </StackPanel>
+                                </StackPanel>
+                            </ScrollViewer>
+                            <ScrollViewer x:Name="SettingsShortcutsPage" Visibility="Collapsed" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                                <StackPanel Spacing="20" Padding="24,20,24,24">
+                                    <StackPanel Spacing="5">
+                                        <TextBlock Text="Shortcuts" FontSize="22" FontWeight="SemiBold" Foreground="{StaticResource KlippTextPrimaryBrush}" />
+                                        <TextBlock Text="Save a moment from any app, then edit it with familiar keyboard commands." Style="{StaticResource KlippBodyTextSecondary}" TextWrapping="Wrap" />
+                                    </StackPanel>
+                                    <Border Style="{StaticResource SettingsCardStyle}">
+                                        <StackPanel Spacing="16">
+                                            <Grid ColumnSpacing="16">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                </Grid.ColumnDefinitions>
+                                                <StackPanel Spacing="3" VerticalAlignment="Center">
+                                                    <TextBlock Text="Capture shortcut" Style="{StaticResource KlippBodyText}" FontWeight="SemiBold" />
+                                                    <TextBlock Text="Save an instant clip or start / stop recording, even while Klipp is in the background." Style="{StaticResource KlippBodyTextSecondary}" TextWrapping="Wrap" />
+                                                </StackPanel>
+                                                <Button x:Name="SettingsCaptureHotkeyButton" Grid.Column="1" Click="OnSettingsCaptureHotkeyClicked" Height="32" Padding="12,4" AutomationProperties.Name="Change capture shortcut">
+                                                    <TextBlock Text="{Binding Text, ElementName=HotkeyText}" FontSize="12" />
+                                                </Button>
+                                            </Grid>
+                                            <Grid ColumnSpacing="16">
+                                                <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                                <StackPanel Spacing="3" VerticalAlignment="Center">
+                                                    <TextBlock Text="Mark a highlight" Style="{StaticResource KlippBodyText}" FontWeight="SemiBold" />
+                                                    <TextBlock Text="Add a marker while recording. Highlights appear on the editor timeline." Style="{StaticResource KlippBodyTextSecondary}" TextWrapping="Wrap" />
+                                                </StackPanel>
+                                                <Button Grid.Column="1" Click="OnBookmarkHotkeyClicked" Height="32" Padding="12,4" AutomationProperties.Name="Change highlight shortcut">
+                                                    <TextBlock x:Name="BookmarkHotkeyText" Text="Ctrl + Shift + M" FontSize="12" />
+                                                </Button>
+                                            </Grid>
+                                            <TextBlock x:Name="BookmarkShortcutStatusText" Style="{StaticResource KlippBodyTextSecondary}" TextWrapping="Wrap" AutomationProperties.LiveSetting="Polite" />
+                                        </StackPanel>
+                                    </Border>
+                                    <StackPanel Spacing="12">
+                                        <Grid ColumnSpacing="12">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Text="Editor shortcuts" Style="{StaticResource KlippBodyText}" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                            <Button Grid.Column="1" Click="OnResetEditorShortcutsClicked" Padding="10,4" CornerRadius="4" Background="Transparent" BorderBrush="{StaticResource KlippBorderBrush}" BorderThickness="1" Content="Reset" Height="32" />
+                                        </Grid>
+                                        <ItemsControl ItemsSource="{x:Bind EditorShortcutItems}">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate x:DataType="local:EditorShortcutViewModel">
+                                                    <Grid ColumnSpacing="12" Margin="0,3">
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="*" />
+                                                            <ColumnDefinition Width="118" />
+                                                        </Grid.ColumnDefinitions>
+                                                        <TextBlock Text="{x:Bind Label}" Style="{StaticResource KlippBodyTextSecondary}" TextWrapping="Wrap" VerticalAlignment="Center" />
+                                                        <Button Grid.Column="1" Tag="{x:Bind Action}" Click="OnEditorShortcutButtonClicked" Height="32" Padding="10,4" CornerRadius="4" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Background="{StaticResource KlippBackgroundBrush}" BorderBrush="{StaticResource KlippBorderBrush}" BorderThickness="1">
+                                                            <TextBlock Text="{x:Bind GestureDisplay}" FontSize="12" TextTrimming="CharacterEllipsis" />
+                                                        </Button>
+                                                    </Grid>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                        <TextBlock x:Name="EditorShortcutStatusText" Style="{StaticResource KlippBodyTextSecondary}" TextWrapping="Wrap" />
+                                    </StackPanel>
+                                </StackPanel>
+                            </ScrollViewer>
+                            <ScrollViewer x:Name="SettingsNotificationsPage" Visibility="Collapsed" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                                <StackPanel Spacing="20" Padding="24,20,24,24">
+                                    <StackPanel Spacing="5">
+                                        <TextBlock Text="Notifications" FontSize="22" FontWeight="SemiBold" Foreground="{StaticResource KlippTextPrimaryBrush}" />
+                                        <TextBlock Text="Quiet confirmations while you play, without taking focus from your game." Style="{StaticResource KlippBodyTextSecondary}" TextWrapping="Wrap" />
+                                    </StackPanel>
+                                    <Border Style="{StaticResource SettingsCardStyle}">
+                                        <StackPanel Spacing="16">
+                                            <Grid ColumnSpacing="20">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                </Grid.ColumnDefinitions>
+                                                <StackPanel Spacing="3" VerticalAlignment="Center">
+                                                    <TextBlock Text="Clip saved" Style="{StaticResource KlippBodyText}" FontWeight="SemiBold" TextWrapping="Wrap" />
+                                                    <TextBlock Text="Confirm that an instant clip is ready." Style="{StaticResource KlippBodyTextSecondary}" TextWrapping="Wrap" />
+                                                </StackPanel>
+                                                <ToggleSwitch x:Name="SettingsNotifyClipSavedToggle" Grid.Column="1" Toggled="OnSettingsNotificationToggled" MinWidth="44" Width="44" HorizontalAlignment="Right" OnContent="" OffContent="" VerticalAlignment="Center" AutomationProperties.Name="Clip saved" />
+                                            </Grid>
+                                            <Grid ColumnSpacing="20">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                </Grid.ColumnDefinitions>
+                                                <StackPanel Spacing="3" VerticalAlignment="Center">
+                                                    <TextBlock Text="Recording started" Style="{StaticResource KlippBodyText}" FontWeight="SemiBold" TextWrapping="Wrap" />
+                                                    <TextBlock Text="Confirm that manual recording has begun." Style="{StaticResource KlippBodyTextSecondary}" TextWrapping="Wrap" />
+                                                </StackPanel>
+                                                <ToggleSwitch x:Name="SettingsNotifyRecordingStartedToggle" Grid.Column="1" Toggled="OnSettingsNotificationToggled" MinWidth="44" Width="44" HorizontalAlignment="Right" OnContent="" OffContent="" VerticalAlignment="Center" AutomationProperties.Name="Recording started" />
+                                            </Grid>
+                                            <Grid ColumnSpacing="20">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                </Grid.ColumnDefinitions>
+                                                <StackPanel Spacing="3" VerticalAlignment="Center">
+                                                    <TextBlock Text="Recording stopped" Style="{StaticResource KlippBodyText}" FontWeight="SemiBold" TextWrapping="Wrap" />
+                                                    <TextBlock Text="Confirm that a manual recording has finished." Style="{StaticResource KlippBodyTextSecondary}" TextWrapping="Wrap" />
+                                                </StackPanel>
+                                                <ToggleSwitch x:Name="SettingsNotifyRecordingStoppedToggle" Grid.Column="1" Toggled="OnSettingsNotificationToggled" MinWidth="44" Width="44" HorizontalAlignment="Right" OnContent="" OffContent="" VerticalAlignment="Center" AutomationProperties.Name="Recording stopped" />
+                                            </Grid>
+                                            <Grid ColumnSpacing="20">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                </Grid.ColumnDefinitions>
+                                                <StackPanel Spacing="3" VerticalAlignment="Center">
+                                                    <TextBlock Text="Automatic source changes" Style="{StaticResource KlippBodyText}" FontWeight="SemiBold" TextWrapping="Wrap" />
+                                                    <TextBlock Text="Show when a detected game becomes the capture source." Style="{StaticResource KlippBodyTextSecondary}" TextWrapping="Wrap" />
+                                                </StackPanel>
+                                                <ToggleSwitch x:Name="SettingsNotifySourceChangeToggle" Grid.Column="1" Toggled="OnSettingsNotificationToggled" MinWidth="44" Width="44" HorizontalAlignment="Right" OnContent="" OffContent="" VerticalAlignment="Center" AutomationProperties.Name="Automatic source changes" />
+                                            </Grid>
+                                            <Grid ColumnSpacing="20">
+                                                <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                                <StackPanel Spacing="3"><TextBlock Text="Highlight marked" Style="{StaticResource KlippBodyText}" FontWeight="SemiBold" /><TextBlock Text="Confirm that a recording marker was saved." Style="{StaticResource KlippBodyTextSecondary}" TextWrapping="Wrap" /></StackPanel>
+                                                <ToggleSwitch x:Name="SettingsNotifyBookmarkToggle" Grid.Column="1" Toggled="OnSettingsNotificationToggled" MinWidth="44" Width="44" OnContent="" OffContent="" VerticalAlignment="Center" AutomationProperties.Name="Highlight marked" />
+                                            </Grid>
+                                            <Grid ColumnSpacing="20">
+                                                <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                                <StackPanel Spacing="3"><TextBlock Text="Audio device connection" Style="{StaticResource KlippBodyText}" FontWeight="SemiBold" /><TextBlock Text="Show when a recording device disconnects or reconnects." Style="{StaticResource KlippBodyTextSecondary}" TextWrapping="Wrap" /></StackPanel>
+                                                <ToggleSwitch x:Name="SettingsNotifyAudioDeviceToggle" Grid.Column="1" Toggled="OnSettingsNotificationToggled" MinWidth="44" Width="44" OnContent="" OffContent="" VerticalAlignment="Center" AutomationProperties.Name="Audio device connection" />
+                                            </Grid>
+                                        </StackPanel>
+                                    </Border>
+                                    <Border Style="{StaticResource SettingsCardStyle}">
+                                        <StackPanel Spacing="16">
+                                            <StackPanel Spacing="7">
+                                                <TextBlock Text="Show notifications for" Style="{StaticResource KlippBodyText}" FontWeight="SemiBold" />
+                                                <NumberBox x:Name="SettingsNotificationDurationBox" Minimum="2" Maximum="10" SmallChange="1" LargeChange="2" Value="4" SpinButtonPlacementMode="Inline" ValueChanged="OnSettingsNotificationDurationChanged" AutomationProperties.Name="Notification duration in seconds" Width="150" HorizontalAlignment="Left" />
+                                                <TextBlock Text="Seconds · choose between 2 and 10." Style="{StaticResource KlippBodyTextSecondary}" />
+                                            </StackPanel>
+                                            <Button Content="Show a test notification" Click="OnSettingsTestNotificationClicked" HorizontalAlignment="Left" Height="32" Padding="12,4" />
+                                            <TextBlock Text="Popups stay out of Klipp recordings. Use borderless fullscreen for the most reliable in-game display." Style="{StaticResource KlippBodyTextSecondary}" TextWrapping="Wrap" />
+                                        </StackPanel>
+                                    </Border>
+                                </StackPanel>
+                            </ScrollViewer>
+                        </Grid>
+                    </Grid>
+                    <Border Grid.Row="2" BorderBrush="{StaticResource KlippBorderBrush}" BorderThickness="0,1,0,0" Padding="20,10">
+                        <TextBlock Text="Changes save automatically" Style="{StaticResource KlippBodyTextSecondary}" FontSize="12" />
+                    </Border>
+                </Grid>
+            </Border>
+            <Border x:Name="SideMenuBackdrop" Grid.Column="1" Background="#99000000" Opacity="0" Tapped="OnSideMenuBackdropTapped" />
         </Grid>
     </Grid>
 </Window>

@@ -11,14 +11,14 @@
 
   <Identity
     Name="32848254-5c02-4888-a6dc-14f78cb62c16"
-    Publisher="CN=jon"
-    Version="1.0.0.0" />
+    Publisher="CN=Klipp Local Dev"
+    Version="1.0.5.0" />
 
   <mp:PhoneIdentity PhoneProductId="32848254-5c02-4888-a6dc-14f78cb62c16" PhonePublisherId="00000000-0000-0000-0000-000000000000"/>
 
   <Properties>
-    <DisplayName>Klipp.Desktop</DisplayName>
-    <PublisherDisplayName>jon</PublisherDisplayName>
+    <DisplayName>Klipp</DisplayName>
+    <PublisherDisplayName>Klipp Local Dev</PublisherDisplayName>
     <Logo>Assets\StoreLogo.png</Logo>
   </Properties>
 
@@ -28,7 +28,7 @@
   </Dependencies>
 
   <Resources>
-    <Resource Language="x-generate"/>
+    <Resource Language="en-US"/>
   </Resources>
 
   <Applications>
@@ -36,9 +36,9 @@
       Executable="$targetnametoken$.exe"
       EntryPoint="$targetentrypoint$">
       <uap:VisualElements
-        DisplayName="Klipp.Desktop"
-        Description="Klipp.Desktop"
-        BackgroundColor="transparent"
+        DisplayName="Klipp"
+        Description="Game capture and video editing"
+        BackgroundColor="#17191C"
         Square150x150Logo="Assets\Square150x150Logo.png"
         Square44x44Logo="Assets\Square44x44Logo.png">
         <uap:DefaultTile Wide310x150Logo="Assets\Wide310x150Logo.png" />
@@ -47,8 +47,18 @@
     </Application>
   </Applications>
 
+  <Extensions>
+    <Extension Category="windows.activatableClass.inProcessServer">
+      <InProcessServer>
+        <Path>Klipp.AudioEffects.dll</Path>
+        <ActivatableClass ActivatableClassId="Klipp.AudioEffects.Gain" ThreadingModel="both" />
+      </InProcessServer>
+    </Extension>
+  </Extensions>
+
   <Capabilities>
     <rescap:Capability Name="runFullTrust" />
+    <rescap:Capability Name="graphicsCaptureWithoutBorder" />
     <systemai:Capability Name="systemAIModels"/>
     <uap:Capability Name="videosLibrary"/>
     <uap6:Capability Name="graphicsCapture"/>

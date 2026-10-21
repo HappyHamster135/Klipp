@@ -1,0 +1,129 @@
+<UserControl
+    x:Class="Klipp.Desktop.Controls.TrimRangeSelector"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <StackPanel Spacing="12"
+                MinWidth="280"
+                MaxWidth="520">
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+
+            <StackPanel Spacing="2">
+                <TextBlock Text="Start"
+                           Foreground="{StaticResource KlippTextMutedBrush}"
+                           FontSize="12" />
+                <TextBlock x:Name="StartValueText"
+                           Text="0:00"
+                           Foreground="{StaticResource KlippTextPrimaryBrush}"
+                           FontWeight="SemiBold" />
+            </StackPanel>
+
+            <StackPanel Grid.Column="1"
+                        HorizontalAlignment="Center"
+                        Spacing="2">
+                <TextBlock Text="Selection"
+                           Foreground="{StaticResource KlippTextMutedBrush}"
+                           FontSize="12"
+                           HorizontalAlignment="Center" />
+                <TextBlock x:Name="SelectionValueText"
+                           Text="0:00"
+                           Foreground="{StaticResource KlippAccentBrush}"
+                           FontWeight="SemiBold"
+                           HorizontalAlignment="Center" />
+            </StackPanel>
+
+            <StackPanel Grid.Column="2"
+                        HorizontalAlignment="Right"
+                        Spacing="2">
+                <TextBlock Text="End"
+                           Foreground="{StaticResource KlippTextMutedBrush}"
+                           FontSize="12"
+                           HorizontalAlignment="Right" />
+                <TextBlock x:Name="EndValueText"
+                           Text="0:00"
+                           Foreground="{StaticResource KlippTextPrimaryBrush}"
+                           FontWeight="SemiBold"
+                           HorizontalAlignment="Right" />
+            </StackPanel>
+        </Grid>
+
+        <Border x:Name="TimelineSurface"
+                Height="72"
+                Background="Transparent"
+                AutomationProperties.Name="Visual trim timeline"
+                AutomationProperties.HelpText="Drag the handles or enter exact times in the fields below the timeline."
+                SizeChanged="OnTimelineSizeChanged"
+                PointerPressed="OnTimelinePointerPressed"
+                PointerMoved="OnTimelinePointerMoved"
+                PointerReleased="OnTimelinePointerReleased"
+                PointerCanceled="OnTimelinePointerCanceled"
+                PointerCaptureLost="OnTimelinePointerCaptureLost">
+            <Canvas x:Name="TimelineCanvas"
+                    Height="72">
+                <Border x:Name="TrackRail"
+                        Canvas.Top="32"
+                        Height="8"
+                        CornerRadius="4"
+                        Background="{StaticResource KlippBorderBrush}"
+                        Opacity="0.9" />
+
+                <Border x:Name="SelectionRail"
+                        Canvas.Top="32"
+                        Height="8"
+                        CornerRadius="4"
+                        Background="{StaticResource KlippAccentBrush}" />
+
+                <Border x:Name="StartThumb"
+                        Canvas.Top="18"
+                        Width="18"
+                        Height="36"
+                        CornerRadius="9"
+                        Background="{StaticResource KlippAccentBrush}"
+                        BorderBrush="{StaticResource KlippTextPrimaryBrush}"
+                        BorderThickness="2"
+                        PointerPressed="OnStartThumbPointerPressed" />
+
+                <Border x:Name="EndThumb"
+                        Canvas.Top="18"
+                        Width="18"
+                        Height="36"
+                        CornerRadius="9"
+                        Background="{StaticResource KlippAccentBrush}"
+                        BorderBrush="{StaticResource KlippTextPrimaryBrush}"
+                        BorderThickness="2"
+                        PointerPressed="OnEndThumbPointerPressed" />
+            </Canvas>
+        </Border>
+
+        <Grid ColumnSpacing="12">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <NumberBox x:Name="StartNumberBox"
+                       Header="Start (seconds)"
+                       Minimum="0"
+                       SmallChange="0.1"
+                       SpinButtonPlacementMode="Compact"
+                       ValueChanged="OnStartNumberBoxValueChanged"
+                       AutomationProperties.Name="Trim start in seconds"
+                       AutomationProperties.HelpText="Enter where the exported clip should begin." />
+
+            <NumberBox x:Name="EndNumberBox"
+                       Grid.Column="1"
+                       Header="End (seconds)"
+                       Minimum="0.1"
+                       SmallChange="0.1"
+                       SpinButtonPlacementMode="Compact"
+                       ValueChanged="OnEndNumberBoxValueChanged"
+                       AutomationProperties.Name="Trim end in seconds"
+                       AutomationProperties.HelpText="Enter where the exported clip should end." />
+        </Grid>
+    </StackPanel>
+</UserControl>

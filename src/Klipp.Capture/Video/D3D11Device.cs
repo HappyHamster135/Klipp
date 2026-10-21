@@ -40,7 +40,7 @@ internal sealed class D3D11Device : IDisposable
             out ID3D11DeviceContext context);
 
         if (result.Failure)
-            throw new InvalidOperationException("D3D11CreateDevice misslyckades.");
+            throw new InvalidOperationException("D3D11CreateDevice failed.");
 
         Device = device;
         Context = context;
@@ -52,7 +52,7 @@ internal sealed class D3D11Device : IDisposable
         using var dxgiDevice = d3dDevice.QueryInterface<IDXGIDevice>();
         var hr = CreateDirect3D11DeviceFromDXGIDevice(dxgiDevice.NativePointer, out var graphicsDevicePtr);
         if (hr < 0)
-            throw new InvalidOperationException("CreateDirect3D11DeviceFromDXGIDevice misslyckades.");
+            throw new InvalidOperationException("CreateDirect3D11DeviceFromDXGIDevice failed.");
 
         try
         {

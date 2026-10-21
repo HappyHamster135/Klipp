@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../../src/Klipp.Encoding/Muxing/Rf64WaveFileWriter.cs" Link="Rf64WaveFileWriter.cs" />
+    <Compile Include="../../src/Klipp.Encoding/Muxing/RecordingWaveRepair.cs" Link="RecordingWaveRepair.cs" />
+    <Compile Include="../../src/Klipp.Encoding/Audio/CaptureAudioLayout.cs" Link="CaptureAudioLayout.cs" />
+  </ItemGroup>
+</Project>

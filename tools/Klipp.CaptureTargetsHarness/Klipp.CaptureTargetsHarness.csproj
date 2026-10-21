@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0-windows10.0.22621.0</TargetFramework>
+    <SupportedOSPlatformVersion>10.0.19041.0</SupportedOSPlatformVersion>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <PlatformTarget>x64</PlatformTarget>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/Klipp.Capture/Klipp.Capture.csproj" />
+    <ProjectReference Include="../../src/Klipp.Encoding/Klipp.Encoding.csproj" />
+    <ProjectReference Include="../../src/Klipp.Storage/Klipp.Storage.csproj" />
+    <Compile Include="../../src/Klipp.Desktop/Services/CaptureTargetService.cs" Link="Services/CaptureTargetService.cs" />
+    <Compile Include="../../src/Klipp.Desktop/Services/CaptureOptions.cs" Link="Services/CaptureOptions.cs" />
+    <Compile Include="../../src/Klipp.Desktop/Services/CaptureProfileService.cs" Link="Services/CaptureProfileService.cs" />
+    <Compile Include="../../src/Klipp.Desktop/Services/SettingsService.cs" Link="Services/SettingsService.cs" />
+    <Compile Include="../../src/Klipp.Desktop/Services/CaptureHealthService.cs" Link="Services/CaptureHealthService.cs" />
+    <Compile Include="../../src/Klipp.Desktop/Services/VideoCaptureSourceFactory.cs" Link="Services/VideoCaptureSourceFactory.cs" />
+    <Compile Include="../../src/Klipp.Desktop/Services/RecordingService.cs" Link="Services/RecordingService.cs" />
+    <Compile Include="../../src/Klipp.Desktop/Services/ClipModeService.cs" Link="Services/ClipModeService.cs" />
+  </ItemGroup>
+</Project>

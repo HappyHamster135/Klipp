@@ -12,7 +12,7 @@ namespace Klipp.Capture.Video;
 /// <c>IGraphicsCaptureItemInterop</c>. Detta är standard Win32-interop som
 /// alla WGC-applikationer skriver själva (se Microsofts officiella samples).
 /// </remarks>
-internal static class GraphicsCaptureItemFactory
+public static class GraphicsCaptureItemFactory
 {
     private static readonly Guid GraphicsCaptureItemIid = new("79C3F95B-31F7-4EC2-A464-632EF5D30760");
 
@@ -29,14 +29,14 @@ internal static class GraphicsCaptureItemFactory
     public static GraphicsCaptureItem CreateForWindow(nint hwnd)
     {
         if (hwnd == nint.Zero)
-            throw new ArgumentException("HWND får inte vara noll.", nameof(hwnd));
+            throw new ArgumentException("HWND must not be zero.", nameof(hwnd));
 
         var interop = GraphicsCaptureItem.As<IGraphicsCaptureItemInterop>();
         var iid = GraphicsCaptureItemIid;
         var itemPtr = interop.CreateForWindow(hwnd, ref iid);
 
         if (itemPtr == nint.Zero)
-            throw new InvalidOperationException("CreateForWindow returnerade null.");
+            throw new InvalidOperationException("CreateForWindow returned null.");
 
         return GraphicsCaptureItem.FromAbi(itemPtr);
     }
@@ -45,14 +45,14 @@ internal static class GraphicsCaptureItemFactory
     public static GraphicsCaptureItem CreateForMonitor(nint hmonitor)
     {
         if (hmonitor == nint.Zero)
-            throw new ArgumentException("HMONITOR får inte vara noll.", nameof(hmonitor));
+            throw new ArgumentException("HMONITOR must not be zero.", nameof(hmonitor));
 
         var interop = GraphicsCaptureItem.As<IGraphicsCaptureItemInterop>();
         var iid = GraphicsCaptureItemIid;
         var itemPtr = interop.CreateForMonitor(hmonitor, ref iid);
 
         if (itemPtr == nint.Zero)
-            throw new InvalidOperationException("CreateForMonitor returnerade null.");
+            throw new InvalidOperationException("CreateForMonitor returned null.");
 
         return GraphicsCaptureItem.FromAbi(itemPtr);
     }

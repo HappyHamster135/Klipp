@@ -17,6 +17,9 @@ public sealed record class CaptureTarget
 
     /// <summary>Mänskligt läsbart namn för UI:t, t.ex. "Notepad" eller "Skärm 1 (3840x2160)".</summary>
     public required string DisplayName { get; init; }
+    public string DeviceId { get; init; } = string.Empty;
+    public uint ProcessId { get; init; }
+    public long ProcessCreated { get; init; }
 
     public override string ToString() => $"{Kind}: {DisplayName}";
 }

@@ -23,6 +23,9 @@ public sealed record class RecordingSettings
     /// <summary>Audio-bitrate i bits per sekund. 128 kbps = 128_000.</summary>
     public int AudioBitrate { get; init; } = 128_000;
 
+    /// <summary>Capture encoder: auto prefers a tested GPU encoder; cpu always uses software.</summary>
+    public string EncoderPreference { get; init; } = "auto";
+
     /// <summary>Video-codec att använda.</summary>
     public VideoCodec VideoCodec { get; init; } = VideoCodec.H264;
 

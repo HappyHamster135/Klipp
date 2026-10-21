@@ -1,10 +1,43 @@
-﻿<ResourceDictionary
+<ResourceDictionary
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
 
+    <ResourceDictionary.ThemeDictionaries>
+        <ResourceDictionary x:Key="HighContrast">
+            <Color x:Key="KlippBackgroundColor">{ThemeResource SystemColorWindowColor}</Color>
+            <Color x:Key="KlippBackgroundTopColor">{ThemeResource SystemColorWindowColor}</Color>
+            <Color x:Key="KlippBackgroundBottomColor">{ThemeResource SystemColorWindowColor}</Color>
+            <Color x:Key="KlippSurfaceColor">{ThemeResource SystemColorWindowColor}</Color>
+            <Color x:Key="KlippSurfaceElevatedColor">{ThemeResource SystemColorButtonFaceColor}</Color>
+            <Color x:Key="KlippTitleBarColor">{ThemeResource SystemColorWindowColor}</Color>
+
+            <Color x:Key="KlippBorderColor">{ThemeResource SystemColorWindowTextColor}</Color>
+            <Color x:Key="KlippBorderSubtleColor">{ThemeResource SystemColorGrayTextColor}</Color>
+
+            <Color x:Key="KlippTextPrimaryColor">{ThemeResource SystemColorWindowTextColor}</Color>
+            <Color x:Key="KlippTextSecondaryColor">{ThemeResource SystemColorWindowTextColor}</Color>
+            <Color x:Key="KlippTextMutedColor">{ThemeResource SystemColorGrayTextColor}</Color>
+
+            <Color x:Key="KlippAccentColor">{ThemeResource SystemColorHighlightColor}</Color>
+            <Color x:Key="KlippAccentHoverColor">{ThemeResource SystemColorHotlightColor}</Color>
+            <Color x:Key="KlippAccentPressedColor">{ThemeResource SystemColorHighlightColor}</Color>
+            <Color x:Key="KlippAccentGradientStartColor">{ThemeResource SystemColorHighlightColor}</Color>
+            <Color x:Key="KlippAccentGradientEndColor">{ThemeResource SystemColorHighlightColor}</Color>
+
+            <Color x:Key="KlippSuccessColor">{ThemeResource SystemColorWindowTextColor}</Color>
+            <Color x:Key="KlippDangerColor">{ThemeResource SystemColorWindowTextColor}</Color>
+            <Color x:Key="KlippWarningColor">{ThemeResource SystemColorWindowTextColor}</Color>
+            <Color x:Key="KlippAccentSoftColor">{ThemeResource SystemColorHighlightColor}</Color>
+            <Color x:Key="KlippAccentFaintColor">{ThemeResource SystemColorHighlightColor}</Color>
+            <Color x:Key="KlippAccentGlowStartColor">Transparent</Color>
+            <Color x:Key="KlippThumbnailScrimStartColor">Transparent</Color>
+            <Color x:Key="KlippThumbnailScrimEndColor">{ThemeResource SystemColorWindowColor}</Color>
+        </ResourceDictionary>
+    </ResourceDictionary.ThemeDictionaries>
+
     <!-- ============================================================ -->
     <!-- Klipp Design System                                          -->
-    <!-- Mörkt tema, Medal-inspirerat                                 -->
+    <!-- Neutral surfaces, consistent density, restrained feedback.   -->
     <!-- ============================================================ -->
 
     <!-- ============================================================ -->
@@ -12,63 +45,89 @@
     <!-- ============================================================ -->
 
     <!-- Bakgrunder -->
-    <Color x:Key="KlippBackgroundColor">#0E0E12</Color>
-    <Color x:Key="KlippSurfaceColor">#1A1A22</Color>
-    <Color x:Key="KlippSurfaceElevatedColor">#252530</Color>
-    <Color x:Key="KlippTitleBarColor">#14141A</Color>
+    <Color x:Key="KlippBackgroundColor">#17191C</Color>
+    <Color x:Key="KlippBackgroundTopColor">#17191C</Color>
+    <Color x:Key="KlippBackgroundBottomColor">#17191C</Color>
+    <Color x:Key="KlippSurfaceColor">#202327</Color>
+    <Color x:Key="KlippSurfaceElevatedColor">#292D32</Color>
+    <Color x:Key="KlippTitleBarColor">#1C1F23</Color>
 
     <!-- Ramar -->
-    <Color x:Key="KlippBorderColor">#33333F</Color>
-    <Color x:Key="KlippBorderSubtleColor">#1F1F28</Color>
+    <Color x:Key="KlippBorderColor">#3A3F46</Color>
+    <Color x:Key="KlippBorderSubtleColor">#2C3036</Color>
 
     <!-- Text -->
-    <Color x:Key="KlippTextPrimaryColor">#F0F0F5</Color>
-    <Color x:Key="KlippTextSecondaryColor">#B8B8C6</Color>
-    <Color x:Key="KlippTextMutedColor">#8E8E9C</Color>
+    <Color x:Key="KlippTextPrimaryColor">#E6E8EB</Color>
+    <Color x:Key="KlippTextSecondaryColor">#A7ADB5</Color>
+    <Color x:Key="KlippTextMutedColor">#929AA4</Color>
 
-    <!-- Accent (purpur, Medal-inspirerad) -->
-    <Color x:Key="KlippAccentColor">#9D7AEA</Color>
-    <Color x:Key="KlippAccentHoverColor">#AE8FEF</Color>
-    <Color x:Key="KlippAccentPressedColor">#8C66E0</Color>
+    <!-- Muted blue is reserved for selection and primary actions. -->
+    <Color x:Key="KlippAccentColor">#7198C7</Color>
+    <Color x:Key="KlippAccentHoverColor">#86A9D2</Color>
+    <Color x:Key="KlippAccentPressedColor">#6084AF</Color>
+    <Color x:Key="KlippAccentGradientStartColor">#7198C7</Color>
+    <Color x:Key="KlippAccentGradientEndColor">#7198C7</Color>
 
     <!-- Semantic -->
-    <Color x:Key="KlippSuccessColor">#48C774</Color>
-    <Color x:Key="KlippDangerColor">#EF4444</Color>
-    <Color x:Key="KlippWarningColor">#F59E0B</Color>
+    <Color x:Key="KlippSuccessColor">#79B697</Color>
+    <Color x:Key="KlippDangerColor">#D47878</Color>
+    <Color x:Key="KlippWarningColor">#D1AD70</Color>
+    <Color x:Key="KlippAccentSoftColor">#327198C7</Color>
+    <Color x:Key="KlippAccentFaintColor">#187198C7</Color>
+    <Color x:Key="KlippAccentGlowStartColor">Transparent</Color>
+    <Color x:Key="KlippThumbnailScrimStartColor">#00000000</Color>
+    <Color x:Key="KlippThumbnailScrimEndColor">#B3000000</Color>
 
     <!-- ============================================================ -->
     <!-- Borstar (Brushes) — för bindning i XAML                       -->
     <!-- ============================================================ -->
 
-    <SolidColorBrush x:Key="KlippBackgroundBrush" Color="{StaticResource KlippBackgroundColor}" />
-    <SolidColorBrush x:Key="KlippSurfaceBrush" Color="{StaticResource KlippSurfaceColor}" />
-    <SolidColorBrush x:Key="KlippSurfaceElevatedBrush" Color="{StaticResource KlippSurfaceElevatedColor}" />
-    <SolidColorBrush x:Key="KlippTitleBarBrush" Color="{StaticResource KlippTitleBarColor}" />
+    <SolidColorBrush x:Key="KlippBackgroundBrush" Color="{ThemeResource KlippBackgroundColor}" />
+    <SolidColorBrush x:Key="KlippSurfaceBrush" Color="{ThemeResource KlippSurfaceColor}" />
+    <SolidColorBrush x:Key="KlippSurfaceElevatedBrush" Color="{ThemeResource KlippSurfaceElevatedColor}" />
+    <SolidColorBrush x:Key="KlippTitleBarBrush" Color="{ThemeResource KlippTitleBarColor}" />
 
-    <SolidColorBrush x:Key="KlippBorderBrush" Color="{StaticResource KlippBorderColor}" />
-    <SolidColorBrush x:Key="KlippBorderSubtleBrush" Color="{StaticResource KlippBorderSubtleColor}" />
+    <SolidColorBrush x:Key="KlippBorderBrush" Color="{ThemeResource KlippBorderColor}" />
+    <SolidColorBrush x:Key="KlippBorderSubtleBrush" Color="{ThemeResource KlippBorderSubtleColor}" />
 
-    <SolidColorBrush x:Key="KlippTextPrimaryBrush" Color="{StaticResource KlippTextPrimaryColor}" />
-    <SolidColorBrush x:Key="KlippTextSecondaryBrush" Color="{StaticResource KlippTextSecondaryColor}" />
-    <SolidColorBrush x:Key="KlippTextMutedBrush" Color="{StaticResource KlippTextMutedColor}" />
+    <SolidColorBrush x:Key="KlippTextPrimaryBrush" Color="{ThemeResource KlippTextPrimaryColor}" />
+    <SolidColorBrush x:Key="KlippTextSecondaryBrush" Color="{ThemeResource KlippTextSecondaryColor}" />
+    <SolidColorBrush x:Key="KlippTextMutedBrush" Color="{ThemeResource KlippTextMutedColor}" />
 
-    <SolidColorBrush x:Key="KlippAccentBrush" Color="{StaticResource KlippAccentColor}" />
-    <SolidColorBrush x:Key="KlippAccentHoverBrush" Color="{StaticResource KlippAccentHoverColor}" />
-    <SolidColorBrush x:Key="KlippAccentPressedBrush" Color="{StaticResource KlippAccentPressedColor}" />
+    <SolidColorBrush x:Key="KlippAccentBrush" Color="{ThemeResource KlippAccentColor}" />
+    <SolidColorBrush x:Key="KlippAccentHoverBrush" Color="{ThemeResource KlippAccentHoverColor}" />
+    <SolidColorBrush x:Key="KlippAccentPressedBrush" Color="{ThemeResource KlippAccentPressedColor}" />
 
-    <SolidColorBrush x:Key="KlippSuccessBrush" Color="{StaticResource KlippSuccessColor}" />
-    <SolidColorBrush x:Key="KlippDangerBrush" Color="{StaticResource KlippDangerColor}" />
-    <SolidColorBrush x:Key="KlippWarningBrush" Color="{StaticResource KlippWarningColor}" />
+    <SolidColorBrush x:Key="KlippSuccessBrush" Color="{ThemeResource KlippSuccessColor}" />
+    <SolidColorBrush x:Key="KlippDangerBrush" Color="{ThemeResource KlippDangerColor}" />
+    <SolidColorBrush x:Key="KlippWarningBrush" Color="{ThemeResource KlippWarningColor}" />
+
+    <!-- Mjuk accent — för subtila hover-toningar och highlights -->
+    <SolidColorBrush x:Key="KlippAccentSoftBrush" Color="{ThemeResource KlippAccentSoftColor}" />
+    <SolidColorBrush x:Key="KlippAccentFaintBrush" Color="{ThemeResource KlippAccentFaintColor}" />
+
+    <!-- Compatibility keys remain solid so every view shares the same material. -->
+    <SolidColorBrush x:Key="KlippAccentGradientBrush" Color="{ThemeResource KlippAccentColor}" />
+    <SolidColorBrush x:Key="KlippWindowBackgroundBrush" Color="{ThemeResource KlippBackgroundColor}" />
+    <SolidColorBrush x:Key="KlippAccentGlowBrush" Color="Transparent" />
+
+    <!-- Mörk scrim för thumbnails (gör text läsbar över bilden) -->
+    <LinearGradientBrush x:Key="KlippThumbnailScrimBrush" StartPoint="0,0" EndPoint="0,1">
+        <GradientStop Color="{ThemeResource KlippThumbnailScrimStartColor}" Offset="0.45" />
+        <GradientStop Color="{ThemeResource KlippThumbnailScrimEndColor}" Offset="1" />
+    </LinearGradientBrush>
 
     <!-- ============================================================ -->
     <!-- Typografi                                                    -->
     <!-- ============================================================ -->
 
-    <!-- Inter används som primärt typsnitt. Fallback till Segoe UI om Inter saknas. -->
-    <x:String x:Key="KlippFontFamilySans">Inter, Segoe UI Variable, Segoe UI</x:String>
+    <x:String x:Key="KlippFontFamilySans">Segoe UI Variable, Segoe UI</x:String>
 
     <!-- JetBrains Mono för tidsstämplar och tekniska värden -->
-    <x:String x:Key="KlippFontFamilyMono">JetBrains Mono, Cascadia Mono, Consolas</x:String>
+    <x:String x:Key="KlippFontFamilyMono">Cascadia Mono, Consolas</x:String>
+    <x:Double x:Key="KlippControlHeight">32</x:Double>
+    <x:Double x:Key="KlippControlFontSize">13</x:Double>
+    <CornerRadius x:Key="KlippControlCornerRadius">4</CornerRadius>
 
     <!-- ============================================================ -->
     <!-- Spacing (4px-grid)                                           -->
@@ -85,20 +144,30 @@
     <!-- Border radius                                                -->
     <!-- ============================================================ -->
 
-    <CornerRadius x:Key="KlippRadiusSm">6</CornerRadius>
-    <CornerRadius x:Key="KlippRadiusMd">8</CornerRadius>
-    <CornerRadius x:Key="KlippRadiusLg">12</CornerRadius>
-    <CornerRadius x:Key="KlippRadiusXl">16</CornerRadius>
-    <CornerRadius x:Key="KlippRadiusPill">9999</CornerRadius>
+    <CornerRadius x:Key="KlippRadiusSm">4</CornerRadius>
+    <CornerRadius x:Key="KlippRadiusMd">4</CornerRadius>
+    <CornerRadius x:Key="KlippRadiusLg">6</CornerRadius>
+    <CornerRadius x:Key="KlippRadiusXl">6</CornerRadius>
+    <CornerRadius x:Key="KlippRadiusPill">4</CornerRadius>
+
+    <!-- Globala kontroll-radier — gör combobox, flyouts m.m. konsekvent rundade -->
+    <CornerRadius x:Key="ControlCornerRadius">4</CornerRadius>
+    <CornerRadius x:Key="OverlayCornerRadius">6</CornerRadius>
 
     <!-- ============================================================ -->
     <!-- Text styles                                                  -->
     <!-- ============================================================ -->
 
+    <Style TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{StaticResource KlippFontFamilySans}" />
+        <Setter Property="FontSize" Value="13" />
+        <Setter Property="Foreground" Value="{StaticResource KlippTextPrimaryBrush}" />
+    </Style>
+
     <!-- Titel (stort, för headers) -->
     <Style x:Key="KlippHeadingLarge" TargetType="TextBlock">
         <Setter Property="FontFamily" Value="{StaticResource KlippFontFamilySans}" />
-        <Setter Property="FontSize" Value="22" />
+        <Setter Property="FontSize" Value="20" />
         <Setter Property="FontWeight" Value="SemiBold" />
         <Setter Property="Foreground" Value="{StaticResource KlippTextPrimaryBrush}" />
     </Style>
@@ -106,7 +175,7 @@
     <!-- Mellanrubrik -->
     <Style x:Key="KlippHeadingMedium" TargetType="TextBlock">
         <Setter Property="FontFamily" Value="{StaticResource KlippFontFamilySans}" />
-        <Setter Property="FontSize" Value="18" />
+        <Setter Property="FontSize" Value="16" />
         <Setter Property="FontWeight" Value="SemiBold" />
         <Setter Property="Foreground" Value="{StaticResource KlippTextPrimaryBrush}" />
     </Style>
@@ -114,7 +183,7 @@
     <!-- Body text -->
     <Style x:Key="KlippBodyText" TargetType="TextBlock">
         <Setter Property="FontFamily" Value="{StaticResource KlippFontFamilySans}" />
-        <Setter Property="FontSize" Value="14" />
+        <Setter Property="FontSize" Value="13" />
         <Setter Property="FontWeight" Value="Normal" />
         <Setter Property="Foreground" Value="{StaticResource KlippTextPrimaryBrush}" />
     </Style>
@@ -124,7 +193,8 @@
         <Setter Property="FontFamily" Value="{StaticResource KlippFontFamilySans}" />
         <Setter Property="FontSize" Value="12" />
         <Setter Property="FontWeight" Value="Normal" />
-        <Setter Property="Foreground" Value="{StaticResource KlippTextMutedBrush}" />
+        <Setter Property="Foreground" Value="{StaticResource KlippTextSecondaryBrush}" />
+        <Setter Property="TextWrapping" Value="Wrap" />
     </Style>
 
     <!-- Caption (väldigt liten, för labels och badges) -->
@@ -141,6 +211,141 @@
         <Setter Property="FontSize" Value="12" />
         <Setter Property="FontWeight" Value="Normal" />
         <Setter Property="Foreground" Value="{StaticResource KlippTextPrimaryBrush}" />
+    </Style>
+
+    <!-- ============================================================ -->
+    <!-- Immediate state feedback keeps repeated keyboard and pointer work responsive. -->
+    <Style x:Key="KlippBaseButtonStyle" TargetType="Button">
+        <Setter Property="Background" Value="{StaticResource KlippSurfaceElevatedBrush}" />
+        <Setter Property="Foreground" Value="{StaticResource KlippTextPrimaryBrush}" />
+        <Setter Property="BorderBrush" Value="{StaticResource KlippBorderBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="{StaticResource KlippControlCornerRadius}" />
+        <Setter Property="MinHeight" Value="{StaticResource KlippControlHeight}" />
+        <Setter Property="Padding" Value="10,4" />
+        <Setter Property="FontFamily" Value="{StaticResource KlippFontFamilySans}" />
+        <Setter Property="FontSize" Value="{StaticResource KlippControlFontSize}" />
+        <Setter Property="FontWeight" Value="Normal" />
+        <Setter Property="HorizontalContentAlignment" Value="Center" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+        <Setter Property="UseSystemFocusVisuals" Value="True" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Grid x:Name="RootGrid" Background="Transparent" CornerRadius="{TemplateBinding CornerRadius}">
+                        <Border x:Name="BackgroundLayer"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="{TemplateBinding CornerRadius}" />
+                        <Border x:Name="HoverOverlay" Background="White"
+                                CornerRadius="{TemplateBinding CornerRadius}" Opacity="0" />
+                        <ContentPresenter x:Name="ContentPresenter"
+                                          Content="{TemplateBinding Content}"
+                                          ContentTemplate="{TemplateBinding ContentTemplate}"
+                                          ContentTransitions="{TemplateBinding ContentTransitions}"
+                                          Foreground="{TemplateBinding Foreground}"
+                                          Padding="{TemplateBinding Padding}"
+                                          HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                          VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}"
+                                          AutomationProperties.AccessibilityView="Raw" />
+                        <VisualStateManager.VisualStateGroups>
+                            <VisualStateGroup x:Name="CommonStates">
+                                <VisualState x:Name="Normal" />
+                                <VisualState x:Name="PointerOver">
+                                    <VisualState.Setters>
+                                        <Setter Target="HoverOverlay.Opacity" Value="0.06" />
+                                    </VisualState.Setters>
+                                </VisualState>
+                                <VisualState x:Name="Pressed">
+                                    <VisualState.Setters>
+                                        <Setter Target="HoverOverlay.Opacity" Value="0.13" />
+                                    </VisualState.Setters>
+                                </VisualState>
+                                <VisualState x:Name="Disabled">
+                                    <VisualState.Setters>
+                                        <Setter Target="RootGrid.Opacity" Value="0.45" />
+                                    </VisualState.Setters>
+                                </VisualState>
+                            </VisualStateGroup>
+                        </VisualStateManager.VisualStateGroups>
+                    </Grid>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style TargetType="Button" BasedOn="{StaticResource KlippBaseButtonStyle}" />
+
+    <!-- Toolbars and forms use one control scale; labels and popups remain native. -->
+    <Style x:Key="KlippToolbarButton" TargetType="Button" BasedOn="{StaticResource KlippBaseButtonStyle}">
+        <Setter Property="MinHeight" Value="32" />
+        <Setter Property="Height" Value="32" />
+        <Setter Property="Padding" Value="10,4" />
+        <Setter Property="CornerRadius" Value="4" />
+        <Setter Property="FontFamily" Value="{StaticResource KlippFontFamilySans}" />
+        <Setter Property="FontSize" Value="13" />
+    </Style>
+    <Style x:Key="KlippIconButton" TargetType="Button" BasedOn="{StaticResource KlippToolbarButton}">
+        <Setter Property="Width" Value="32" />
+        <Setter Property="Padding" Value="0" />
+    </Style>
+    <Style x:Key="KlippPrimaryButton" TargetType="Button" BasedOn="{StaticResource KlippToolbarButton}">
+        <Setter Property="Background" Value="{StaticResource KlippAccentBrush}" />
+        <Setter Property="Foreground" Value="#101419" />
+        <Setter Property="BorderThickness" Value="0" />
+    </Style>
+    <Style TargetType="ToggleButton">
+        <Setter Property="MinHeight" Value="32" />
+        <Setter Property="CornerRadius" Value="4" />
+        <Setter Property="Padding" Value="10,4" />
+        <Setter Property="FontFamily" Value="{StaticResource KlippFontFamilySans}" />
+        <Setter Property="FontSize" Value="13" />
+    </Style>
+    <Style TargetType="ComboBox">
+        <Setter Property="MinHeight" Value="32" />
+        <Setter Property="CornerRadius" Value="4" />
+        <Setter Property="Padding" Value="10,4,28,4" />
+        <Setter Property="FontFamily" Value="{StaticResource KlippFontFamilySans}" />
+        <Setter Property="FontSize" Value="13" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+    </Style>
+    <Style TargetType="TextBox">
+        <Setter Property="MinHeight" Value="32" />
+        <Setter Property="CornerRadius" Value="4" />
+        <Setter Property="Padding" Value="10,4" />
+        <Setter Property="FontFamily" Value="{StaticResource KlippFontFamilySans}" />
+        <Setter Property="FontSize" Value="13" />
+        <Setter Property="Background" Value="{StaticResource KlippSurfaceBrush}" />
+        <Setter Property="Foreground" Value="{StaticResource KlippTextPrimaryBrush}" />
+        <Setter Property="BorderBrush" Value="{StaticResource KlippBorderBrush}" />
+    </Style>
+    <Style TargetType="NumberBox">
+        <Setter Property="MinHeight" Value="32" />
+        <Setter Property="CornerRadius" Value="4" />
+        <Setter Property="FontFamily" Value="{StaticResource KlippFontFamilySans}" />
+        <Setter Property="FontSize" Value="13" />
+    </Style>
+    <Style TargetType="ToggleSwitch">
+        <Setter Property="MinHeight" Value="32" />
+        <Setter Property="FontFamily" Value="{StaticResource KlippFontFamilySans}" />
+        <Setter Property="FontSize" Value="13" />
+        <Setter Property="Foreground" Value="{StaticResource KlippTextPrimaryBrush}" />
+    </Style>
+    <Style TargetType="CheckBox">
+        <Setter Property="MinHeight" Value="32" />
+        <Setter Property="FontFamily" Value="{StaticResource KlippFontFamilySans}" />
+        <Setter Property="FontSize" Value="13" />
+        <Setter Property="Foreground" Value="{StaticResource KlippTextPrimaryBrush}" />
+    </Style>
+    <Style TargetType="RadioButton">
+        <Setter Property="MinHeight" Value="32" />
+        <Setter Property="FontFamily" Value="{StaticResource KlippFontFamilySans}" />
+        <Setter Property="FontSize" Value="13" />
+        <Setter Property="Foreground" Value="{StaticResource KlippTextPrimaryBrush}" />
+    </Style>
+    <Style TargetType="FontIcon">
+        <Setter Property="FontSize" Value="16" />
     </Style>
 
     <!-- ============================================================ -->
@@ -188,5 +393,47 @@
 
     <!-- Accent-färgen som ComboBox använder för fokus-ring m.m. -->
     <SolidColorBrush x:Key="ComboBoxItemPillFillBrush" Color="{StaticResource KlippAccentColor}" />
+
+    <!-- ============================================================ -->
+    <!-- ToggleSwitch colors follow the shared accent. -->
+    <!-- ============================================================ -->
+
+    <SolidColorBrush x:Key="ToggleSwitchFillOn" Color="{StaticResource KlippAccentColor}" />
+    <SolidColorBrush x:Key="ToggleSwitchFillOnPointerOver" Color="{StaticResource KlippAccentHoverColor}" />
+    <SolidColorBrush x:Key="ToggleSwitchFillOnPressed" Color="{StaticResource KlippAccentPressedColor}" />
+    <SolidColorBrush x:Key="ToggleSwitchFillOnDisabled" Color="{StaticResource KlippSurfaceElevatedColor}" />
+
+    <SolidColorBrush x:Key="ToggleSwitchStrokeOn" Color="{StaticResource KlippAccentColor}" />
+    <SolidColorBrush x:Key="ToggleSwitchStrokeOnPointerOver" Color="{StaticResource KlippAccentHoverColor}" />
+    <SolidColorBrush x:Key="ToggleSwitchStrokeOnPressed" Color="{StaticResource KlippAccentPressedColor}" />
+
+    <SolidColorBrush x:Key="ToggleSwitchKnobFillOn" Color="#FFFFFF" />
+    <SolidColorBrush x:Key="ToggleSwitchKnobFillOnPointerOver" Color="#FFFFFF" />
+    <SolidColorBrush x:Key="ToggleSwitchKnobFillOnPressed" Color="#FFFFFF" />
+
+    <SolidColorBrush x:Key="ToggleSwitchFillOff" Color="{StaticResource KlippSurfaceElevatedColor}" />
+    <SolidColorBrush x:Key="ToggleSwitchFillOffPointerOver" Color="#343A42" />
+    <SolidColorBrush x:Key="ToggleSwitchStrokeOff" Color="{StaticResource KlippBorderColor}" />
+    <SolidColorBrush x:Key="ToggleSwitchStrokeOffPointerOver" Color="#555E69" />
+
+    <!-- ============================================================ -->
+    <!-- Button-överstyrningar (oanvända av egen mall men kvar som     -->
+    <!-- fallback för knappar i WinUI-kontroller vi inte mallat om)    -->
+    <!-- ============================================================ -->
+
+    <SolidColorBrush x:Key="ButtonBackground" Color="Transparent" />
+    <SolidColorBrush x:Key="ButtonBackgroundPointerOver" Color="{StaticResource KlippSurfaceElevatedColor}" />
+    <SolidColorBrush x:Key="ButtonBackgroundPressed" Color="#343A42" />
+    <SolidColorBrush x:Key="ButtonBackgroundDisabled" Color="Transparent" />
+
+    <SolidColorBrush x:Key="ButtonForeground" Color="{StaticResource KlippTextPrimaryColor}" />
+    <SolidColorBrush x:Key="ButtonForegroundPointerOver" Color="{StaticResource KlippTextPrimaryColor}" />
+    <SolidColorBrush x:Key="ButtonForegroundPressed" Color="{StaticResource KlippTextPrimaryColor}" />
+    <SolidColorBrush x:Key="ButtonForegroundDisabled" Color="{StaticResource KlippTextMutedColor}" />
+
+    <SolidColorBrush x:Key="ButtonBorderBrush" Color="{StaticResource KlippBorderColor}" />
+    <SolidColorBrush x:Key="ButtonBorderBrushPointerOver" Color="#555E69" />
+    <SolidColorBrush x:Key="ButtonBorderBrushPressed" Color="{StaticResource KlippAccentColor}" />
+    <SolidColorBrush x:Key="ButtonBorderBrushDisabled" Color="{StaticResource KlippBorderSubtleColor}" />
 
 </ResourceDictionary>

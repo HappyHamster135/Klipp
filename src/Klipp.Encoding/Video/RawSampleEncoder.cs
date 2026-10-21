@@ -20,7 +20,7 @@ public sealed class RawSampleEncoder : IVideoEncoder
     public Task InitializeAsync(RecordingSettings settings, CancellationToken cancellationToken = default)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
-        if (_initialized) throw new InvalidOperationException("Encoder är redan initialiserad.");
+        if (_initialized) throw new InvalidOperationException("The encoder is already initialized.");
 
         ArgumentNullException.ThrowIfNull(settings);
         settings.Validate();
@@ -37,7 +37,7 @@ public sealed class RawSampleEncoder : IVideoEncoder
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
-        if (!_initialized) throw new InvalidOperationException("Anropa InitializeAsync först.");
+        if (!_initialized) throw new InvalidOperationException("Call InitializeAsync first.");
 
         var sample = new EncodedSample
         {

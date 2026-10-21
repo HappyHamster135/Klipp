@@ -43,7 +43,7 @@ public sealed class MediaFoundationH264Encoder : IVideoEncoder
     public Task InitializeAsync(RecordingSettings settings, CancellationToken cancellationToken = default)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
-        if (_initialized) throw new InvalidOperationException("Encoder är redan initialiserad.");
+        if (_initialized) throw new InvalidOperationException("The encoder is already initialized.");
 
         ArgumentNullException.ThrowIfNull(settings);
         settings.Validate();
@@ -54,9 +54,9 @@ public sealed class MediaFoundationH264Encoder : IVideoEncoder
         // Fas 1: Discovery + Selection + Activation
         var activate = FindBestH264Encoder()
             ?? throw new InvalidOperationException(
-                "Ingen H.264-encoder hittades på systemet. Klipp kräver att Media Foundation " +
-                "H.264-encoders är registrerade. Installera Media Feature Pack från Windows " +
-                "Optional Features om de saknas.");
+                "No H.264 encoder was found on this system. Klipp requires registered Media Foundation " +
+                "H.264 encoders. If they are missing, install the Media Feature Pack from Windows " +
+                "Optional Features.");
 
         try
         {
@@ -183,7 +183,7 @@ public sealed class MediaFoundationH264Encoder : IVideoEncoder
     {
         var hr = MfApi.MFCreateMediaType(out var mediaType);
         if (hr < 0 || mediaType is null)
-            throw new InvalidOperationException($"MFCreateMediaType misslyckades: 0x{hr:X8}");
+            throw new InvalidOperationException($"MFCreateMediaType failed: 0x{hr:X8}");
 
         return mediaType;
     }
@@ -201,7 +201,7 @@ public sealed class MediaFoundationH264Encoder : IVideoEncoder
     private static void ThrowIfFailed(int hr, string operation)
     {
         if (hr < 0)
-            throw new InvalidOperationException($"{operation} misslyckades: 0x{hr:X8}");
+            throw new InvalidOperationException($"{operation} failed: 0x{hr:X8}");
     }
 
     private IMFActivate? FindBestH264Encoder()
@@ -288,13 +288,13 @@ public sealed class MediaFoundationH264Encoder : IVideoEncoder
 
         var hr = activate.ActivateObject(iidTransform, out var transformPtr);
         if (hr < 0 || transformPtr == nint.Zero)
-            throw new InvalidOperationException($"ActivateObject misslyckades: 0x{hr:X8}");
+            throw new InvalidOperationException($"ActivateObject failed: 0x{hr:X8}");
 
         try
         {
             var obj = _comWrappers.GetOrCreateObjectForComInstance(transformPtr, CreateObjectFlags.None);
             if (obj is not IMFTransform transform)
-                throw new InvalidOperationException("Aktiverat objekt är inte IMFTransform.");
+                throw new InvalidOperationException("The activated object does not implement IMFTransform.");
 
             return transform;
         }
@@ -331,12 +331,12 @@ public sealed class MediaFoundationH264Encoder : IVideoEncoder
 
     public IAsyncEnumerable<EncodedSample> EncodeAsync(VideoFrame frame, CancellationToken cancellationToken = default)
     {
-        throw new NotImplementedException("Fas 4 — kommer i nästa session.");
+        throw new NotImplementedException("This Media Foundation encoding operation is not implemented.");
     }
 
     public IAsyncEnumerable<EncodedSample> FlushAsync(CancellationToken cancellationToken = default)
     {
-        throw new NotImplementedException("Fas 4 — kommer i nästa session.");
+        throw new NotImplementedException("This Media Foundation encoding operation is not implemented.");
     }
 
     public ValueTask DisposeAsync()

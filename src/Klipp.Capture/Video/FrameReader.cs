@@ -10,9 +10,18 @@ namespace Klipp.Capture.Video;
 /// Läser ut pixel-bytes från en D3D11-textur som ligger i GPU-minne.
 /// Återanvänds av både <see cref="SingleFrameGrabber"/> och <see cref="WgcCaptureSource"/>.
 /// </summary>
-internal sealed class FrameReader
+internal sealed class FrameReader : IDisposable
 {
+    private const int BytesPerPixel = 4;
+    private const int MaxTextureDimension = 16_384;
+    private const int MaxFrameBytes = 512 * 1024 * 1024;
+
     private readonly D3D11Device _d3d;
+    private ID3D11Texture2D? _stagingTexture;
+    private uint _stagingWidth;
+    private uint _stagingHeight;
+    private Format _stagingFormat;
+    private bool _disposed;
 
     public FrameReader(D3D11Device d3d)
     {
@@ -28,6 +37,48 @@ internal sealed class FrameReader
         using var d3dTexture = GetD3D11Texture2D(surface);
         var desc = d3dTexture.Description;
 
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        var staging = GetOrCreateStagingTexture(desc);
+        _d3d.Context.CopyResource(staging, d3dTexture);
+
+        var mapped = _d3d.Context.Map(staging, 0, MapMode.Read, Vortice.Direct3D11.MapFlags.None);
+        try
+        {
+            var width = ValidateDimension(desc.Width, nameof(desc.Width));
+            var height = ValidateDimension(desc.Height, nameof(desc.Height));
+            var rowPitch = ValidateRowPitch(mapped.RowPitch, width);
+            var widthBytes = checked(width * BytesPerPixel);
+            var totalBytes = ValidateFrameByteCount(widthBytes, height);
+            if (mapped.DataPointer == 0)
+                throw new InvalidOperationException("Invalid capture frame: D3D Map returned no data pointer.");
+
+            var pixelBytes = new byte[totalBytes];
+
+            for (int row = 0; row < height; row++)
+            {
+                var srcPtr = nint.Add(mapped.DataPointer, row * rowPitch);
+                Marshal.Copy(srcPtr, pixelBytes, row * widthBytes, widthBytes);
+            }
+            return (pixelBytes, width, height);
+        }
+        finally
+        {
+            _d3d.Context.Unmap(staging, 0);
+        }
+    }
+
+    private ID3D11Texture2D GetOrCreateStagingTexture(Texture2DDescription desc)
+    {
+        if (_stagingTexture is not null &&
+            _stagingWidth == desc.Width &&
+            _stagingHeight == desc.Height &&
+            _stagingFormat == desc.Format)
+        {
+            return _stagingTexture;
+        }
+
+        _stagingTexture?.Dispose();
+
         var stagingDesc = new Texture2DDescription
         {
             Width = desc.Width,
@@ -42,28 +93,54 @@ internal sealed class FrameReader
             MiscFlags = ResourceOptionFlags.None
         };
 
-        using var staging = _d3d.Device.CreateTexture2D(stagingDesc);
-        _d3d.Context.CopyResource(staging, d3dTexture);
+        _stagingTexture = _d3d.Device.CreateTexture2D(stagingDesc);
+        _stagingWidth = desc.Width;
+        _stagingHeight = desc.Height;
+        _stagingFormat = desc.Format;
+        return _stagingTexture;
+    }
 
-        var mapped = _d3d.Context.Map(staging, 0, MapMode.Read, Vortice.Direct3D11.MapFlags.None);
-        try
+    public void Dispose()
+    {
+        if (_disposed) return;
+        _disposed = true;
+        _stagingTexture?.Dispose();
+        _stagingTexture = null;
+    }
+
+    private static int ValidateDimension(uint value, string name)
+    {
+        if (value == 0 || value > MaxTextureDimension)
         {
-            var width = (int)desc.Width;
-            var height = (int)desc.Height;
-            var rowPitch = (int)mapped.RowPitch;
-            var widthBytes = width * 4;
-            var pixelBytes = new byte[widthBytes * height];
-            for (int row = 0; row < height; row++)
-            {
-                var srcPtr = nint.Add(mapped.DataPointer, row * rowPitch);
-                Marshal.Copy(srcPtr, pixelBytes, row * widthBytes, widthBytes);
-            }
-            return (pixelBytes, width, height);
+            throw new InvalidOperationException(
+                $"Invalid capture frame: {name}={value}. The maximum supported dimension is {MaxTextureDimension}px.");
         }
-        finally
+
+        return checked((int)value);
+    }
+
+    private static int ValidateRowPitch(uint rowPitch, int width)
+    {
+        var widthBytes = checked(width * BytesPerPixel);
+        if (rowPitch < widthBytes || rowPitch > int.MaxValue)
         {
-            _d3d.Context.Unmap(staging, 0);
+            throw new InvalidOperationException(
+                $"Invalid capture frame: RowPitch={rowPitch}, widthBytes={widthBytes}.");
         }
+
+        return (int)rowPitch;
+    }
+
+    private static int ValidateFrameByteCount(int widthBytes, int height)
+    {
+        var totalBytes = (long)widthBytes * height;
+        if (totalBytes <= 0 || totalBytes > MaxFrameBytes)
+        {
+            throw new InvalidOperationException(
+                $"Invalid capture frame: buffer size {totalBytes:N0} bytes.");
+        }
+
+        return (int)totalBytes;
     }
 
     private static ID3D11Texture2D GetD3D11Texture2D(IDirect3DSurface surface)

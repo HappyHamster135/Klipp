@@ -1,84 +1,61 @@
-﻿# Klipp
+# Klipp
 
-Screen clipping app for Windows. Built as a portfolio project to demonstrate modern .NET desktop development with low-level Windows API interop.
+Game recording, instant clips and a built-in video editor for Windows. Built with .NET 10, WinUI 3, Windows Graphics Capture, Direct3D 11, WASAPI and FFmpeg.
 
-## Features
+## Download and run
 
-- **Continuous background capture** of selected window or monitor using Windows Graphics Capture API
-- **Ring buffer** holds the last N seconds in memory, ready to save instantly
-- **Instant clip save** captures the last 30 seconds to disk on demand
-- **Clip library** with auto-detected duration and metadata
-- **Modern dark UI** built with WinUI 3
-- **Architecture designed for swappable components** via interface-based design
+Get the Windows x64 ZIP from [GitHub Releases](https://github.com/HappyHamster135/Klipp/releases), extract the entire archive, then run `Klipp.Desktop.exe`. Keep its DLLs and folders together. The portable release includes .NET, the Windows App Runtime and the VC++ runtime; no developer certificate installation is needed. Releases are currently unsigned.
 
-## Technology
+- Windows 10 version 2004 (build 19041) or newer; Windows 11 is recommended.
+- DirectX 11-capable GPU. Hardware H.264 encoding depends on the GPU/driver; CPU encoding remains available.
+- Game-only, Discord and music capture require Windows build 20348 or newer. Each track captures an application and its child processes, rather than individual browser tabs.
+- FFmpeg/FFprobe download on first use. Automatic captions download whisper.cpp and a speech model when requested.
 
-- **.NET 10** with C# latest
-- **WinUI 3** for the desktop UI (modern Microsoft stack)
-- **Windows Graphics Capture API** for low-overhead screen capture
-- **Media Foundation** via custom COM interop for H.264 encoding
-- **Direct3D 11** for GPU-accelerated capture
-- **Source-generated COM interop** (`GeneratedComInterface`) for AOT-friendly performance
+Recordings default to `%USERPROFILE%\Videos\Klipp`. Settings and caches live in `%LOCALAPPDATA%\Klipp`; extracting an updated release does not replace those folders.
 
-## Architecture
+## Capture and edit
 
-Clean Architecture with clear separation:
-Klipp.Core         — Domain models and interfaces (no dependencies)
+- Record a display or window, or keep an instant-clip buffer ready to save. Automatic game detection, global shortcuts, tray controls and capture notifications are included.
+- Automatic GPU encoder selection with a CPU fallback, quality profiles, recording recovery and low-disk protection.
+- Separate game, microphone, Discord and music tracks, device reconnection, volume controls, live meters and peak protection. Choose **Settings → Audio → Game only** to configure application audio.
+- Play clips directly in their thumbnails; double-click or press **F** for fullscreen and **Escape** to return, using the same playback session.
+- Multitrack video/audio timeline with trimming, splitting, group dragging, snapping, ripple editing, audio fades and volume automation.
+- Effects, filters, editable effect regions, keyframes, transitions with previews, text and captions. Projects, backups and an export queue preserve editable work.
 
-Klipp.Capture      — Windows Graphics Capture implementation
+## Build from source
 
-Klipp.Encoding     — Media Foundation H.264 encoder + raw passthrough
+Install the .NET 10 SDK and Visual Studio with the Windows App SDK/.NET desktop workload, a Windows SDK and the x64 C++ build tools. The C++ tools build the native capture hook and audio gain effect. The development app uses Windows App Runtime 1.6 x64.
 
-Klipp.Storage      — Ring buffer with GOP-aligned eviction
-
-Klipp.Desktop      — WinUI 3 application
-
-Klipp.Tests        — Unit tests (xUnit + Shouldly)
-
-Klipp.SmokeTest    — End-to-end pipeline verification
-
-Every encoder, capture source, and clip writer implements an interface in `Klipp.Core` — components can be swapped without touching the rest of the app.
-
-## Requirements
-
-- Windows 10 build 19041 (May 2020 Update) or later
-- DirectX 11.1-capable GPU
-- Visual Studio 2026 with the Windows App SDK workload (for development)
-- Media Feature Pack installed (required for H.264 encoders on some Windows N or OEM installations)
-
-## Status
-
-Work in progress. Current functionality:
-
-- [x] Continuous WGC capture at 30/60 FPS
-- [x] Thread-safe ring buffer
-- [x] End-to-end pipeline: capture → encoder → buffer → file
-- [x] WinUI 3 library UI with live recording status
-- [x] Save last 30 seconds to disk
-- [ ] H.264 encoding (in progress — phase 1 of 5 complete)
-- [ ] MP4 muxing
-- [ ] Built-in video player
-- [ ] System tray integration
-- [ ] Global hotkey for clip-save
-- [ ] WASAPI loopback audio capture
-
-## Build
-
-```bash
+```powershell
 git clone https://github.com/HappyHamster135/Klipp.git
 cd Klipp
 dotnet restore
-dotnet build
+dotnet test tests/Klipp.Tests/Klipp.Tests.csproj
 ```
 
-Run the smoke test (verifies the full pipeline works):
+Open `Klipp.sln` in Visual Studio, select **x64**, set `Klipp.Desktop` as the startup project and run it. Native harnesses under `tools/` cover capture, audio, recovery, preview and export paths.
 
-```bash
-dotnet run --project tools/Klipp.SmokeTest
+To build a portable release in a new directory under `artifacts/releases/`:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File tools/Publish-KlippRelease.ps1 -Version 1.0.5
 ```
 
-Run the WinUI app from Visual Studio: open `Klipp.sln`, set `Klipp.Desktop` as startup project, press F5.
+The script publishes untrimmed Release binaries with .NET and Windows App SDK dependencies, adds the local VC++ redistributable DLLs, then writes a ZIP and `SHA256SUMS.txt`. It never uploads a release or includes user recordings, settings or certificates.
+
+## Project layout
+
+| Project | Purpose |
+| --- | --- |
+| `Klipp.Core` | Editing, capture and playback models and rules |
+| `Klipp.Capture` | Windows Graphics Capture and Direct3D interop |
+| `Klipp.Encoding` | FFmpeg video encoding, WASAPI audio and MP4 muxing |
+| `Klipp.Storage` | Capture buffer storage |
+| `Klipp.Desktop` | WinUI application, library, player and editor |
+| `Klipp.AudioEffects` | Native playback gain processing |
+| `Klipp.GameHook` | Optional DirectX game overlay/capture support |
+| `Klipp.Tests` | Core regression tests |
 
 ## License
 
-MIT
+Klipp is [MIT licensed](LICENSE). MinHook has its own [license](src/Klipp.GameHook/third_party/minhook/LICENSE.txt). Microsoft runtimes and NuGet dependencies retain their respective licenses. FFmpeg and whisper.cpp are separate tools downloaded when needed.

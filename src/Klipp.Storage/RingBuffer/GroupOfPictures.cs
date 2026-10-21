@@ -39,9 +39,9 @@ internal sealed class GroupOfPictures
     public GroupOfPictures(EncodedSample keyframe)
     {
         if (keyframe.Type != SampleType.Video)
-            throw new ArgumentException("GOP startar alltid med en video-keyframe.", nameof(keyframe));
+            throw new ArgumentException("A GOP must start with a video keyframe.", nameof(keyframe));
         if (!keyframe.IsKeyframe)
-            throw new ArgumentException("Första samplet i en GOP måste vara en keyframe.", nameof(keyframe));
+            throw new ArgumentException("The first sample in a GOP must be a keyframe.", nameof(keyframe));
 
         _samples.Add(keyframe);
         StartTimestamp = keyframe.Timestamp;
@@ -53,9 +53,9 @@ internal sealed class GroupOfPictures
     public void Append(EncodedSample sample)
     {
         if (sample.Type != SampleType.Video)
-            throw new ArgumentException("GOP innehåller bara video-samples.", nameof(sample));
+            throw new ArgumentException("A GOP can only contain video samples.", nameof(sample));
         if (sample.IsKeyframe)
-            throw new ArgumentException("Keyframes startar nya GOP:er, kan inte appendas.", nameof(sample));
+            throw new ArgumentException("Keyframes start new GOPs and cannot be appended.", nameof(sample));
 
         _samples.Add(sample);
         EndTimestamp = sample.Timestamp + sample.Duration;

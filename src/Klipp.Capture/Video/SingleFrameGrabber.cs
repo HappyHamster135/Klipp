@@ -40,7 +40,7 @@ public sealed class SingleFrameGrabber : IDisposable
         {
             CaptureTargetKind.Window => GraphicsCaptureItemFactory.CreateForWindow(target.Handle),
             CaptureTargetKind.Monitor => GraphicsCaptureItemFactory.CreateForMonitor(target.Handle),
-            _ => throw new NotSupportedException("Okänd target-typ: " + target.Kind)
+            _ => throw new NotSupportedException("Unknown capture target type: " + target.Kind)
         };
 
         using var framePool = Direct3D11CaptureFramePool.Create(
@@ -64,7 +64,7 @@ public sealed class SingleFrameGrabber : IDisposable
         }
 
         if (capturedFrame is null)
-            throw new TimeoutException("Ingen frame mottagen inom 5 sekunder. Är fönstret minimerat?");
+            throw new TimeoutException("No frame was received within 5 seconds. Is the window minimized?");
 
         using (capturedFrame)
         {
@@ -95,6 +95,7 @@ public sealed class SingleFrameGrabber : IDisposable
     {
         if (_disposed) return;
         _disposed = true;
+        _reader.Dispose();
         _d3d.Dispose();
     }
 }

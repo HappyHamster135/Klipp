@@ -1,0 +1,46 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../../src/Klipp.Core/Editing/EditorAudioDuckingMath.cs" Link="Editing/EditorAudioDuckingMath.cs" />
+    <Compile Include="../../src/Klipp.Desktop/Services/WaveformService.cs" Link="Services/WaveformService.cs" />
+    <Compile Include="../../src/Klipp.Desktop/Services/AudioSignalAnalysisService.cs" Link="Services/AudioSignalAnalysisService.cs" />
+    <Compile Include="../../src/Klipp.Desktop/Services/AudioLoudnessAnalysisService.cs" Link="Services/AudioLoudnessAnalysisService.cs" />
+    <Compile Include="../Klipp.ProjectExportHarness/TransitionFamilyChecks.cs" Link="TransitionFamilyChecks.cs" />
+    <Compile Include="../../src/Klipp.Core/Editing/EditorTransitionAuditionMath.cs" Link="Editing/EditorTransitionAuditionMath.cs" />
+    <Compile Include="../../src/Klipp.Encoding/FFmpeg/FFmpegLocator.cs" Link="Services/FFmpegLocator.cs" />
+    <Compile Include="../../src/Klipp.Core/Performance/PriorityBackgroundWorkQueue.cs" Link="Services/PriorityBackgroundWorkQueue.cs" />
+    <Compile Include="../../src/Klipp.Core/Models/PiecewiseLinearCurve.cs" Link="Models/PiecewiseLinearCurve.cs" />
+    <Compile Include="../../src/Klipp.Core/Models/NaturalCubicCurve.cs" Link="Models/NaturalCubicCurve.cs" />
+    <Compile Include="../../src/Klipp.Core/Models/EditorLookCurves.cs" Link="Models/EditorLookCurves.cs" />
+    <Compile Include="../../src/Klipp.Core/Models/RecordingSessionManifest.cs" Link="Models/RecordingSessionManifest.cs" />
+    <Compile Include="../../src/Klipp.Core/Editing/EditorEffectRegionMath.cs" Link="Editing/EditorEffectRegionMath.cs" />
+    <Compile Include="../../src/Klipp.Core/Editing/EditorSourceFitMath.cs" Link="Editing/EditorSourceFitMath.cs" />
+    <Compile Include="../../src/Klipp.Core/Editing/EditorKeyframeTrimMath.cs" Link="Editing/EditorKeyframeTrimMath.cs" />
+    <Compile Include="../../src/Klipp.Desktop/Models/EditorProject.cs" Link="Models/EditorProject.cs" />
+    <Compile Include="../../src/Klipp.Desktop/Models/EditorProjectEffectLayer.cs" Link="Models/EditorProjectEffectLayer.cs" />
+    <Compile Include="../../src/Klipp.Desktop/Models/SavedEditorProjectInfo.cs" Link="Models/SavedEditorProjectInfo.cs" />
+    <Compile Include="../../src/Klipp.Desktop/Models/EditorTextTypography.cs" Link="Models/EditorTextTypography.cs" />
+    <Compile Include="../../src/Klipp.Desktop/Services/ClipEditService.cs" Link="Services/ClipEditService.cs" />
+    <Compile Include="../../src/Klipp.Desktop/Services/CubeLutService.cs" Link="Services/CubeLutService.cs" />
+    <Compile Include="../../src/Klipp.Desktop/Services/EditorProjectExportService.cs" Link="Services/EditorProjectExportService.cs" />
+    <Compile Include="../../src/Klipp.Desktop/Services/EditorProjectService.cs" Link="Services/EditorProjectService.cs" />
+    <Compile Include="../../src/Klipp.Desktop/Services/RecordingBookmarkService.cs" Link="Services/RecordingBookmarkService.cs" />
+    <Compile Include="../../src/Klipp.Desktop/Services/EditorProjectBackupService.cs" Link="Services/EditorProjectBackupService.cs" />
+    <Compile Include="../../src/Klipp.Desktop/Services/EditorProjectFilesService.cs" Link="Services/EditorProjectFilesService.cs" />
+    <Compile Include="../../src/Klipp.Desktop/Services/EditorSourceAudioService.cs" Link="Services/EditorSourceAudioService.cs" />
+    <Compile Include="../../src/Klipp.Desktop/Services/EditorVideoProcessingService.cs" Link="Services/EditorVideoProcessingService.cs" />
+    <Compile Include="../../src/Klipp.Desktop/Services/EditorTimelineRenderCacheService.cs" Link="Services/EditorTimelineRenderCacheService.cs" />
+    <Compile Include="../../src/Klipp.Desktop/Services/FFmpegEncoderService.cs" Link="Services/FFmpegEncoderService.cs" />
+    <Compile Include="../../src/Klipp.Desktop/Services/FFmpegProgressReader.cs" Link="Services/FFmpegProgressReader.cs" />
+    <Compile Include="../../src/Klipp.Desktop/Services/MediaProbeService.cs" Link="Services/MediaProbeService.cs" />
+    <Compile Include="../../src/Klipp.Desktop/Services/MediaPreviewWorkQueue.cs" Link="Services/MediaPreviewWorkQueue.cs" />
+    <Compile Include="../../src/Klipp.Desktop/Services/MediaCacheGenerationGate.cs" Link="Services/MediaCacheGenerationGate.cs" />
+    <Compile Include="../../src/Klipp.Desktop/Services/EditorLookThumbnailService.cs" Link="Services/EditorLookThumbnailService.cs" />
+  </ItemGroup>
+</Project>

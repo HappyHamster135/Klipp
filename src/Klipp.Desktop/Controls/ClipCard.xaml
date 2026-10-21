@@ -1,88 +1,171 @@
-﻿<UserControl
+<UserControl
     x:Class="Klipp.Desktop.Controls.ClipCard"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-    PointerPressed="OnPointerPressed">
-
-    <Border Background="{StaticResource KlippSurfaceBrush}"
-            BorderBrush="{StaticResource KlippBorderBrush}"
-            BorderThickness="1"
-            CornerRadius="{StaticResource KlippRadiusMd}">
-
+    xmlns:controls="using:Klipp.Desktop.Controls"
+    IsTabStop="True" UseSystemFocusVisuals="True" UseLayoutRounding="True"
+    KeyDown="OnCardKeyDown" GotFocus="OnCardGotFocus" LostFocus="OnCardLostFocus"
+    Tapped="OnCardTapped"
+    AutomationProperties.HelpText="Press Enter or Space to play here. Double-click or press F for fullscreen; Escape returns to the thumbnail. Press E to edit."
+    PointerEntered="OnPointerEntered" PointerExited="OnPointerExited"
+    PointerPressed="OnPointerPressed" PointerReleased="OnPointerReleased"
+    PointerCanceled="OnCardPointerCanceled" PointerCaptureLost="OnCardPointerCanceled">
+    <Border x:Name="CardRoot" Background="{StaticResource KlippSurfaceBrush}"
+            BorderBrush="{StaticResource KlippBorderBrush}" BorderThickness="1" CornerRadius="6">
         <Grid>
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
 
-            <!-- Thumbnail-area -->
-            <!-- Thumbnail-area -->
-            <Grid Grid.Row="0" Height="120">
-                <Rectangle Fill="{StaticResource KlippSurfaceElevatedBrush}" />
-
-                <!-- Riktig thumbnail från videon (dold tills laddad) -->
-                <Image x:Name="ThumbnailImage"
-                       Stretch="UniformToFill"
-                       Visibility="Collapsed" />
-
-                <!-- Placeholder-ikon som visas innan thumbnail laddats -->
-                <Border x:Name="PlaceholderIcon"
-                        Width="40"
-                        Height="40"
-                        Background="{StaticResource KlippAccentBrush}"
-                        CornerRadius="20"
-                        HorizontalAlignment="Center"
-                        VerticalAlignment="Center">
-                    <TextBlock Text="&#x25B6;"
-                               Foreground="White"
-                               FontSize="14"
-                               HorizontalAlignment="Center"
-                               VerticalAlignment="Center"
-                               Margin="3,0,0,0" />
+            <controls:PlaybackCursorGrid x:Name="ThumbnailFrame" Grid.Row="0" Height="152" CornerRadius="5,5,0,0"
+                  Background="{StaticResource KlippSurfaceElevatedBrush}"
+                  Tapped="OnInlineVideoTapped" DoubleTapped="OnInlineVideoDoubleTapped">
+                <Image x:Name="ThumbnailImage" Stretch="UniformToFill" Opacity="0" Visibility="Collapsed" />
+                <Rectangle x:Name="ThumbnailScrim" Fill="{StaticResource KlippThumbnailScrimBrush}" IsHitTestVisible="False" />
+                <Rectangle x:Name="HoverOverlay" Fill="White" Opacity="0" IsHitTestVisible="False" />
+                <!-- Thumbnail decoration must stay underneath decoded video in either view. -->
+                <Grid x:Name="InlinePlayerHost" Background="Black" Visibility="Collapsed" IsHitTestVisible="False" />
+                <Border x:Name="PlaceholderIcon" Width="40" Height="32" CornerRadius="4"
+                        HorizontalAlignment="Center" VerticalAlignment="Center"
+                        Background="{StaticResource KlippSurfaceBrush}">
+                    <FontIcon Glyph="&#xE714;" FontSize="16" Foreground="{StaticResource KlippTextSecondaryBrush}" />
                 </Border>
-
-                <Border x:Name="NewBadge"
-                        Background="{StaticResource KlippAccentBrush}"
-                        CornerRadius="10"
-                        Padding="7,2,7,2"
-                        HorizontalAlignment="Left"
-                        VerticalAlignment="Top"
-                        Margin="8,8,0,0"
-                        Visibility="Collapsed">
-                    <TextBlock Text="NY"
-                               Foreground="White"
-                               FontSize="10"
-                               FontWeight="SemiBold" />
+                <Border x:Name="InlinePlayBadge" Width="36" Height="36" CornerRadius="18"
+                        Background="#DD17191C" BorderBrush="#33FFFFFF" BorderThickness="1"
+                        HorizontalAlignment="Center" VerticalAlignment="Center" IsHitTestVisible="False">
+                    <FontIcon Glyph="&#xE768;" FontSize="14" Foreground="White" Margin="2,0,0,0" />
                 </Border>
-
-                <Border Background="#B3000000"
-                        CornerRadius="3"
-                        Padding="6,2,6,2"
-                        HorizontalAlignment="Right"
-                        VerticalAlignment="Bottom"
-                        Margin="0,0,8,8">
-                    <TextBlock x:Name="DurationText"
-                               Text="0:30"
-                               Foreground="White"
-                               FontSize="11" />
+                <Border x:Name="InlineErrorBorder" Background="#ED17191C" CornerRadius="4" Padding="10,6"
+                        Margin="12" VerticalAlignment="Center" Visibility="Collapsed" IsHitTestVisible="False">
+                    <TextBlock Text="Preview unavailable. Open the player from More actions."
+                               FontSize="12" Foreground="White" TextWrapping="Wrap" TextAlignment="Center" />
                 </Border>
+                <Border x:Name="NewBadge" Background="{StaticResource KlippAccentBrush}" CornerRadius="4"
+                        Padding="6,2" HorizontalAlignment="Left" VerticalAlignment="Top"
+                        Margin="8" Visibility="Collapsed">
+                    <TextBlock Text="NEW" Foreground="#101419" FontSize="10" FontWeight="SemiBold" />
+                </Border>
+                <Border x:Name="FavoriteBadge" Width="24" Height="24" Background="#D9202327"
+                        CornerRadius="4" HorizontalAlignment="Right" VerticalAlignment="Top"
+                        Margin="8" Visibility="Collapsed" IsHitTestVisible="False">
+                    <FontIcon Glyph="&#xE735;" FontSize="12" Foreground="{StaticResource KlippWarningBrush}" />
+                </Border>
+                <Border x:Name="DurationBadge" Background="#D917191C" CornerRadius="4" Padding="6,2"
+                        HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="8">
+                    <TextBlock x:Name="DurationText" Text="0:30" Foreground="White"
+                               FontFamily="{StaticResource KlippFontFamilyMono}" FontSize="11" />
+                </Border>
+                <Grid x:Name="InlineControls" VerticalAlignment="Bottom" Visibility="Collapsed"
+                      Background="#E617191C" Padding="4,0,4,4" RowSpacing="0"
+                      PointerPressed="OnActionBarPointerPressed" PointerReleased="OnActionBarPointerReleased">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="24" />
+                        <RowDefinition Height="28" />
+                    </Grid.RowDefinitions>
+                    <Slider x:Name="InlineSeekSlider" Minimum="0" Maximum="1" Value="0" Height="24" MinHeight="24" Margin="6,0"
+                            Foreground="{StaticResource KlippAccentBrush}" Background="#55FFFFFF"
+                            AutomationProperties.Name="Preview position" IsEnabled="False"
+                            ValueChanged="OnInlineSeekChanged" />
+                    <Grid x:Name="InlineButtonBar" Grid.Row="1" ColumnSpacing="4">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="28" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="28" />
+                            <ColumnDefinition Width="28" />
+                        </Grid.ColumnDefinitions>
+                        <Button x:Name="InlinePlayButton" Width="28" Height="28" MinWidth="28" MinHeight="28" Padding="0"
+                                Background="Transparent" Foreground="White" BorderThickness="0"
+                                Click="OnInlinePlayClicked" AutomationProperties.Name="Pause preview" ToolTipService.ToolTip="Play / pause">
+                            <FontIcon x:Name="InlinePlayIcon" Glyph="&#xE769;" FontSize="12" />
+                        </Button>
+                        <TextBlock x:Name="InlineTimeText" Grid.Column="1" Text="0:00" Foreground="White" FontSize="10"
+                                   FontFamily="{StaticResource KlippFontFamilyMono}" VerticalAlignment="Center"
+                                   TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" IsHitTestVisible="False" />
+                        <Button x:Name="InlineMuteButton" Grid.Column="2" Width="28" Height="28" MinWidth="28" MinHeight="28" Padding="0"
+                                Background="Transparent" Foreground="White" BorderThickness="0"
+                                Click="OnInlineMuteClicked" AutomationProperties.Name="Mute preview" ToolTipService.ToolTip="Mute / unmute">
+                            <FontIcon x:Name="InlineMuteIcon" Glyph="&#xE995;" FontSize="13" />
+                        </Button>
+                        <Button x:Name="InlineExpandButton" Grid.Column="3" Width="28" Height="28" MinWidth="28" MinHeight="28" Padding="0"
+                                Background="Transparent" Foreground="White" BorderThickness="0"
+                                Click="OnInlineExpandClicked" AutomationProperties.Name="Play fullscreen" ToolTipService.ToolTip="Fullscreen (double-click or F)">
+                            <FontIcon x:Name="InlineExpandIcon" Glyph="&#xE740;" FontSize="12" />
+                        </Button>
+                    </Grid>
+                </Grid>
+                <Grid x:Name="InlineFullscreenHeader" VerticalAlignment="Top" Visibility="Collapsed"
+                      Padding="16,12" ColumnSpacing="16" Background="#D917191C">
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                    <Button Click="OnInlineExpandClicked" Height="32" Padding="10,4"
+                            AutomationProperties.Name="Return to thumbnail" ToolTipService.ToolTip="Return to thumbnail (Escape)">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <FontIcon Glyph="&#xE72B;" FontSize="14" />
+                            <TextBlock Text="Thumbnail" />
+                        </StackPanel>
+                    </Button>
+                    <TextBlock x:Name="InlineFullscreenTitle" Grid.Column="1" VerticalAlignment="Center"
+                               FontSize="14" FontWeight="SemiBold" Foreground="White" TextTrimming="CharacterEllipsis" />
+                </Grid>
+            </controls:PlaybackCursorGrid>
+
+            <Grid Grid.Row="1" Padding="12,8,12,4">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" MinHeight="24" />
+                    <RowDefinition Height="Auto" MinHeight="20" />
+                    <RowDefinition Height="Auto" MinHeight="18" />
+                </Grid.RowDefinitions>
+                <TextBlock x:Name="TitleText" Text="Clip" Style="{StaticResource KlippBodyText}"
+                           FontWeight="SemiBold" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                <TextBlock x:Name="MetaText" Grid.Row="1" Style="{StaticResource KlippBodyTextSecondary}"
+                           TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                <TextBlock x:Name="OrganizationText" Grid.Row="2" Style="{StaticResource KlippCaption}"
+                           TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" Visibility="Collapsed" />
             </Grid>
 
-            <!-- Caption -->
-            <StackPanel Grid.Row="1"
-                        Padding="12,10,12,12"
-                        Spacing="2">
-                <TextBlock x:Name="TitleText"
-                           Text="Triple kill - Haven"
-                           Style="{StaticResource KlippBodyText}"
-                           FontWeight="SemiBold"
-                           FontSize="13"
-                           TextTrimming="CharacterEllipsis" />
-                <TextBlock x:Name="MetaText"
-                           Text="Valorant &#x2022; 5 min sedan"
-                           Style="{StaticResource KlippBodyTextSecondary}"
-                           FontSize="11" />
-            </StackPanel>
+            <Grid x:Name="ActionBar" Grid.Row="2" Padding="12,4,12,12" ColumnSpacing="8"
+                  VerticalAlignment="Bottom"
+                  PointerPressed="OnActionBarPointerPressed" PointerReleased="OnActionBarPointerReleased">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="32" />
+                    <ColumnDefinition Width="32" />
+                    <ColumnDefinition Width="32" />
+                </Grid.ColumnDefinitions>
+                <Button Grid.Column="0" Height="32" HorizontalAlignment="Stretch" Click="OnEditClicked"
+                        Background="{StaticResource KlippSurfaceElevatedBrush}" Padding="10,4"
+                        AutomationProperties.Name="Edit clip" ToolTipService.ToolTip="Edit clip (E)">
+                    <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                        <FontIcon Glyph="&#xE70F;" FontSize="16" />
+                        <TextBlock Text="Edit" VerticalAlignment="Center" />
+                    </StackPanel>
+                </Button>
+                <Button x:Name="FavoriteButton" Grid.Column="1" Width="32" Height="32" Padding="0" Background="Transparent"
+                        Click="OnFavoriteClicked" AutomationProperties.Name="Toggle favorite" ToolTipService.ToolTip="Favorite">
+                    <TextBlock x:Name="FavoriteGlyphText" Text="&#xE734;" FontFamily="Segoe MDL2 Assets" FontSize="16" />
+                </Button>
+                <Button Grid.Column="2" Width="32" Height="32" Padding="0" Background="Transparent"
+                        Click="OnOpenFolderClicked" AutomationProperties.Name="Show clip in folder" ToolTipService.ToolTip="Show in folder">
+                    <FontIcon Glyph="&#xE8B7;" FontSize="16" />
+                </Button>
+                <Button Grid.Column="3" Width="32" Height="32" Padding="0" Background="Transparent"
+                        AutomationProperties.Name="More clip actions" ToolTipService.ToolTip="More actions">
+                    <FontIcon Glyph="&#xE712;" FontSize="16" />
+                    <Button.Flyout>
+                        <MenuFlyout>
+                            <MenuFlyoutItem Text="Play fullscreen" Click="OnInlineExpandClicked" />
+                            <MenuFlyoutSeparator />
+                            <MenuFlyoutItem Text="Organize" Click="OnOrganizeClicked" />
+                            <MenuFlyoutItem Text="Rename" Click="OnRenameClicked" />
+                            <MenuFlyoutItem Text="Delete" Click="OnDeleteClicked" />
+                        </MenuFlyout>
+                    </Button.Flyout>
+                </Button>
+            </Grid>
+            <Border x:Name="HoverBorder" Grid.RowSpan="3" CornerRadius="6"
+                    BorderBrush="{StaticResource KlippAccentBrush}" BorderThickness="1"
+                    Background="Transparent" Opacity="0" IsHitTestVisible="False" />
         </Grid>
     </Border>
 </UserControl>

@@ -1,6 +1,5 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 using System.Runtime.CompilerServices;
-using System.Threading;
 using Klipp.Core.Abstractions;
 using Klipp.Core.Models;
 using Klipp.Encoding.FFmpeg;
@@ -8,36 +7,31 @@ using Klipp.Encoding.FFmpeg;
 namespace Klipp.Encoding.Video;
 
 /// <summary>
-/// H.264 encoder som använder FFmpeg via Process.Start. Pipear raw BGRA-frames till
-/// FFmpegs stdin, FFmpeg producerar en MP4-fil med H.264-kodning.
+/// H.264 encoder via FFmpeg. Pipear raw BGRA-frames till FFmpegs stdin och
+/// producerar en video-only MP4-fil. Ljud muxas separat efter inspelningen.
 /// </summary>
-/// <remarks>
-/// Encodern är dimensions-agnostisk och har inbyggd frame pacing — den pipear frames
-/// till FFmpeg med konstant frekvens (target FPS från RecordingSettings), oberoende av
-/// hur ofta caller anropar EncodeAsync. När ingen ny frame kommer från caller pipear
-/// vi den senaste igen, vilket ger korrekt timing i den producerade MP4-filen.
-///
-/// VIKTIGT: Output-sökväg sätts via SetOutputPath() innan InitializeAsync().
-/// FFmpeg-processen startar dock först vid första framen, så vi kan lära oss
-/// dimensions från capture-källan.
-/// </remarks>
 public sealed class FFmpegH264Encoder : IVideoEncoder
 {
     private readonly FFmpegLocator _locator;
     private string? _outputPath;
     private string? _ffmpegPath;
     private RecordingSettings? _settings;
+    private CaptureVideoEncoderSelection? _encoderSelection;
 
     private Process? _ffmpegProcess;
     private Stream? _stdin;
     private int _inputWidth;
     private int _inputHeight;
 
-    // Pacing: håll senaste framen + en timer som pipear den i constant rate
+    // Pacing: håll senaste framen + en timer som pipear den i constant rate.
     private readonly Lock _frameLock = new();
     private ReadOnlyMemory<byte> _latestFrameData;
     private CancellationTokenSource? _pacingCts;
     private Task? _pacingTask;
+    private long _framesWritten;
+    private long _pacingStartTimestamp;
+    private long _stopTargetFrames = -1;
+    private volatile bool _stopRequested;
 
     private bool _initialized;
     private bool _ffmpegStarted;
@@ -48,24 +42,39 @@ public sealed class FFmpegH264Encoder : IVideoEncoder
         _locator = locator ?? new FFmpegLocator();
     }
 
-    /// <summary>
-    /// Sätter sökvägen där FFmpeg ska skriva MP4-filen. Måste anropas innan
-    /// InitializeAsync().
-    /// </summary>
+    public long FramesWritten => Interlocked.Read(ref _framesWritten);
+    public long PacingStartTimestamp => Interlocked.Read(ref _pacingStartTimestamp);
+    public bool IsRunning
+    {
+        get
+        {
+            try { return _ffmpegStarted && _ffmpegProcess is { HasExited: false }; }
+            catch { return false; }
+        }
+    }
+    public int InputWidth => _inputWidth;
+    public int InputHeight => _inputHeight;
+    public string EncoderDisplayName => _encoderSelection?.DisplayName ?? "Preparing encoder";
+    public string? EncoderFallbackReason => _encoderSelection?.FallbackReason;
+    public bool IsHardwareEncoder => _encoderSelection?.IsHardware == true;
+
+    /// <summary>Sätter MP4-output-sökväg. Måste anropas innan InitializeAsync().</summary>
     public void SetOutputPath(string path) => _outputPath = path;
 
     public async Task InitializeAsync(RecordingSettings settings, CancellationToken cancellationToken = default)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
-        if (_initialized) throw new InvalidOperationException("Encoder är redan initialiserad.");
+        if (_initialized) throw new InvalidOperationException("The encoder is already initialized.");
         if (string.IsNullOrWhiteSpace(_outputPath))
-            throw new InvalidOperationException("Anropa SetOutputPath() innan InitializeAsync().");
+            throw new InvalidOperationException("Call SetOutputPath() before InitializeAsync().");
 
         ArgumentNullException.ThrowIfNull(settings);
         settings.Validate();
         _settings = settings;
 
         _ffmpegPath = await _locator.GetFFmpegPathAsync(progress: null, cancellationToken)
+            .ConfigureAwait(false);
+        _encoderSelection = await FFmpegCaptureEncoderSelector.SelectAsync(_ffmpegPath, settings, cancellationToken)
             .ConfigureAwait(false);
 
         _initialized = true;
@@ -76,7 +85,7 @@ public sealed class FFmpegH264Encoder : IVideoEncoder
         _inputWidth = width;
         _inputHeight = height;
 
-        var args = BuildFFmpegArgs(_settings!, _outputPath!, width, height);
+        var args = BuildFFmpegArgs(_settings!, _encoderSelection!, _outputPath!, width, height);
 
         var psi = new ProcessStartInfo
         {
@@ -90,68 +99,71 @@ public sealed class FFmpegH264Encoder : IVideoEncoder
         };
 
         _ffmpegProcess = Process.Start(psi)
-            ?? throw new InvalidOperationException("Kunde inte starta ffmpeg.exe");
+            ?? throw new InvalidOperationException("Could not start ffmpeg.exe.");
 
+        TrySetFFmpegPriority(_ffmpegProcess);
         _stdin = _ffmpegProcess.StandardInput.BaseStream;
 
-        // Konsumera stderr i bakgrunden så processen inte hänger på en full pipe
+        // Konsumera stderr i bakgrunden så processen inte hänger på full pipe.
         _ = Task.Run(async () =>
         {
             try
             {
                 var stderr = _ffmpegProcess.StandardError;
-                while (await stderr.ReadLineAsync().ConfigureAwait(false) is not null)
-                {
-                    // Ignorera output men håll pipen tom
-                }
+                while (await stderr.ReadLineAsync().ConfigureAwait(false) is not null) { }
             }
-            catch { /* processen kan vara död */ }
+            catch { }
         });
 
-        // Starta pacing-tråden som pipear senaste frame i constant rate
         _pacingCts = new CancellationTokenSource();
         _pacingTask = Task.Run(() => PacingLoopAsync(_pacingCts.Token));
 
         _ffmpegStarted = true;
     }
 
-    /// <summary>
-    /// Pacing-loopen kör i bakgrunden och pipear senaste frame till FFmpeg
-    /// med constant frekvens (target FPS från settings). Detta säkerställer att
-    /// FFmpeg får exakt rätt antal frames per sekund även om capture-källan
-    /// inte levererar frames i jämn takt.
-    /// </summary>
     private async Task PacingLoopAsync(CancellationToken cancellationToken)
     {
         var targetFps = _settings!.FrameRate;
-        var frameIntervalTicks = TimeSpan.TicksPerSecond / targetFps;
-        var nextTick = Stopwatch.GetTimestamp();
         var ticksPerStopwatchSecond = Stopwatch.Frequency;
+        var frameIntervalStopwatch = ticksPerStopwatchSecond / targetFps;
 
-        // Konvertera frame interval från TimeSpan ticks till stopwatch ticks
-        var frameIntervalStopwatch = (long)((double)frameIntervalTicks / TimeSpan.TicksPerSecond * ticksPerStopwatchSecond);
+        // Starta klockan först när första riktiga frame finns.
+        while (!cancellationToken.IsCancellationRequested)
+        {
+            bool hasFrame;
+            lock (_frameLock) { hasFrame = !_latestFrameData.IsEmpty; }
+            if (hasFrame) break;
+
+            try { await Task.Delay(5, cancellationToken).ConfigureAwait(false); }
+            catch (OperationCanceledException) { return; }
+        }
+
+        var startTick = Stopwatch.GetTimestamp();
+        Interlocked.Exchange(ref _pacingStartTimestamp, startTick);
+        var nextTick = startTick;
 
         while (!cancellationToken.IsCancellationRequested)
         {
-            // Snapshot av senaste frame
-            ReadOnlyMemory<byte> frameData;
-            lock (_frameLock)
+            if (_stopRequested &&
+                Interlocked.Read(ref _framesWritten) >= Interlocked.Read(ref _stopTargetFrames))
             {
-                frameData = _latestFrameData;
+                break;
             }
 
-            // Pipea om vi har en frame att skicka
+            ReadOnlyMemory<byte> frameData;
+            lock (_frameLock) { frameData = _latestFrameData; }
+
             if (!frameData.IsEmpty && _stdin is not null)
             {
                 try
                 {
                     await _stdin.WriteAsync(frameData, cancellationToken).ConfigureAwait(false);
+                    Interlocked.Increment(ref _framesWritten);
                 }
                 catch (OperationCanceledException) { break; }
-                catch (IOException) { break; } // FFmpeg-processen har troligen avslutats
+                catch (IOException) { break; }
             }
 
-            // Vänta till nästa tick — använd Stopwatch för precis timing
             nextTick += frameIntervalStopwatch;
             var now = Stopwatch.GetTimestamp();
             var ticksToWait = nextTick - now;
@@ -161,70 +173,86 @@ public sealed class FFmpegH264Encoder : IVideoEncoder
                 var msToWait = (int)(ticksToWait * 1000.0 / ticksPerStopwatchSecond);
                 if (msToWait > 0)
                 {
-                    try
-                    {
-                        await Task.Delay(msToWait, cancellationToken).ConfigureAwait(false);
-                    }
+                    try { await Task.Delay(msToWait, cancellationToken).ConfigureAwait(false); }
                     catch (OperationCanceledException) { break; }
                 }
-            }
-            else
-            {
-                // Vi ligger efter — hoppa fram så vi inte ackumulerar fördröjning
-                nextTick = now;
             }
         }
     }
 
-    private static string BuildFFmpegArgs(RecordingSettings settings, string outputPath, int width, int height)
+    private static string BuildFFmpegArgs(RecordingSettings settings, CaptureVideoEncoderSelection selection, string outputPath, int width, int height)
     {
-        return $"-f rawvideo -pix_fmt bgra " +
-               $"-s {width}x{height} -r {settings.FrameRate} " +
-               $"-i - " +
-               $"-c:v libx264 -preset veryfast " +
-               $"-b:v {settings.VideoBitrate / 1000}k " +
-               $"-pix_fmt yuv420p " +
-               $"-y \"{outputPath}\"";
+        var keyframeInterval = settings.FrameRate * settings.KeyframeIntervalSeconds;
+        var scaleFilter = settings.Width != width || settings.Height != height
+            ? $"-vf scale={settings.Width}:{settings.Height}:flags=fast_bilinear "
+            : string.Empty;
+
+        return $"-hide_banner -loglevel warning -filter_threads 2 -f rawvideo -pix_fmt bgra " +
+               $"-s {width}x{height} -r {settings.FrameRate} -i - " +
+               string.Join(" ", FFmpegCaptureEncoderSelector.VideoArguments(settings, selection, keyframeInterval)) + " " +
+               scaleFilter +
+               // A completed moov is written before media; each one-second
+               // fragment remains readable if capture or Windows stops early.
+               $"-vsync cfr -movflags +frag_keyframe+empty_moov+default_base_moof " +
+               $"-frag_duration 1000000 -flush_packets 1 -n \"{outputPath}\"";
     }
 
-    public IAsyncEnumerable<EncodedSample> EncodeAsync(
-        VideoFrame frame,
-        CancellationToken cancellationToken = default)
+    private static void TrySetFFmpegPriority(Process process)
+    {
+        try { process.PriorityClass = ProcessPriorityClass.BelowNormal; }
+        catch { }
+    }
+
+    public IAsyncEnumerable<EncodedSample> EncodeAsync(VideoFrame frame, CancellationToken cancellationToken = default)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
-        if (!_initialized) throw new InvalidOperationException("Anropa InitializeAsync först.");
+        if (!_initialized) throw new InvalidOperationException("Call InitializeAsync first.");
 
-        // Starta FFmpeg vid första framen med de faktiska dimensions
         if (!_ffmpegStarted)
         {
+            Interlocked.Exchange(ref _framesWritten, 0);
+            Interlocked.Exchange(ref _pacingStartTimestamp, 0);
+            Interlocked.Exchange(ref _stopTargetFrames, -1);
+            _stopRequested = false;
             StartFFmpeg(frame.Width, frame.Height);
         }
         else if (frame.Width != _inputWidth || frame.Height != _inputHeight)
         {
-            // Capture-storleken har ändrats mitt i — ignorera framen för nu
             return EmptyAsync();
         }
 
-        // Spara framen — pacing-tråden plockar upp den och pipear i constant rate
-        lock (_frameLock)
-        {
-            _latestFrameData = frame.PixelData;
-        }
-
+        lock (_frameLock) { _latestFrameData = frame.PixelData; }
         return EmptyAsync();
     }
 
     public async IAsyncEnumerable<EncodedSample> FlushAsync(
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
-        // Stoppa pacing-tråden — vi vill inte mata in fler duplicerade frames
         if (_pacingCts is not null)
         {
-            _pacingCts.Cancel();
             if (_pacingTask is not null)
             {
-                try { await _pacingTask.ConfigureAwait(false); }
-                catch (OperationCanceledException) { /* förväntat */ }
+                RequestPacingStop();
+                try
+                {
+                    await _pacingTask.WaitAsync(TimeSpan.FromSeconds(8), cancellationToken)
+                        .ConfigureAwait(false);
+                }
+                catch (TimeoutException)
+                {
+                    _pacingCts.Cancel();
+                    try { await _pacingTask.ConfigureAwait(false); }
+                    catch (OperationCanceledException) { }
+                }
+                catch (OperationCanceledException)
+                {
+                    _pacingCts.Cancel();
+                    throw;
+                }
+            }
+            else
+            {
+                _pacingCts.Cancel();
             }
         }
 
@@ -240,7 +268,28 @@ public sealed class FFmpegH264Encoder : IVideoEncoder
             await _ffmpegProcess.WaitForExitAsync(cancellationToken).ConfigureAwait(false);
         }
 
+        if (_ffmpegProcess is { ExitCode: not 0 })
+            throw new InvalidOperationException("The video encoder stopped before finalizing. The captured video has been kept for recovery.");
+
         yield break;
+    }
+
+    private void RequestPacingStop()
+    {
+        var startTimestamp = Interlocked.Read(ref _pacingStartTimestamp);
+        if (startTimestamp == 0 || _settings is null)
+        {
+            _pacingCts?.Cancel();
+            return;
+        }
+
+        var elapsedSeconds = (Stopwatch.GetTimestamp() - startTimestamp) / (double)Stopwatch.Frequency;
+        var targetFrames = Math.Max(
+            Interlocked.Read(ref _framesWritten),
+            (long)Math.Ceiling(elapsedSeconds * _settings.FrameRate));
+
+        Interlocked.Exchange(ref _stopTargetFrames, targetFrames);
+        _stopRequested = true;
     }
 
     public async ValueTask DisposeAsync()
@@ -248,14 +297,13 @@ public sealed class FFmpegH264Encoder : IVideoEncoder
         if (_disposed) return;
         _disposed = true;
 
-        // Stoppa pacing-tråden först
         try
         {
             _pacingCts?.Cancel();
             if (_pacingTask is not null)
             {
                 try { await _pacingTask.ConfigureAwait(false); }
-                catch { /* ignorera fel vid dispose */ }
+                catch { }
             }
             _pacingCts?.Dispose();
         }
@@ -272,14 +320,8 @@ public sealed class FFmpegH264Encoder : IVideoEncoder
             if (_ffmpegProcess is not null && !_ffmpegProcess.HasExited)
             {
                 using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
-                try
-                {
-                    await _ffmpegProcess.WaitForExitAsync(cts.Token).ConfigureAwait(false);
-                }
-                catch (OperationCanceledException)
-                {
-                    try { _ffmpegProcess.Kill(); } catch { }
-                }
+                try { await _ffmpegProcess.WaitForExitAsync(cts.Token).ConfigureAwait(false); }
+                catch (OperationCanceledException) { try { _ffmpegProcess.Kill(); } catch { } }
             }
         }
         finally

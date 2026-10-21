@@ -1,5 +1,7 @@
 ﻿using System;
 using System.Runtime.InteropServices;
+using System.Collections.Generic;
+using System.Linq;
 
 namespace Klipp.Desktop.Services;
 
@@ -50,11 +52,12 @@ public sealed class HotkeyManager : IDisposable
     private readonly int _hotkeyId;
     private WndProcDelegate? _newWndProc;
     private nint _originalWndProc;
-    private bool _registered;
+    private readonly Dictionary<int, (uint Modifiers, uint Key)> _registrations = [];
     private bool _disposed;
 
     /// <summary>Triggas när den registrerade hotkeyen trycks.</summary>
     public event EventHandler? HotkeyPressed;
+    public event Action<int>? AdditionalHotkeyPressed;
 
     /// <summary>
     /// Skapar en HotkeyManager för ett fönster.
@@ -79,26 +82,37 @@ public sealed class HotkeyManager : IDisposable
     /// <param name="virtualKey">Virtual key code (t.ex. 0x53 för 'S').</param>
     /// <returns>True om registreringen lyckades.</returns>
     public bool Register(Modifiers modifiers, uint virtualKey)
+        => RegisterCore(_hotkeyId, modifiers, virtualKey);
+
+    public bool RegisterAdditional(int id, Modifiers modifiers, uint virtualKey)
+    {
+        if (id == _hotkeyId || id < 1) throw new ArgumentOutOfRangeException(nameof(id));
+        return RegisterCore(id, modifiers, virtualKey);
+    }
+
+    private bool RegisterCore(int id, Modifiers modifiers, uint virtualKey)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
-
-        if (_registered)
-        {
-            UnregisterHotKey(_hwnd, _hotkeyId);
-            _registered = false;
-        }
-
-        // Lägg alltid till NoRepeat så att hålla nere tangenten inte spammar events
         var mods = (uint)(modifiers | Modifiers.NoRepeat);
-        _registered = RegisterHotKey(_hwnd, _hotkeyId, mods, virtualKey);
-        return _registered;
+        if (_registrations.TryGetValue(id, out var old) && old == (mods, virtualKey)) return true;
+        if (_registrations.Any(pair => pair.Key != id && pair.Value == (mods, virtualKey))) return false;
+        var hadOld = _registrations.Remove(id);
+        if (hadOld) UnregisterHotKey(_hwnd, id);
+        if (RegisterHotKey(_hwnd, id, mods, virtualKey))
+        {
+            _registrations[id] = (mods, virtualKey);
+            return true;
+        }
+        if (hadOld && RegisterHotKey(_hwnd, id, old.Modifiers, old.Key)) _registrations[id] = old;
+        return false;
     }
 
     private nint CustomWndProc(nint hWnd, uint msg, nint wParam, nint lParam)
     {
-        if (msg == WM_HOTKEY && wParam.ToInt32() == _hotkeyId)
+        if (msg == WM_HOTKEY && _registrations.ContainsKey(wParam.ToInt32()))
         {
-            HotkeyPressed?.Invoke(this, EventArgs.Empty);
+            if (wParam.ToInt32() == _hotkeyId) HotkeyPressed?.Invoke(this, EventArgs.Empty);
+            else AdditionalHotkeyPressed?.Invoke(wParam.ToInt32());
         }
 
         // Skicka vidare till original-WndProc så fönstret fungerar normalt
@@ -110,11 +124,8 @@ public sealed class HotkeyManager : IDisposable
         if (_disposed) return;
         _disposed = true;
 
-        if (_registered)
-        {
-            UnregisterHotKey(_hwnd, _hotkeyId);
-            _registered = false;
-        }
+        foreach (var id in _registrations.Keys) UnregisterHotKey(_hwnd, id);
+        _registrations.Clear();
 
         // Återställ original-WndProc
         if (_originalWndProc != nint.Zero)

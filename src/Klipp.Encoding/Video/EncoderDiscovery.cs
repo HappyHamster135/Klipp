@@ -55,7 +55,7 @@ public static class EncoderDiscovery
         Console.WriteLine($"[debug] MFTEnumEx hr=0x{hr:X8} count={count}");
 
         if (hr < 0)
-            throw new InvalidOperationException($"MFTEnumEx misslyckades: 0x{hr:X8}");
+            throw new InvalidOperationException($"MFTEnumEx failed: 0x{hr:X8}");
 
         if (count == 0 || activatesArrayPtr == nint.Zero)
             return Array.Empty<EncoderInfo>();

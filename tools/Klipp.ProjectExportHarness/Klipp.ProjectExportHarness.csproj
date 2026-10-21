@@ -1,0 +1,42 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0-windows10.0.22621.0</TargetFramework>
+    <SupportedOSPlatformVersion>10.0.19041.0</SupportedOSPlatformVersion>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <PlatformTarget>x64</PlatformTarget>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <SelfContained>true</SelfContained>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <AppendRuntimeIdentifierToOutputPath>false</AppendRuntimeIdentifierToOutputPath>
+    <DesktopOutputDirectory Condition="'$(DesktopOutputDirectory)' == ''">$(MSBuildThisFileDirectory)..\..\src\Klipp.Desktop\bin\x64\$(Configuration)\net10.0-windows10.0.22621.0\win-x64\</DesktopOutputDirectory>
+    <OutputPath>$(DesktopOutputDirectory)</OutputPath>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Reference Include="Klipp.Desktop">
+      <HintPath>$(DesktopOutputDirectory)Klipp.Desktop.dll</HintPath>
+      <Private>true</Private>
+    </Reference>
+    <Reference Include="Klipp.Capture">
+      <HintPath>$(DesktopOutputDirectory)Klipp.Capture.dll</HintPath>
+      <Private>true</Private>
+    </Reference>
+    <Reference Include="Klipp.Core">
+      <HintPath>$(DesktopOutputDirectory)Klipp.Core.dll</HintPath>
+      <Private>true</Private>
+    </Reference>
+    <Reference Include="Klipp.Encoding">
+      <HintPath>$(DesktopOutputDirectory)Klipp.Encoding.dll</HintPath>
+      <Private>true</Private>
+    </Reference>
+    <Reference Include="Klipp.Storage">
+      <HintPath>$(DesktopOutputDirectory)Klipp.Storage.dll</HintPath>
+      <Private>true</Private>
+    </Reference>
+  </ItemGroup>
+
+</Project>

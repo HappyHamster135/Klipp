@@ -17,6 +17,7 @@ public sealed class FFmpegLocator
     // gyan.dev:s "essentials" build innehåller bara binärerna vi behöver (~50 MB)
     private const string FFmpegDownloadUrl =
         "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip";
+    private static readonly SemaphoreSlim InstallLock = new(1, 1);
 
     /// <summary>Mapp där vi cachar ffmpeg.exe och ffprobe.exe.</summary>
     public string BinDirectory { get; }
@@ -24,8 +25,11 @@ public sealed class FFmpegLocator
     /// <summary>Förväntad sökväg till ffmpeg.exe (existerar inte nödvändigtvis).</summary>
     public string FFmpegPath => Path.Combine(BinDirectory, "ffmpeg.exe");
 
-    /// <summary>Returnerar true om ffmpeg.exe redan finns lokalt.</summary>
-    public bool IsInstalled => File.Exists(FFmpegPath);
+    /// <summary>Förväntad sökväg till ffprobe.exe (existerar inte nödvändigtvis).</summary>
+    public string FFprobePath => Path.Combine(BinDirectory, "ffprobe.exe");
+
+    /// <summary>Returnerar true om både ffmpeg.exe och ffprobe.exe redan finns lokalt.</summary>
+    public bool IsInstalled => File.Exists(FFmpegPath) && File.Exists(FFprobePath);
 
     public FFmpegLocator()
     {
@@ -43,15 +47,44 @@ public sealed class FFmpegLocator
         IProgress<double>? progress = null,
         CancellationToken cancellationToken = default)
     {
-        if (IsInstalled) return FFmpegPath;
-
-        await DownloadAndExtractAsync(progress, cancellationToken).ConfigureAwait(false);
-
-        if (!IsInstalled)
-            throw new InvalidOperationException(
-                $"FFmpeg installerades inte korrekt. Förväntad sökväg: {FFmpegPath}");
-
+        await EnsureInstalledAsync(progress, cancellationToken).ConfigureAwait(false);
         return FFmpegPath;
+    }
+
+    /// <summary>
+    /// Returnerar sökvägen till ffprobe.exe. Laddar ner och packar upp om filen saknas.
+    /// </summary>
+    public async Task<string> GetFFprobePathAsync(
+        IProgress<double>? progress = null,
+        CancellationToken cancellationToken = default)
+    {
+        await EnsureInstalledAsync(progress, cancellationToken).ConfigureAwait(false);
+        return FFprobePath;
+    }
+
+    private async Task EnsureInstalledAsync(
+        IProgress<double>? progress,
+        CancellationToken cancellationToken)
+    {
+        if (IsInstalled) return;
+
+        await InstallLock.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            if (!IsInstalled)
+                await DownloadAndExtractAsync(progress, cancellationToken).ConfigureAwait(false);
+
+            if (!File.Exists(FFmpegPath))
+                throw new InvalidOperationException(
+                    $"FFmpeg was not installed correctly. Expected path: {FFmpegPath}");
+            if (!File.Exists(FFprobePath))
+                throw new InvalidOperationException(
+                    $"FFprobe was not installed correctly. Expected path: {FFprobePath}");
+        }
+        finally
+        {
+            InstallLock.Release();
+        }
     }
 
     private async Task DownloadAndExtractAsync(

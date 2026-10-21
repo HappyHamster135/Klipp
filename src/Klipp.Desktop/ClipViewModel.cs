@@ -1,5 +1,6 @@
 ﻿using System.Collections.Generic;
 using System.ComponentModel;
+using System.Linq;
 using System.Runtime.CompilerServices;
 
 namespace Klipp.Desktop;
@@ -16,6 +17,11 @@ public sealed class ClipViewModel : INotifyPropertyChanged
     private string _filePath = string.Empty;
     private string _thumbnailPath = string.Empty;
     private bool _isNew;
+    private bool _isFavorite;
+    private string _tagsText = string.Empty;
+    private string _collection = string.Empty;
+    private long _fileSizeBytes;
+    private System.DateTime _lastWriteTime;
 
     public string Title
     {
@@ -53,12 +59,61 @@ public sealed class ClipViewModel : INotifyPropertyChanged
         set => SetField(ref _isNew, value);
     }
 
+    public bool IsFavorite
+    {
+        get => _isFavorite;
+        set
+        {
+            if (SetField(ref _isFavorite, value))
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(FavoriteGlyph)));
+        }
+    }
+
+    public string FavoriteGlyph => IsFavorite ? "\uE735" : "\uE734";
+
+    public string TagsText
+    {
+        get => _tagsText;
+        set
+        {
+            if (SetField(ref _tagsText, value ?? string.Empty))
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(OrganizationText)));
+        }
+    }
+
+    public string Collection
+    {
+        get => _collection;
+        set
+        {
+            if (SetField(ref _collection, value ?? string.Empty))
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(OrganizationText)));
+        }
+    }
+
+    public string OrganizationText => string.Join(
+        "  •  ",
+        new[] { Collection, TagsText }.Where(value => !string.IsNullOrWhiteSpace(value)));
+
+    public long FileSizeBytes
+    {
+        get => _fileSizeBytes;
+        set => SetField(ref _fileSizeBytes, value);
+    }
+
+    public System.DateTime LastWriteTime
+    {
+        get => _lastWriteTime;
+        set => SetField(ref _lastWriteTime, value);
+    }
+
     public event PropertyChangedEventHandler? PropertyChanged;
 
-    private void SetField<T>(ref T field, T value, [CallerMemberName] string? propertyName = null)
+    private bool SetField<T>(ref T field, T value, [CallerMemberName] string? propertyName = null)
     {
-        if (EqualityComparer<T>.Default.Equals(field, value)) return;
+        if (EqualityComparer<T>.Default.Equals(field, value)) return false;
         field = value;
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        return true;
     }
 }

@@ -14,4 +14,8 @@
     <ProjectReference Include="..\Klipp.Core\Klipp.Core.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <PackageReference Include="NAudio" Version="2.3.0" />
+  </ItemGroup>
+
 </Project>
