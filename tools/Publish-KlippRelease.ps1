@@ -1,10 +1,12 @@
 [CmdletBinding()]
 param(
     [ValidatePattern('^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$')]
-    [string]$Version = '1.0.5',
+    [string]$Version = '1.0.6',
     [string]$OutputRoot = '',
     [string]$VisualStudioDirectory = '',
-    [string]$VcRuntimeDirectory = ''
+    [string]$VcRuntimeDirectory = '',
+    [string]$PreviousReleaseDirectory = '',
+    [switch]$PortableOnly
 )
 
 $ErrorActionPreference = 'Stop'
@@ -176,6 +178,8 @@ its model only when requested. Those tools are not part of this archive.
 Settings and caches: %LOCALAPPDATA%\Klipp
 Default recordings: %USERPROFILE%\Videos\Klipp
 
+For automatic updates, use Klipp-Setup.exe from the same GitHub release. The
+installer uses its own application folder and preserves these data folders.
 This portable release is unsigned. It does not install developer certificates.
 Source, license information and updates: https://github.com/HappyHamster135/Klipp
 "@ | Set-Content -LiteralPath (Join-Path $packageDirectory 'START-HERE.txt') -Encoding utf8
@@ -185,7 +189,32 @@ $zipPath = Join-Path $runDirectory ($packageName + '.zip')
 [IO.Compression.ZipFile]::CreateFromDirectory($packageDirectory, $zipPath, [IO.Compression.CompressionLevel]::Optimal, $true)
 $checksumPath = Join-Path $runDirectory 'SHA256SUMS.txt'
 $checksum = (Get-FileHash -LiteralPath $zipPath -Algorithm SHA256).Hash.ToLowerInvariant()
-Set-Content -LiteralPath $checksumPath -Value ($checksum + '  ' + [IO.Path]::GetFileName($zipPath)) -Encoding ascii
+$releaseAssets = @($zipPath)
+$installerPackage = $null
+if (!$PortableOnly) {
+    $installerPackage = & (Join-Path $PSScriptRoot 'Pack-KlippInstaller.ps1') -PackageDirectory $packageDirectory -Version $Version -PreviousReleaseDirectory $PreviousReleaseDirectory
+    $releaseAssets += @($installerPackage.ReleaseAssets)
+}
+$checksumLines = foreach ($releaseAsset in $releaseAssets) {
+    (Get-FileHash -LiteralPath $releaseAsset -Algorithm SHA256).Hash.ToLowerInvariant() + '  ' + [IO.Path]::GetFileName($releaseAsset)
+}
+$checksumLines | Set-Content -LiteralPath $checksumPath -Encoding ascii
+$releaseAssets += $checksumPath
+[ordered]@{
+    version = $Version
+    sourceCommit = $sourceCommit
+    packageDirectory = $packageDirectory
+    installer = $installerPackage.Installer
+    updateFeed = $installerPackage.UpdateFeed
+    releaseAssets = @($releaseAssets | ForEach-Object {
+        [ordered]@{
+            path = $_
+            name = [IO.Path]::GetFileName($_)
+            size = (Get-Item -LiteralPath $_).Length
+            sha256 = (Get-FileHash -LiteralPath $_ -Algorithm SHA256).Hash.ToLowerInvariant()
+        }
+    })
+} | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath (Join-Path $runDirectory 'release-artifacts.json') -Encoding utf8
 
 [pscustomobject]@{
     Version = $Version
@@ -193,4 +222,8 @@ Set-Content -LiteralPath $checksumPath -Value ($checksum + '  ' + [IO.Path]::Get
     Archive = $zipPath
     Checksums = $checksumPath
     Sha256 = $checksum
+    Installer = $installerPackage.Installer
+    UpdateFeed = $installerPackage.UpdateFeed
+    UpdatePackages = @($installerPackage.UpdatePackages)
+    ReleaseAssets = $releaseAssets
 }

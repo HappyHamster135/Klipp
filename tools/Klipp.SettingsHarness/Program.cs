@@ -11,6 +11,12 @@ void Check(bool condition, string message)
     checks++;
 }
 
+async Task<Exception?> CaptureFailureAsync(Func<Task> operation)
+{
+    try { await operation(); return null; }
+    catch (Exception exception) { return exception; }
+}
+
 void CheckDefaults(KlippSettings value)
 {
     Check(value.CaptureSourceMode == "auto" && value.AutoDetectGames, "Automatic game detection is not the default.");
@@ -29,6 +35,7 @@ void CheckDefaults(KlippSettings value)
         "Optional Discord/music sources or gains changed without user configuration.");
     Check(value.AudioLimiterEnabled && value.LowDiskProtectionEnabled,
         "Audio limiting and recording disk protection should default on.");
+    Check(value.AutomaticUpdatesEnabled, "Automatic updates should default on for new and legacy settings.");
     Check(value.CaptureGameProcessNames.Count == 0 && value.CaptureMonitorId == "" &&
         value.CaptureWindowProcessName == "" && value.CaptureWindowTitle == "", "A source identity was invented.");
 }
@@ -78,6 +85,7 @@ service.Current.MusicProcessName = " Music Player.exe ";
 service.Current.MusicAudioGain = 1.18;
 service.Current.AudioLimiterEnabled = false;
 service.Current.LowDiskProtectionEnabled = false;
+service.Current.AutomaticUpdatesEnabled = false;
 await service.SaveAsync();
 var reloaded = new SettingsService(path);
 await reloaded.LoadAsync();
@@ -105,6 +113,7 @@ Check(reloaded.Current.CaptureDiscordAudio && reloaded.Current.CaptureMusicAudio
     reloaded.Current.MusicAudioGain == 1.18, "Optional app-source toggles and independent gains did not round-trip.");
 Check(!reloaded.Current.AudioLimiterEnabled && !reloaded.Current.LowDiskProtectionEnabled,
     "Limiter/disk protection opt-outs did not round-trip.");
+Check(!reloaded.Current.AutomaticUpdatesEnabled, "Automatic update opt-out did not round-trip.");
 
 await File.WriteAllTextAsync(path, """
 {"CaptureSourceMode":"unknown","CaptureMonitorId":null,"CaptureWindowProcessName":null,"CaptureWindowTitle":null,"CaptureGameProcessNames":null,"CaptureNotificationDurationSeconds":999}
@@ -162,6 +171,63 @@ await Task.WhenAll(Enumerable.Range(0, 12).Select(_ => reloaded.SaveAsync()));
 using (var json = JsonDocument.Parse(await File.ReadAllTextAsync(path)))
     Check(json.RootElement.GetProperty("CaptureSourceMode").GetString() == "desktop", "Concurrent saves left invalid JSON.");
 Check(!File.Exists(path + ".tmp"), "Saving left an unfinished temporary file.");
+
+// A restart must wait for a successful durable save instead of using the
+// best-effort preference path, which intentionally keeps capture running on I/O errors.
+var updatePath = Path.Combine(directory, "update-settings.json");
+var updateSettings = new SettingsService(updatePath);
+await updateSettings.LoadAsync();
+updateSettings.Current.AutomaticUpdatesEnabled = false;
+await updateSettings.SaveForUpdateAsync();
+var updateReloaded = new SettingsService(updatePath);
+await updateReloaded.LoadAsync();
+Check(!updateReloaded.Current.AutomaticUpdatesEnabled, "Strict update save did not persist the automatic-update opt-out.");
+Check(!File.Exists(updatePath + ".tmp"), "Strict update save left a temporary file after success.");
+updateSettings.Current.AutomaticUpdatesEnabled = true;
+await updateSettings.SaveForUpdateAsync();
+await updateReloaded.LoadAsync();
+Check(updateReloaded.Current.AutomaticUpdatesEnabled, "Re-enabling automatic updates was not persisted by the strict save.");
+
+var previousSettings = await File.ReadAllBytesAsync(updatePath);
+var blockedTemporaryPath = updatePath + ".tmp";
+Directory.CreateDirectory(blockedTemporaryPath);
+updateSettings.Current.AutomaticUpdatesEnabled = false;
+var ordinarySaveFailure = await CaptureFailureAsync(updateSettings.SaveAsync);
+Check(ordinarySaveFailure is null, "Ordinary preference I/O errors must remain non-fatal during capture.");
+var strictSaveFailure = await CaptureFailureAsync(() => updateSettings.SaveForUpdateAsync());
+Check(strictSaveFailure is IOException or UnauthorizedAccessException,
+    "Strict update save must propagate a storage failure so Klipp can cancel restart.");
+var afterFailedSave = await File.ReadAllBytesAsync(updatePath);
+Check(previousSettings.SequenceEqual(afterFailedSave),
+    "A failed strict save replaced the last valid preferences.");
+Directory.Delete(blockedTemporaryPath);
+await updateSettings.SaveForUpdateAsync();
+await updateReloaded.LoadAsync();
+Check(!updateReloaded.Current.AutomaticUpdatesEnabled, "Strict save did not recover after the storage obstruction was removed.");
+
+await Task.WhenAll(Enumerable.Range(0, 24).Select(index => index % 2 == 0
+    ? updateSettings.SaveAsync()
+    : updateSettings.SaveForUpdateAsync()));
+using (var json = JsonDocument.Parse(await File.ReadAllTextAsync(updatePath)))
+    Check(!json.RootElement.GetProperty("AutomaticUpdatesEnabled").GetBoolean(),
+        "Concurrent ordinary and strict saves corrupted or lost update preferences.");
+Check(!File.Exists(updatePath + ".tmp"), "Concurrent strict/ordinary saves left an unfinished temporary file.");
+
+var beforeCanceledSave = await File.ReadAllBytesAsync(updatePath);
+using (var canceled = new CancellationTokenSource())
+{
+    canceled.Cancel();
+    updateSettings.Current.AutomaticUpdatesEnabled = true;
+    var cancellation = await CaptureFailureAsync(() => updateSettings.SaveForUpdateAsync(canceled.Token));
+    Check(cancellation is OperationCanceledException, "A canceled strict save did not propagate cancellation.");
+}
+var afterCanceledSave = await File.ReadAllBytesAsync(updatePath);
+Check(beforeCanceledSave.SequenceEqual(afterCanceledSave),
+    "A canceled strict save modified persisted preferences.");
+await updateSettings.SaveForUpdateAsync();
+await updateReloaded.LoadAsync();
+Check(updateReloaded.Current.AutomaticUpdatesEnabled,
+    "A canceled strict save left the save gate unusable for the next restart attempt.");
 
 await File.WriteAllTextAsync(path, "{ corrupt");
 await reloaded.LoadAsync();

@@ -4,14 +4,16 @@ Game recording, instant clips and a built-in video editor for Windows. Built wit
 
 ## Download and run
 
-Get the Windows x64 ZIP from [GitHub Releases](https://github.com/HappyHamster135/Klipp/releases), extract the entire archive, then run `Klipp.Desktop.exe`. Keep its DLLs and folders together. The portable release includes .NET, the Windows App Runtime and the VC++ runtime; no developer certificate installation is needed. Releases are currently unsigned.
+Download [Klipp-Setup.exe](https://github.com/HappyHamster135/Klipp/releases/latest/download/Klipp-Setup.exe) and run it to install Klipp for your Windows account. Setup adds Start menu and desktop shortcuts and an entry in Windows **Installed apps**. It includes .NET, the Windows App Runtime and the VC++ runtime, and does not require administrator access or developer certificates. Releases are currently unsigned.
+
+Klipp checks GitHub for updates and downloads them while it is idle. Open **Settings → Updates** to check manually, change **Automatic updates**, or choose **Restart to update** when an update is ready. Restarting waits until recording, instant capture and exports are stopped so work is not interrupted. The portable ZIP is still available, but ZIP installations need the installer once to enable in-app updates.
 
 - Windows 10 version 2004 (build 19041) or newer; Windows 11 is recommended.
 - DirectX 11-capable GPU. Hardware H.264 encoding depends on the GPU/driver; CPU encoding remains available.
 - Game-only, Discord and music capture require Windows build 20348 or newer. Each track captures an application and its child processes, rather than individual browser tabs.
 - FFmpeg/FFprobe download on first use. Automatic captions download whisper.cpp and a speech model when requested.
 
-Recordings default to `%USERPROFILE%\Videos\Klipp`. Settings and caches live in `%LOCALAPPDATA%\Klipp`; extracting an updated release does not replace those folders.
+Recordings default to `%USERPROFILE%\Videos\Klipp`. Settings, projects and caches live in `%LOCALAPPDATA%\Klipp`. Installed application files use the separate `%LOCALAPPDATA%\HappyHamster135.Klipp` folder; updates and uninstalling Klipp preserve recordings and user data.
 
 ## Capture and edit
 
@@ -35,13 +37,13 @@ dotnet test tests/Klipp.Tests/Klipp.Tests.csproj
 
 Open `Klipp.sln` in Visual Studio, select **x64**, set `Klipp.Desktop` as the startup project and run it. Native harnesses under `tools/` cover capture, audio, recovery, preview and export paths.
 
-To build a portable release in a new directory under `artifacts/releases/`:
+To build an installer, update packages and portable ZIP in a new directory under `artifacts/releases/`:
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File tools/Publish-KlippRelease.ps1 -Version 1.0.5
+powershell -NoProfile -ExecutionPolicy Bypass -File tools/Publish-KlippRelease.ps1 -Version 1.0.6
 ```
 
-The script publishes untrimmed Release binaries with .NET and Windows App SDK dependencies, adds the local VC++ redistributable DLLs, then writes a ZIP and `SHA256SUMS.txt`. It never uploads a release or includes user recordings, settings or certificates.
+The script publishes untrimmed Release binaries with .NET and Windows App SDK dependencies, adds the local VC++ redistributable DLLs, then uses a pinned local Velopack tool to create `Klipp-Setup.exe`, a full update package and `releases.win.json`. It also writes a portable ZIP, `SHA256SUMS.txt` and a `release-artifacts.json` manifest listing all files to upload. It never uploads a release or includes user recordings, settings or certificates. See [release instructions](docs/RELEASING.md) for publishing updates and optional delta packages.
 
 ## Project layout
 

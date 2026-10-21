@@ -500,6 +500,11 @@
                         </InfoBar.ActionButton>
                     </InfoBar>
                     <InfoBar x:Name="CaptureSafetyInfoBar" IsOpen="False" Visibility="Collapsed" Margin="0,12,0,0" Closed="OnLibraryNoticeClosed" Severity="Warning" IsClosable="True" />
+                    <InfoBar x:Name="AppUpdateInfoBar" IsOpen="False" Visibility="Collapsed" Margin="0,12,0,0" Closed="OnLibraryNoticeClosed" Severity="Informational" Title="Update ready" IsClosable="True">
+                        <InfoBar.ActionButton>
+                            <Button x:Name="AppUpdateRestartButton" Content="Restart to update" Click="OnRestartForUpdateClicked" />
+                        </InfoBar.ActionButton>
+                    </InfoBar>
                     </StackPanel>
                 </Grid>
 
@@ -701,6 +706,7 @@
                                 <Button x:Name="SettingsStorageNavButton" Tag="storage" Content="Storage" Click="OnSettingsPageClicked" Style="{StaticResource SettingsNavigationButtonStyle}" />
                                 <Button x:Name="SettingsShortcutsNavButton" Tag="shortcuts" Content="Shortcuts" Click="OnSettingsPageClicked" Style="{StaticResource SettingsNavigationButtonStyle}" />
                                 <Button x:Name="SettingsNotificationsNavButton" Tag="notifications" Content="Notifications" Click="OnSettingsPageClicked" Style="{StaticResource SettingsNavigationButtonStyle}" />
+                                <Button x:Name="SettingsUpdatesNavButton" Tag="updates" Content="Updates" Click="OnSettingsPageClicked" Style="{StaticResource SettingsNavigationButtonStyle}" />
                                 <Border Height="1" Background="{StaticResource KlippBorderBrush}" Margin="8,12" />
                                 <Button Content="Back to library" Click="OnSideMenuLibraryClicked" Style="{StaticResource SettingsNavigationButtonStyle}" FontSize="12" />
                             </StackPanel>
@@ -1335,6 +1341,41 @@
                                             <TextBlock Text="Popups stay out of Klipp recordings. Use borderless fullscreen for the most reliable in-game display." Style="{StaticResource KlippBodyTextSecondary}" TextWrapping="Wrap" />
                                         </StackPanel>
                                     </Border>
+                                </StackPanel>
+                            </ScrollViewer>
+                            <ScrollViewer x:Name="SettingsUpdatesPage" Visibility="Collapsed" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                                <StackPanel Spacing="20" Padding="24,20,24,24">
+                                    <StackPanel Spacing="5">
+                                        <TextBlock Text="Updates" FontSize="22" FontWeight="SemiBold" Foreground="{StaticResource KlippTextPrimaryBrush}" />
+                                        <TextBlock Text="Keep Klipp up to date from GitHub." Style="{StaticResource KlippBodyTextSecondary}" TextWrapping="Wrap" />
+                                    </StackPanel>
+                                    <Border Style="{StaticResource SettingsCardStyle}">
+                                        <StackPanel Spacing="14">
+                                            <TextBlock x:Name="SettingsAppVersionText" Text="Klipp" FontSize="16" FontWeight="SemiBold" />
+                                            <TextBlock x:Name="SettingsUpdateStatusText" Style="{StaticResource KlippBodyTextSecondary}" TextWrapping="Wrap" />
+                                            <ProgressBar x:Name="SettingsUpdateProgress" Minimum="0" Maximum="100" Value="0" Visibility="Collapsed" AutomationProperties.Name="Update download progress" />
+                                            <TextBlock x:Name="SettingsUpdateLastCheckedText" Style="{StaticResource KlippCaption}" TextWrapping="Wrap" />
+                                            <StackPanel Spacing="8" HorizontalAlignment="Left">
+                                                <Button x:Name="SettingsUpdateCheckButton" Content="Check for updates" Click="OnCheckForUpdatesClicked" Height="32" Padding="12,4" />
+                                                <Button x:Name="SettingsUpdateDownloadButton" Content="Download update" Click="OnDownloadUpdateClicked" Height="32" Padding="12,4" Visibility="Collapsed" />
+                                                <Button x:Name="SettingsUpdatePauseButton" Content="Pause download" Click="OnPauseUpdateDownloadClicked" Height="32" Padding="12,4" Visibility="Collapsed" />
+                                                <Button x:Name="SettingsUpdateRestartButton" Content="Restart to update" Click="OnRestartForUpdateClicked" Height="32" Padding="12,4" Visibility="Collapsed" />
+                                                <Button x:Name="SettingsUpdateInstallerButton" Content="Get installer" Click="OnGetInstallerClicked" Height="32" Padding="12,4" Visibility="Collapsed" />
+                                            </StackPanel>
+                                        </StackPanel>
+                                    </Border>
+                                    <Border Style="{StaticResource SettingsCardStyle}">
+                                        <Grid ColumnSpacing="20">
+                                            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                            <StackPanel Spacing="5">
+                                                <TextBlock Text="Automatic updates" Style="{StaticResource KlippBodyText}" FontWeight="SemiBold" />
+                                                <TextBlock Text="Check and download updates when Klipp is idle. You choose when to restart." Style="{StaticResource KlippBodyTextSecondary}" TextWrapping="Wrap" />
+                                            </StackPanel>
+                                            <ToggleSwitch x:Name="SettingsAutomaticUpdatesToggle" Grid.Column="1" Toggled="OnAutomaticUpdatesToggled" MinWidth="44" Width="44" OnContent="" OffContent="" VerticalAlignment="Center" AutomationProperties.Name="Automatic updates" />
+                                        </Grid>
+                                    </Border>
+                                    <TextBlock Text="Your clips, projects and preferences are kept when Klipp updates." Style="{StaticResource KlippBodyTextSecondary}" TextWrapping="Wrap" />
+                                    <HyperlinkButton Content="Release notes on GitHub" Click="OnUpdateReleaseNotesClicked" Padding="0" HorizontalAlignment="Left" />
                                 </StackPanel>
                             </ScrollViewer>
                         </Grid>

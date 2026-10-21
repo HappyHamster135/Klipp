@@ -8,6 +8,8 @@ public sealed partial class MainWindow
 {
     private async void OnEditorSourceMediaImportRequested(object? sender, EventArgs e)
     {
+        if (_updateRestarting) return;
+        using var updateWork = BeginUpdateBlockingOperation();
         try
         {
             var picker = new FileOpenPicker { SuggestedStartLocation = PickerLocationId.VideosLibrary };
@@ -23,6 +25,8 @@ public sealed partial class MainWindow
 
     private async void OnEditorProjectFileOpenRequested(object? sender, EventArgs e)
     {
+        if (_updateRestarting) return;
+        using var updateWork = BeginUpdateBlockingOperation();
         try
         {
             var picker = new FileOpenPicker { SuggestedStartLocation = PickerLocationId.DocumentsLibrary };
@@ -37,6 +41,8 @@ public sealed partial class MainWindow
 
     private async void OnEditorProjectMediaCollectRequested(object? sender, EventArgs e)
     {
+        if (_updateRestarting) return;
+        using var updateWork = BeginUpdateBlockingOperation();
         try
         {
             var picker = new FolderPicker { SuggestedStartLocation = PickerLocationId.DocumentsLibrary };

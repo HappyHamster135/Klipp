@@ -42,6 +42,7 @@ public sealed partial class MainWindow
             SettingsNotifyBookmarkToggle.IsOn = settings.NotifyOnRecordingBookmark;
             SettingsNotifyAudioDeviceToggle.IsOn = settings.NotifyOnAudioDeviceChange;
             SettingsNotificationDurationBox.Value = settings.CaptureNotificationDurationSeconds;
+            SyncUpdateSettings();
             RefreshSettingsSourceSummary();
             RefreshSettingsAudioSummary();
             SelectSettingsPage(_settingsPage);
@@ -105,7 +106,8 @@ public sealed partial class MainWindow
             ("audio", SettingsAudioNavButton, SettingsAudioPage),
             ("storage", SettingsStorageNavButton, SettingsStoragePage),
             ("shortcuts", SettingsShortcutsNavButton, SettingsShortcutsPage),
-            ("notifications", SettingsNotificationsNavButton, SettingsNotificationsPage)
+            ("notifications", SettingsNotificationsNavButton, SettingsNotificationsPage),
+            ("updates", SettingsUpdatesNavButton, SettingsUpdatesPage)
         ];
         foreach (var section in sections)
         {

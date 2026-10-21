@@ -24,6 +24,11 @@ public sealed partial class MainWindow
 
     private void OnInlineFullscreenPreviewKeyDown(object sender, KeyRoutedEventArgs args)
     {
+        if (_updateRestarting)
+        {
+            args.Handled = true;
+            return;
+        }
         // The detached transport still belongs to its card. Fullscreen shortcuts
         // also work if focus returns to a library field while chrome is hidden.
         if (_fullscreenInlineCard?.HandleFullscreenPlaybackKey(args.Key) == true ||

@@ -11,6 +11,10 @@ public static class Program
     [STAThread]
     public static void Main(string[] args)
     {
+        // Installer hooks must finish before WinUI, capture and single-instance
+        // startup. Pending updates are applied only after a safe user restart.
+        Velopack.VelopackApp.Build().SetAutoApplyOnStartup(false).Run();
+
 #if !MICROSOFT_WINDOWSAPPSDK_SELFCONTAINED
         InitializeWindowsAppSdk();
 #endif

@@ -81,6 +81,7 @@ public sealed class KlippSettings
     public double MusicAudioGain { get; set; } = 1;
     public bool AudioLimiterEnabled { get; set; } = true;
     public bool LowDiskProtectionEnabled { get; set; } = true;
+    public bool AutomaticUpdatesEnabled { get; set; } = true;
     public bool CaptureCursor { get; set; } = true;
     public bool EnableExclusiveGameCapture { get; set; }
 
@@ -220,6 +221,21 @@ public sealed class SettingsService
     }
 
     /// <summary>Sparar nuvarande inställningar till disk.</summary>
+    public async Task SaveForUpdateAsync(CancellationToken cancellationToken = default)
+    {
+        await _saveGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            Current.NormalizeCapturePreferences();
+            var json = JsonSerializer.Serialize(Current, JsonOptions);
+            var temporaryPath = _settingsPath + ".tmp";
+            await File.WriteAllTextAsync(temporaryPath, json, cancellationToken).ConfigureAwait(false);
+            File.Move(temporaryPath, _settingsPath, overwrite: true);
+        }
+        finally { _saveGate.Release(); }
+    }
+
+    /// <summary>Saves ordinary preferences without interrupting capture on an I/O error.</summary>
     public async Task SaveAsync()
     {
         var temporaryPath = _settingsPath + ".tmp";

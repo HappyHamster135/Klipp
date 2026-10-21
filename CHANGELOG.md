@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.0.6 — 2026-10-21
+
+- Add a per-user Windows installer with Start menu/Desktop shortcuts and an uninstaller. Application files live separately from existing recordings, projects and preferences.
+- Add Settings → Updates, with automatic idle checks and downloads from stable GitHub releases, progress, pause/retry controls, and an explicit restart to install.
+- Keep updates out of active capture, playback, editing, exports, recovery and file operations. Finish project and preference saves before starting the native updater.
+- Verify downloaded packages before enabling restart; handle offline checks, rate limits, canceled transfers and failed downloads without interrupting capture. Existing ZIP users can use Get installer for the one-time migration.
+- Generate the installer, full update package, feed and checksums together for GitHub publishing.
+
 ## 1.0.5 — 2026-10-21
 
 - Keep the same live video presentation when switching between thumbnail playback and fullscreen. Playing videos continue on the same clock; paused videos keep their frame. Double-click, F and Escape preserve playback intent.

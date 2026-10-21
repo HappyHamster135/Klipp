@@ -7,7 +7,7 @@
     <RootNamespace>Klipp.Desktop</RootNamespace>
     <AssemblyTitle>Klipp</AssemblyTitle>
     <Product>Klipp</Product>
-    <Version>1.0.5</Version>
+    <Version>1.0.6</Version>
     <Description>Game capture and video editing</Description>
     <DefaultLanguage>en-US</DefaultLanguage>
     <ApplicationManifest>app.manifest</ApplicationManifest>
@@ -29,6 +29,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Velopack" Version="1.2.161" />
     <PackageReference Include="Microsoft.Graphics.Win2D" Version="1.2.0" />
     <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.4022.49" />
     <PackageReference Include="Microsoft.WindowsAppSDK" Version="1.6.241114003" />

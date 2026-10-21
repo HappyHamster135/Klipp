@@ -155,6 +155,8 @@ public sealed partial class MainWindow : Window
         view.ExportJobActionRequested += OnEditorExportJobActionRequested;
         view.MediaImportHandler = async (path, progress, cancellationToken) =>
         {
+            if (_updateRestarting) throw new OperationCanceledException("Klipp is restarting to update.");
+            using var updateWork = BeginUpdateBlockingOperation();
             var result = await LibraryService.ImportClipWithDetailsAsync(path, progress, cancellationToken);
             ApplyLibraryFilter();
             view.SetLibraryClips(LibraryService.Clips);
@@ -283,6 +285,11 @@ public sealed partial class MainWindow : Window
 
     private void OnWindowKeyDown(object sender, Microsoft.UI.Xaml.Input.KeyRoutedEventArgs e)
     {
+        if (_updateRestarting)
+        {
+            e.Handled = true;
+            return;
+        }
         if (e.Key != Windows.System.VirtualKey.Escape)
             return;
 
@@ -602,6 +609,7 @@ public sealed partial class MainWindow : Window
         {
             Debug.WriteLine($"[Klipp] Export queue history could not be loaded: {ex.Message}");
         }
+        InitializeUpdates();
     }
 
     private async Task ApplyPerformanceDefaultsMigrationAsync()
@@ -2175,6 +2183,8 @@ public sealed partial class MainWindow : Window
 
     private async Task RenameClipAsync(string filePath, bool reloadPlayer)
     {
+        if (_updateRestarting) return;
+        using var updateWork = BeginUpdateBlockingOperation();
         if (string.IsNullOrEmpty(filePath) || !File.Exists(filePath))
             return;
         ClipCard.StopActivePreview(filePath);
@@ -2216,6 +2226,8 @@ public sealed partial class MainWindow : Window
 
     private async Task DeleteClipAsync(string filePath, bool returnToLibrary)
     {
+        if (_updateRestarting) return;
+        using var updateWork = BeginUpdateBlockingOperation();
         if (string.IsNullOrEmpty(filePath) || !File.Exists(filePath))
             return;
         ClipCard.StopActivePreview(filePath);
@@ -2282,6 +2294,8 @@ public sealed partial class MainWindow : Window
         TimeSpan end,
         ClipEditOptions options)
     {
+        if (_updateRestarting) return;
+        using var updateWork = BeginUpdateBlockingOperation();
         try
         {
             var outputPath = LibraryService.GenerateEditedClipPath(filePath, options.RequiresReencode ? "edit" : "trim");
@@ -2358,6 +2372,8 @@ public sealed partial class MainWindow : Window
 
     private async void OnEditorProjectExportRequested(object? sender, EditorProjectExportEventArgs e)
     {
+        if (_updateRestarting) return;
+        using var updateWork = BeginUpdateBlockingOperation();
         var sourcePath = e.Project.PrimaryClips
             .Select(clip => clip.SourcePath)
             .FirstOrDefault(File.Exists);
@@ -2386,7 +2402,11 @@ public sealed partial class MainWindow : Window
     private void OnExportQueueJobsChanged(object? sender, EventArgs e)
     {
         var jobs = _exportQueue.Jobs;
-        DispatcherQueue.TryEnqueue(() => _editorView?.SetExportJobs(jobs));
+        DispatcherQueue.TryEnqueue(() =>
+        {
+            _editorView?.SetExportJobs(jobs);
+            RefreshUpdateUi();
+        });
     }
 
     private void OnExportQueueJobCompleted(object? sender, EditorExportJobEventArgs e)
@@ -2413,6 +2433,8 @@ public sealed partial class MainWindow : Window
 
     private async void OnEditorExportJobActionRequested(object? sender, EditorExportJobActionEventArgs e)
     {
+        if (_updateRestarting) return;
+        using var updateWork = BeginUpdateBlockingOperation();
         try
         {
             switch (e.Action)
@@ -2448,6 +2470,7 @@ public sealed partial class MainWindow : Window
 
     private void OnMainWindowClosed(object sender, WindowEventArgs args)
     {
+        DisposeUpdates();
         DisposeTrayIcon();
         _inlineWindowClosing = true;
         ExitInlineFullscreen(restoreWindow: false);
@@ -2505,6 +2528,8 @@ public sealed partial class MainWindow : Window
 
     private async void OnEditorLibraryImportRequested(object? sender, EventArgs e)
     {
+        if (_updateRestarting) return;
+        using var updateWork = BeginUpdateBlockingOperation();
         try
         {
             var picker = new FileOpenPicker
@@ -2592,6 +2617,8 @@ public sealed partial class MainWindow : Window
 
     private async void OnEditorMissingMediaRelinkRequested(object? sender, MissingMediaRelinkEventArgs e)
     {
+        if (_updateRestarting) return;
+        using var updateWork = BeginUpdateBlockingOperation();
         try
         {
             var picker = new FileOpenPicker
@@ -2628,6 +2655,8 @@ public sealed partial class MainWindow : Window
 
     private async void OnEditorGraphicImportRequested(object? sender, EventArgs e)
     {
+        if (_updateRestarting) return;
+        using var updateWork = BeginUpdateBlockingOperation();
         try
         {
             var picker = new FileOpenPicker
@@ -2653,6 +2682,8 @@ public sealed partial class MainWindow : Window
 
     private async void OnEditorBrandLogoImportRequested(object? sender, EventArgs e)
     {
+        if (_updateRestarting) return;
+        using var updateWork = BeginUpdateBlockingOperation();
         try
         {
             var picker = new FileOpenPicker
@@ -2678,6 +2709,8 @@ public sealed partial class MainWindow : Window
 
     private async void OnEditorBrandFontImportRequested(object? sender, EventArgs e)
     {
+        if (_updateRestarting) return;
+        using var updateWork = BeginUpdateBlockingOperation();
         try
         {
             var picker = new FileOpenPicker
@@ -2703,6 +2736,8 @@ public sealed partial class MainWindow : Window
 
     private async void OnEditorLutImportRequested(object? sender, EventArgs e)
     {
+        if (_updateRestarting) return;
+        using var updateWork = BeginUpdateBlockingOperation();
         try
         {
             var picker = new FileOpenPicker
@@ -2727,6 +2762,8 @@ public sealed partial class MainWindow : Window
 
     private async void OnEditorSubtitleSrtImportRequested(object? sender, EventArgs e)
     {
+        if (_updateRestarting) return;
+        using var updateWork = BeginUpdateBlockingOperation();
         try
         {
             var picker = new FileOpenPicker
@@ -2751,6 +2788,8 @@ public sealed partial class MainWindow : Window
 
     private async void OnEditorAudioTrackImportRequested(object? sender, EventArgs e)
     {
+        if (_updateRestarting) return;
+        using var updateWork = BeginUpdateBlockingOperation();
         try
         {
             var picker = new FileOpenPicker
@@ -2776,6 +2815,8 @@ public sealed partial class MainWindow : Window
 
     private async void OnEditorSubtitleSrtExportRequested(object? sender, EventArgs e)
     {
+        if (_updateRestarting) return;
+        using var updateWork = BeginUpdateBlockingOperation();
         try
         {
             var picker = new FileSavePicker
@@ -2815,6 +2856,8 @@ public sealed partial class MainWindow : Window
 
     private async Task ShowEditorAsync(string filePath)
     {
+        if (_updateRestarting) return;
+        using var updateWork = BeginUpdateBlockingOperation();
         if (string.IsNullOrEmpty(filePath) || !File.Exists(filePath))
             return;
         ClipCard.StopActivePreview();
@@ -2822,6 +2865,7 @@ public sealed partial class MainWindow : Window
         try
         {
             var duration = await _mediaProbe.GetDurationAsync(filePath);
+            if (_updateRestarting) return;
             if (duration is null || duration.Value <= TimeSpan.FromSeconds(0.25))
             {
                 await ShowErrorAsync("Could not open editor", "The clip duration could not be read.");
@@ -2961,6 +3005,7 @@ public sealed partial class MainWindow : Window
 
     private void UpdateStatusUI()
     {
+        RefreshUpdateUi();
         UpdateRecordingTools();
         if (_mode == AppMode.Recording)
         {
@@ -3445,6 +3490,8 @@ public sealed partial class MainWindow : Window
 
     private async Task SetClipsDirectoryAsync(string directory)
     {
+        if (_updateRestarting) return;
+        using var updateWork = BeginUpdateBlockingOperation();
         try
         {
             var before = LibraryService.ClipsDirectory;
@@ -3526,6 +3573,8 @@ public sealed partial class MainWindow : Window
 
     private async Task ShowOrganizeClipDialogAsync(string filePath)
     {
+        if (_updateRestarting) return;
+        using var updateWork = BeginUpdateBlockingOperation();
         if (string.IsNullOrWhiteSpace(filePath))
             return;
 
