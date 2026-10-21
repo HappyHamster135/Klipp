@@ -1606,7 +1606,7 @@ public sealed partial class MainWindow : Window
 
     private async Task RunAutomaticCacheCleanupAsync()
     {
-        if (_cacheOperationRunning || !_settings.Current.AutoCleanCache ||
+        if (_captureWindowClosing || _cacheOperationRunning || !_settings.Current.AutoCleanCache ||
             _recording.IsRecording || _clipMode.IsMonitoring ||
             EditorHost.Visibility == Visibility.Visible)
         {
@@ -1694,7 +1694,7 @@ public sealed partial class MainWindow : Window
 
     private async Task RunAutomaticOriginalClipRetentionAsync()
     {
-        if (_retentionOperationRunning || !_settings.Current.AutoCleanOldOriginalClips ||
+        if (_captureWindowClosing || _retentionOperationRunning || !_settings.Current.AutoCleanOldOriginalClips ||
             _recording.IsRecording || _clipMode.IsMonitoring ||
             PlayerHost.Visibility == Visibility.Visible ||
             EditorHost.Visibility == Visibility.Visible)
