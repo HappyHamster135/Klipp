@@ -2906,6 +2906,7 @@ public sealed partial class MainWindow : Window
         SetViewVisibility(PlayerHost, false);
         SetViewVisibility(EditorHost, false);
         SetViewVisibility(LibraryView, true);
+        RefreshUpdateUi();
     }
 
     private static void SetViewVisibility(UIElement element, bool visible)
@@ -3005,7 +3006,6 @@ public sealed partial class MainWindow : Window
 
     private void UpdateStatusUI()
     {
-        RefreshUpdateUi();
         UpdateRecordingTools();
         if (_mode == AppMode.Recording)
         {

@@ -17,6 +17,7 @@ public sealed partial class MainWindow
     private readonly AppUpdateService _appUpdates = new();
     private readonly CancellationTokenSource _updateLifetime = new();
     private DispatcherTimer? _updateTimer;
+    private DispatcherTimer? _updateUiTimer;
     private bool _updatesInitialized;
     private bool _updatesDisposed;
     private bool _updateRequestRunning;
@@ -32,6 +33,11 @@ public sealed partial class MainWindow
         if (_updatesInitialized || _updatesDisposed) return;
         _updatesInitialized = true;
         _appUpdates.StateChanged += OnAppUpdateStateChanged;
+        // Capture's status timer stops while idle. Keep restart availability and
+        // playback-aware download pausing current independently of capture.
+        _updateUiTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
+        _updateUiTimer.Tick += (_, _) => RefreshUpdateUi();
+        _updateUiTimer.Start();
         _updateTimer = new DispatcherTimer { Interval = TimeSpan.FromMinutes(1) };
         _updateTimer.Tick += async (_, _) => await CheckAutomaticUpdateAsync();
         _updateTimer.Start();
@@ -298,6 +304,7 @@ public sealed partial class MainWindow
         if (_updatesDisposed) return;
         _updatesDisposed = true;
         _updateTimer?.Stop();
+        _updateUiTimer?.Stop();
         _updateLifetime.Cancel();
         _appUpdates.StateChanged -= OnAppUpdateStateChanged;
         _appUpdates.Dispose();
