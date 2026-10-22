@@ -7,7 +7,6 @@
     <RootNamespace>Klipp.Desktop</RootNamespace>
     <AssemblyTitle>Klipp</AssemblyTitle>
     <Product>Klipp</Product>
-    <Version>1.0.6</Version>
     <Description>Game capture and video editing</Description>
     <DefaultLanguage>en-US</DefaultLanguage>
     <ApplicationManifest>app.manifest</ApplicationManifest>
@@ -44,15 +43,32 @@
   </ItemGroup>
 
   <ItemGroup Condition="'$(Platform)' == 'x64'">
-    <GameHookSource Include="..\Klipp.GameHook\**\*.cpp;..\Klipp.GameHook\**\*.c;..\Klipp.GameHook\**\*.h;..\Klipp.GameHook\build.ps1" />
+    <GameHookSource Include="..\Klipp.GameHook\**\*.cpp;..\Klipp.GameHook\**\*.c;..\Klipp.GameHook\**\*.h;..\Klipp.GameHook\build.ps1;..\Klipp.NativeVersion.ps1;..\Klipp.VersionInfo.rc;..\Directory.Build.props" Exclude="..\Klipp.GameHook\bin\**" />
     <Content Include="..\Klipp.GameHook\bin\x64\Release\Klipp.GameHook.dll" Link="Klipp.GameHook.dll" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <Content Include="..\Klipp.GameHook\third_party\minhook\LICENSE.txt" Link="MinHook.LICENSE.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
 
+  <Target Name="PrepareNativeVersion" BeforeTargets="BuildNativeGameHook;BuildNativeAudioEffects"
+          Condition="'$(OS)' == 'Windows_NT' and ('$(Platform)' == 'x64' or '$(Platform)' == 'ARM64')">
+    <MakeDir Directories="$(MSBuildProjectDirectory)\obj" />
+    <WriteLinesToFile File="$(MSBuildProjectDirectory)\obj\Klipp.NativeVersion.$(Platform).txt"
+                      Lines="$(Version)" Overwrite="true" WriteOnlyWhenDifferent="true" />
+    <ReadLinesFromFile File="$(MSBuildProjectDirectory)\..\Klipp.GameHook\bin\x64\Release\Klipp.NativeVersion.txt"
+                       Condition="'$(Platform)' == 'x64' and Exists('$(MSBuildProjectDirectory)\..\Klipp.GameHook\bin\x64\Release\Klipp.NativeVersion.txt')">
+      <Output TaskParameter="Lines" ItemName="_KlippGameHookBuiltVersion" />
+    </ReadLinesFromFile>
+    <ReadLinesFromFile File="$(MSBuildProjectDirectory)\..\Klipp.AudioEffects\bin\$(Platform)\Release\Klipp.NativeVersion.txt"
+                       Condition="Exists('$(MSBuildProjectDirectory)\..\Klipp.AudioEffects\bin\$(Platform)\Release\Klipp.NativeVersion.txt')">
+      <Output TaskParameter="Lines" ItemName="_KlippAudioEffectsBuiltVersion" />
+    </ReadLinesFromFile>
+    <Touch Files="$(MSBuildProjectDirectory)\obj\Klipp.NativeVersion.$(Platform).txt" AlwaysCreate="true"
+           Condition="('$(Platform)' == 'x64' and '@(_KlippGameHookBuiltVersion)' != '$(Version)') or '@(_KlippAudioEffectsBuiltVersion)' != '$(Version)'" />
+  </Target>
+
   <Target Name="BuildNativeGameHook" BeforeTargets="PrepareForBuild"
           Condition="'$(OS)' == 'Windows_NT' and '$(Platform)' == 'x64'"
-          Inputs="@(GameHookSource)" Outputs="$(MSBuildProjectDirectory)\..\Klipp.GameHook\bin\x64\Release\Klipp.GameHook.dll">
-    <Exec Command="powershell -NoProfile -ExecutionPolicy Bypass -File &quot;$(MSBuildProjectDirectory)\..\Klipp.GameHook\build.ps1&quot;" />
+          Inputs="@(GameHookSource);$(MSBuildProjectDirectory)\obj\Klipp.NativeVersion.$(Platform).txt" Outputs="$(MSBuildProjectDirectory)\..\Klipp.GameHook\bin\x64\Release\Klipp.GameHook.dll">
+    <Exec Command="powershell -NoProfile -ExecutionPolicy Bypass -File &quot;$(MSBuildProjectDirectory)\..\Klipp.GameHook\build.ps1&quot; -Version &quot;$(Version)&quot;" />
   </Target>
 
   <ItemGroup>
@@ -61,13 +77,13 @@
     </Content>
   </ItemGroup>
   <ItemGroup Condition="'$(Platform)' == 'x64' or '$(Platform)' == 'ARM64'">
-    <AudioEffectsSource Include="..\Klipp.AudioEffects\AudioEffects.cpp;..\Klipp.AudioEffects\AudioEffects.def;..\Klipp.AudioEffects\build.ps1" />
+    <AudioEffectsSource Include="..\Klipp.AudioEffects\AudioEffects.cpp;..\Klipp.AudioEffects\AudioEffects.def;..\Klipp.AudioEffects\build.ps1;..\Klipp.NativeVersion.ps1;..\Klipp.VersionInfo.rc;..\Directory.Build.props" />
     <Content Include="..\Klipp.AudioEffects\bin\$(Platform)\Release\Klipp.AudioEffects.dll" Link="Klipp.AudioEffects.dll" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
   <Target Name="BuildNativeAudioEffects" BeforeTargets="PrepareForBuild"
           Condition="'$(OS)' == 'Windows_NT' and ('$(Platform)' == 'x64' or '$(Platform)' == 'ARM64')"
-          Inputs="@(AudioEffectsSource)" Outputs="$(MSBuildProjectDirectory)\..\Klipp.AudioEffects\bin\$(Platform)\Release\Klipp.AudioEffects.dll">
-    <Exec Command="powershell -NoProfile -ExecutionPolicy Bypass -File &quot;$(MSBuildProjectDirectory)\..\Klipp.AudioEffects\build.ps1&quot; -Architecture &quot;$(Platform)&quot;" />
+          Inputs="@(AudioEffectsSource);$(MSBuildProjectDirectory)\obj\Klipp.NativeVersion.$(Platform).txt" Outputs="$(MSBuildProjectDirectory)\..\Klipp.AudioEffects\bin\$(Platform)\Release\Klipp.AudioEffects.dll">
+    <Exec Command="powershell -NoProfile -ExecutionPolicy Bypass -File &quot;$(MSBuildProjectDirectory)\..\Klipp.AudioEffects\build.ps1&quot; -Architecture &quot;$(Platform)&quot; -Version &quot;$(Version)&quot;" />
   </Target>
   
   <ItemGroup>

@@ -6,10 +6,20 @@ param(
     [string]$Version = '1.0.6',
     [string]$OutputDirectory = '',
     [string]$PreviousReleaseDirectory = '',
-    [string]$VelopackToolDirectory = ''
+    [string]$VelopackToolDirectory = '',
+    [string]$SignTemplate = '',
+    [string]$ExpectedPublisher = '',
+    [switch]$RequireSigning
 )
 
 $ErrorActionPreference = 'Stop'
+if ($RequireSigning -and [string]::IsNullOrWhiteSpace($SignTemplate)) {
+    throw 'A production signing command is required. Configure an approved signing provider before building a signed release.'
+}
+if ($SignTemplate -and (!$ExpectedPublisher -or ([regex]::Matches($SignTemplate, '\{\{file(?:\.\.\.)?\}\}')).Count -ne 1)) {
+    throw 'Signing requires an exact ExpectedPublisher certificate subject and one {{file}} or {{file...}} placeholder.'
+}
+if ($ExpectedPublisher -and !$SignTemplate) { throw 'ExpectedPublisher requires SignTemplate.' }
 $repoRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 $PackageDirectory = [IO.Path]::GetFullPath($PackageDirectory)
 $velopackVersion = '1.2.161'
@@ -68,12 +78,24 @@ $packArguments = @(
     '--packTitle', 'Klipp', '--packAuthors', 'HappyHamster135',
     '--packDir', $PackageDirectory, '--mainExe', 'Klipp.Desktop.exe',
     '--runtime', 'win-x64', '--channel', $channel,
-    '--outputDir', $OutputDirectory, '--delta', $deltaMode, '--noPortable',
+    '--outputDir', $OutputDirectory, '--delta', $deltaMode,
     '--icon', (Join-Path $repoRoot 'src/Klipp.Desktop/Assets/Klipp.ico'),
     '--splashImage', (Join-Path $repoRoot 'src/Klipp.Desktop/Assets/SplashScreen.scale-200.png'),
     '--splashProgressColor', '#8EAED0',
     '--aumid', $packageId, '--shortcuts', 'Desktop,StartMenuRoot'
 )
+if ($SignTemplate) {
+    # Only Klipp binaries and installer helpers are submitted to our provider.
+    # Upstream libraries retain their existing signatures. Foundation approval
+    # must explicitly include the Velopack launcher and updater helpers.
+    $signFiles = @('Klipp.Desktop.exe', 'Klipp.Desktop.dll', 'Klipp.Core.dll', 'Klipp.Storage.dll',
+        'Klipp.Capture.dll', 'Klipp.Encoding.dll', 'Klipp.AudioEffects.dll', 'Klipp.GameHook.dll',
+        'Klipp_ExecutionStub.exe', 'Squirrel.exe', 'Update.exe',
+        'HappyHamster135.Klipp-win-Setup.exe', 'Klipp-Setup.exe')
+    $signExclude = '(?i)(?:^|[\\/])(?!(?:' + (($signFiles | ForEach-Object { [regex]::Escape($_) }) -join '|') + ')$)[^\\/]+$'
+    $packArguments += @('--signTemplate', $SignTemplate, '--signExclude', $signExclude)
+}
+else { $packArguments += '--noPortable' }
 Write-Host "[Klipp] Creating the per-user installer and GitHub update packages ($Version)..."
 & $vpk @packArguments | Out-Host
 if ($LASTEXITCODE -ne 0) { throw "Velopack packaging failed ($LASTEXITCODE). Staging files remain at $OutputDirectory." }
@@ -113,11 +135,34 @@ foreach ($extraName in @("assets.$channel.json", 'RELEASES')) {
     $extraPath = Join-Path $OutputDirectory $extraName
     if (Test-Path -LiteralPath $extraPath) { $releaseAssets += $extraPath }
 }
+$portableArchive = $null
+if ($SignTemplate) {
+    # vpk signs its temporary payload before creating this ZIP and the full
+    # update package. Zipping the original publish tree would be unsigned.
+    $portableFiles = @(Get-ChildItem -LiteralPath $OutputDirectory -File -Filter '*-Portable.zip')
+    if ($portableFiles.Count -ne 1) { throw 'The signed portable archive was not produced.' }
+    $portableArchive = Join-Path $OutputDirectory "Klipp-$Version-win-x64.zip"
+    Move-Item -LiteralPath $portableFiles[0].FullName -Destination $portableArchive
+    if (Test-Path -LiteralPath $assetManifest) {
+        $assetJson = [IO.File]::ReadAllText($assetManifest).Replace('"' + $portableFiles[0].Name + '"', '"' + [IO.Path]::GetFileName($portableArchive) + '"')
+        [IO.File]::WriteAllText($assetManifest, $assetJson)
+    }
+    $verificationManifest = Join-Path $OutputDirectory '.signing-verification.json'
+    [ordered]@{
+        version = $Version; installer = $installer; updateFeed = $updateFeed
+        releaseAssets = @(@($releaseAssets) + @($portableArchive) | ForEach-Object {
+            [ordered]@{ path = $_; name = [IO.Path]::GetFileName($_); size = (Get-Item -LiteralPath $_).Length
+                sha256 = (Get-FileHash -LiteralPath $_ -Algorithm SHA256).Hash.ToLowerInvariant() }
+        })
+    } | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $verificationManifest -Encoding utf8
+    & (Join-Path $PSScriptRoot 'Test-KlippReleaseSignatures.ps1') -ReleaseManifestPath $verificationManifest -ExpectedPublisher $ExpectedPublisher | Out-Null
+}
 [pscustomobject]@{
     PackageId = $packageId
     Channel = $channel
     Installer = $installer
     UpdateFeed = $updateFeed
     UpdatePackages = @($updatePackages | ForEach-Object FullName)
+    PortableArchive = $portableArchive
     ReleaseAssets = $releaseAssets
 }

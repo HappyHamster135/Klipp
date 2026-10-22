@@ -15,6 +15,10 @@ Klipp checks GitHub for updates and downloads them while it is idle. Open **Sett
 
 Recordings default to `%USERPROFILE%\Videos\Klipp`. Settings, projects and caches live in `%LOCALAPPDATA%\Klipp`. Installed application files use the separate `%LOCALAPPDATA%\HappyHamster135.Klipp` folder; updates and uninstalling Klipp preserve recordings and user data.
 
+## Code signing policy
+
+Public releases are currently unsigned. SignPath Foundation signing is being prepared and requires their approval. See the [code signing policy and setup](docs/SIGNING.md) and [privacy policy](docs/PRIVACY.md). A local development certificate is never used for public releases.
+
 ## Capture and edit
 
 - Record a display or window, or keep an instant-clip buffer ready to save. Automatic game detection, global shortcuts, tray controls and capture notifications are included.

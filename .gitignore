@@ -41,6 +41,15 @@ project.lock.json
 project.fragment.lock.json
 artifacts/
 
+# Private signing material and local provider configuration
+*.pfx
+*.p12
+*.key
+*.pem
+.signing/
+.signpath-tools/
+signing.local.json
+
 # Klipp-specifika filer (ska aldrig committas)
 *.raw
 *.mp4

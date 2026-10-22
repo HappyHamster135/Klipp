@@ -6,10 +6,21 @@ param(
     [string]$VisualStudioDirectory = '',
     [string]$VcRuntimeDirectory = '',
     [string]$PreviousReleaseDirectory = '',
-    [switch]$PortableOnly
+    [switch]$PortableOnly,
+    [string]$SignTemplate = '',
+    [string]$ExpectedPublisher = '',
+    [switch]$RequireSigning
 )
 
 $ErrorActionPreference = 'Stop'
+if ($RequireSigning -and !$SignTemplate) {
+    throw 'A production signing provider is required. Unsigned builds cannot satisfy RequireSigning.'
+}
+if ($SignTemplate -and (!$ExpectedPublisher -or $PortableOnly -or
+    ([regex]::Matches($SignTemplate, '\{\{file(?:\.\.\.)?\}\}')).Count -ne 1)) {
+    throw 'Signing requires an exact ExpectedPublisher subject, one signing placeholder and installer packaging (omit PortableOnly).'
+}
+if ($ExpectedPublisher -and !$SignTemplate) { throw 'ExpectedPublisher requires SignTemplate.' }
 $repoRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 if (!$OutputRoot) { $OutputRoot = Join-Path $repoRoot 'artifacts/releases' }
 $OutputRoot = [IO.Path]::GetFullPath($OutputRoot)
@@ -163,10 +174,13 @@ if (Get-Command git -ErrorAction SilentlyContinue) {
     dotnetSelfContained = $true; windowsAppSdkSelfContained = $true; trimmed = $false
 } | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $packageDirectory 'release-manifest.json') -Encoding utf8
 
+$portableLauncher = if ($SignTemplate) { 'Klipp.exe in the root of the portable archive' } else { 'Klipp.Desktop.exe' }
+$signingNotice = if ($SignTemplate) { 'Release signatures are verified before distribution. Windows reputation may still take time to build.' }
+    else { 'This portable release is unsigned.' }
 @"
 Klipp $Version for Windows x64
 
-Extract this entire folder and run Klipp.Desktop.exe. Keep the DLLs and folders
+Extract the entire archive and run $portableLauncher. Keep the DLLs and folders
 beside the executable. No .NET or Windows App Runtime installation is required.
 The Microsoft VC++ release runtime is included locally.
 
@@ -180,32 +194,37 @@ Default recordings: %USERPROFILE%\Videos\Klipp
 
 For automatic updates, use Klipp-Setup.exe from the same GitHub release. The
 installer uses its own application folder and preserves these data folders.
-This portable release is unsigned. It does not install developer certificates.
+$signingNotice It does not install developer certificates.
 Source, license information and updates: https://github.com/HappyHamster135/Klipp
 "@ | Set-Content -LiteralPath (Join-Path $packageDirectory 'START-HERE.txt') -Encoding utf8
 
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 $zipPath = Join-Path $runDirectory ($packageName + '.zip')
-[IO.Compression.ZipFile]::CreateFromDirectory($packageDirectory, $zipPath, [IO.Compression.CompressionLevel]::Optimal, $true)
 $checksumPath = Join-Path $runDirectory 'SHA256SUMS.txt'
-$checksum = (Get-FileHash -LiteralPath $zipPath -Algorithm SHA256).Hash.ToLowerInvariant()
-$releaseAssets = @($zipPath)
 $installerPackage = $null
 if (!$PortableOnly) {
-    $installerPackage = & (Join-Path $PSScriptRoot 'Pack-KlippInstaller.ps1') -PackageDirectory $packageDirectory -Version $Version -PreviousReleaseDirectory $PreviousReleaseDirectory
-    $releaseAssets += @($installerPackage.ReleaseAssets)
+    $installerPackage = & (Join-Path $PSScriptRoot 'Pack-KlippInstaller.ps1') -PackageDirectory $packageDirectory -Version $Version -PreviousReleaseDirectory $PreviousReleaseDirectory `
+        -SignTemplate $SignTemplate -ExpectedPublisher $ExpectedPublisher -RequireSigning:$RequireSigning
 }
+if ($SignTemplate) { Move-Item -LiteralPath $installerPackage.PortableArchive -Destination $zipPath }
+else { [IO.Compression.ZipFile]::CreateFromDirectory($packageDirectory, $zipPath, [IO.Compression.CompressionLevel]::Optimal, $true) }
+$checksum = (Get-FileHash -LiteralPath $zipPath -Algorithm SHA256).Hash.ToLowerInvariant()
+$releaseAssets = @($zipPath) + @($installerPackage.ReleaseAssets)
+# Portable-only builds have no installer assets.
+$releaseAssets = @($releaseAssets | Where-Object { $_ })
 $checksumLines = foreach ($releaseAsset in $releaseAssets) {
     (Get-FileHash -LiteralPath $releaseAsset -Algorithm SHA256).Hash.ToLowerInvariant() + '  ' + [IO.Path]::GetFileName($releaseAsset)
 }
 $checksumLines | Set-Content -LiteralPath $checksumPath -Encoding ascii
 $releaseAssets += $checksumPath
-[ordered]@{
+$artifactManifestPath = Join-Path $runDirectory 'release-artifacts.json'
+$artifactManifest = [ordered]@{
     version = $Version
     sourceCommit = $sourceCommit
     packageDirectory = $packageDirectory
     installer = $installerPackage.Installer
     updateFeed = $installerPackage.UpdateFeed
+    signing = [ordered]@{ requested = [bool]$SignTemplate; verified = $false; publisher = $ExpectedPublisher }
     releaseAssets = @($releaseAssets | ForEach-Object {
         [ordered]@{
             path = $_
@@ -214,7 +233,14 @@ $releaseAssets += $checksumPath
             sha256 = (Get-FileHash -LiteralPath $_ -Algorithm SHA256).Hash.ToLowerInvariant()
         }
     })
-} | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath (Join-Path $runDirectory 'release-artifacts.json') -Encoding utf8
+}
+$artifactManifest | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $artifactManifestPath -Encoding utf8
+if ($SignTemplate) {
+    $signatureReport = & (Join-Path $PSScriptRoot 'Test-KlippReleaseSignatures.ps1') -ReleaseManifestPath $artifactManifestPath -ExpectedPublisher $ExpectedPublisher
+    $artifactManifest.signing.verified = $true
+    $artifactManifest | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $artifactManifestPath -Encoding utf8
+    $signatureReport | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $runDirectory 'signature-verification.json') -Encoding utf8
+}
 
 [pscustomobject]@{
     Version = $Version
