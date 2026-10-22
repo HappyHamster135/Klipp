@@ -206,6 +206,184 @@ foreach (var missingPreparedPackage in new[] { false, true })
     Assert(service.PrepareRestart() && client.PrepareCalls == 2, "Updater launch retry failed.");
 }
 
+// A deferred staged package does not pin later checks to that older version.
+{
+    var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+    var finish = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+    var client = new FakeClient { Pending = FakeClient.Release("1.0.9"), Offered = FakeClient.Release("1.0.10") };
+    client.Download = async (asset, progress, token) =>
+    {
+        progress(100);
+        entered.TrySetResult();
+        await finish.Task.WaitAsync(token);
+        client.Pending = asset;
+    };
+    using var service = new AppUpdateService(client, State("pending-newer-manual"), new TestClock());
+    await service.CheckAsync(false);
+    Assert(service.Snapshot.Status == AppUpdateStatus.Ready && client.CheckCalls == 0,
+        "The older verified package was not restored before querying the network.");
+    await service.CheckAsync(false, manual: true);
+    Assert(service.Snapshot.Status == AppUpdateStatus.Available && service.Snapshot.AvailableVersion == "1.0.10" && client.DownloadCalls == 0,
+        "Checking with an older staged update did not expose the newer stable download.");
+    var transfer = service.DownloadAsync();
+    await entered.Task.WaitAsync(TimeSpan.FromSeconds(5));
+    Assert(service.Snapshot.Status == AppUpdateStatus.Downloading && client.Pending?.Version == "1.0.9" && !service.PrepareRestart(),
+        "A 100% progress report replaced the verified fallback before the newer download completed.");
+    finish.SetResult();
+    await transfer;
+    Assert(service.Snapshot.Status == AppUpdateStatus.Ready && service.Snapshot.AvailableVersion == "1.0.10",
+        "Manual download could not replace an older staged package.");
+    Assert(service.PrepareRestart() && client.Prepared?.Version == "1.0.10",
+        "Restart did not select the newest verified package.");
+}
+
+// Ready restoration is local, but subsequent feed checks keep their normal persisted interval.
+{
+    var clock = new TestClock();
+    var state = State("pending-check-interval");
+    var client = new FakeClient { Pending = FakeClient.Release("1.0.9"), Offered = FakeClient.Release("1.0.9") };
+    using (var service = new AppUpdateService(client, state, clock))
+    {
+        await service.CheckAsync(true);
+        await service.CheckAsync(true);
+        Assert(client.CheckCalls == 1 && client.DownloadCalls == 0 && service.Snapshot.Status == AppUpdateStatus.Ready,
+            "A pending update either prevented a later feed check or redownloaded its own version.");
+    }
+    clock.Advance(TimeSpan.FromHours(5));
+    var reopenedClient = new FakeClient { Pending = client.Pending, Offered = FakeClient.Release("1.0.10") };
+    using var reopened = new AppUpdateService(reopenedClient, state, clock);
+    await reopened.CheckAsync(true);
+    await reopened.CheckAsync(true);
+    Assert(reopenedClient.CheckCalls == 0 && reopenedClient.DownloadCalls == 0 && reopened.Snapshot.Status == AppUpdateStatus.Ready,
+        "Restoring a pending package bypassed the persisted six-hour feed interval.");
+    clock.Advance(TimeSpan.FromHours(1));
+    await reopened.CheckAsync(true);
+    Assert(reopenedClient.CheckCalls == 1 && reopenedClient.DownloadCalls == 1 && reopened.Snapshot.AvailableVersion == "1.0.10",
+        "An idle check did not discover and download a newer release after its interval elapsed.");
+}
+
+// Offline discovery retains both the old ready status and its usable restart handle.
+{
+    var client = new FakeClient { Pending = FakeClient.Release("1.0.9"), Check = _ => throw new HttpRequestException("offline") };
+    using var service = new AppUpdateService(client, State("pending-offline"), new TestClock());
+    await service.CheckAsync(false);
+    await service.CheckAsync(false, manual: true);
+    Assert(service.Snapshot.Status == AppUpdateStatus.Ready && service.Snapshot.AvailableVersion == "1.0.9" &&
+        service.Snapshot.Message.Contains("connection"), "Offline discovery hid the verified fallback.");
+    Assert(service.PrepareRestart() && client.Prepared?.Version == "1.0.9", "Offline discovery discarded the verified restart handle.");
+}
+
+// Canceled discovery restores the fallback and retains automatic network backoff.
+{
+    var clock = new TestClock();
+    var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+    var client = new FakeClient { Pending = FakeClient.Release("1.0.9") };
+    client.Check = async token => { entered.TrySetResult(); await Task.Delay(Timeout.Infinite, token); return null; };
+    using var service = new AppUpdateService(client, State("pending-cancel-check"), clock);
+    await service.CheckAsync(false);
+    using var cancellation = new CancellationTokenSource();
+    var check = service.CheckAsync(false, manual: true, cancellation.Token);
+    await entered.Task.WaitAsync(TimeSpan.FromSeconds(5));
+    cancellation.Cancel();
+    await check;
+    Assert(service.Snapshot.Status == AppUpdateStatus.Ready && service.Snapshot.AvailableVersion == "1.0.9",
+        "Canceled discovery hid the verified fallback.");
+    client.Check = _ => Task.FromResult<AppUpdateRelease?>(null);
+    clock.Advance(TimeSpan.FromMinutes(14));
+    await service.CheckAsync(false);
+    Assert(client.CheckCalls == 1, "Canceled discovery immediately retried the network.");
+    clock.Advance(TimeSpan.FromMinutes(1));
+    await service.CheckAsync(false);
+    Assert(client.CheckCalls == 2 && service.Snapshot.Status == AppUpdateStatus.Ready,
+        "Canceled discovery never resumed or lost its fallback after a later empty feed.");
+    Assert(service.PrepareRestart() && client.Prepared?.Version == "1.0.9", "Canceled discovery discarded the verified restart handle.");
+}
+
+// Failed, missing, stale or mismatched verification must never replace the old package.
+foreach (var failure in new[] { "disk", "checksum", "stale", "missing", "wrong-version" })
+{
+    var client = new FakeClient { Pending = FakeClient.Release("1.0.9"), Offered = FakeClient.Release("1.0.10") };
+    client.Download = (_, progress, _) =>
+    {
+        progress(100);
+        if (failure == "disk") throw new IOException("disk full");
+        if (failure == "checksum") throw new InvalidDataException("checksum mismatch");
+        if (failure == "missing") client.Pending = null;
+        if (failure == "wrong-version") client.Pending = FakeClient.Release("1.0.11");
+        return Task.CompletedTask;
+    };
+    using var service = new AppUpdateService(client, State("pending-failure-" + failure));
+    await service.CheckAsync(false);
+    await service.CheckAsync(true, manual: true);
+    Assert(service.Snapshot.Status == AppUpdateStatus.Ready && service.Snapshot.AvailableVersion == "1.0.9",
+        "A failed or unverified replacement lost the old ready package: " + failure);
+    Assert(service.PrepareRestart() && client.Prepared?.Version == "1.0.9",
+        "A failed or mismatched replacement changed the restart target: " + failure);
+}
+
+// Pausing a replacement leaves the fallback ready; a manual retry can still install the newer one.
+{
+    var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+    var client = new FakeClient { Pending = FakeClient.Release("1.0.9"), Offered = FakeClient.Release("1.0.10") };
+    client.Download = async (_, _, token) => { entered.TrySetResult(); await Task.Delay(Timeout.Infinite, token); };
+    using var service = new AppUpdateService(client, State("pending-cancel-download"));
+    await service.CheckAsync(false);
+    var replacement = service.CheckAsync(true, manual: true);
+    await entered.Task.WaitAsync(TimeSpan.FromSeconds(5));
+    service.CancelDownload();
+    await replacement;
+    Assert(service.Snapshot.Status == AppUpdateStatus.Ready && service.Snapshot.AvailableVersion == "1.0.9" &&
+        service.Snapshot.Message.Contains("paused"), "Pausing a replacement hid the older verified package.");
+    client.Download = null;
+    await service.DownloadAsync();
+    Assert(client.DownloadCalls == 2 && service.Snapshot.Status == AppUpdateStatus.Ready && service.Snapshot.AvailableVersion == "1.0.10",
+        "Manual replacement retry was blocked by the retained older package.");
+    Assert(service.PrepareRestart() && client.Prepared?.Version == "1.0.10", "Replacement retry installed the stale fallback.");
+}
+
+// Retaining an old ready package must not bypass failed-transfer backoff.
+{
+    var clock = new TestClock();
+    var client = new FakeClient { Pending = FakeClient.Release("1.0.9"), Offered = FakeClient.Release("1.0.10"),
+        Download = (_, _, _) => throw new IOException("disk full") };
+    using var service = new AppUpdateService(client, State("pending-download-backoff"), clock);
+    await service.CheckAsync(false);
+    await service.CheckAsync(true);
+    for (var attempt = 0; attempt < 5; attempt++) await service.CheckAsync(true);
+    clock.Advance(TimeSpan.FromMinutes(14));
+    await service.CheckAsync(true);
+    Assert(client.DownloadCalls == 1 && service.Snapshot.Status == AppUpdateStatus.Ready,
+        "Replacement retry ignored backoff or hid the verified fallback while waiting.");
+    clock.Advance(TimeSpan.FromMinutes(1));
+    client.Download = null;
+    await service.CheckAsync(true);
+    Assert(client.DownloadCalls == 2 && service.Snapshot.AvailableVersion == "1.0.10",
+        "Replacement retry did not resume after backoff.");
+}
+
+// Compare semantic precedence, not strings; ignore stale/equal/prerelease/malformed offers.
+foreach (var offered in new[] { "1.0.8", "1.0.9", "1.0.9.0+rebuilt", "1.0.10-beta.1", "not-a-version" })
+{
+    var client = new FakeClient { Pending = FakeClient.Release("1.0.9"), Offered = FakeClient.Release(offered) };
+    using var service = new AppUpdateService(client, State("pending-ignore-" + Guid.NewGuid()));
+    await service.CheckAsync(false);
+    await service.CheckAsync(true, manual: true);
+    await service.DownloadAsync();
+    Assert(client.CheckCalls == 1 && client.DownloadCalls == 0 && service.Snapshot.Status == AppUpdateStatus.Ready &&
+        service.Snapshot.AvailableVersion == "1.0.9", "An unsuitable offer replaced or redownloaded the ready package: " + offered);
+    Assert(service.PrepareRestart() && client.Prepared?.Version == "1.0.9", "An unsuitable offer changed the restart target: " + offered);
+}
+
+// The installed version is also a lower bound when no package is staged.
+foreach (var offered in new[] { "1.0.5", "1.0.6", "1.0.7-beta.1", "not-a-version" })
+{
+    var client = new FakeClient { Offered = FakeClient.Release(offered) };
+    using var service = new AppUpdateService(client, State("ignore-" + Guid.NewGuid()));
+    await service.CheckAsync(true, manual: true);
+    Assert(client.DownloadCalls == 0 && service.Snapshot.Status == AppUpdateStatus.UpToDate && !service.PrepareRestart(),
+        "A stale, prerelease or malformed offer bypassed the installed-version guard: " + offered);
+}
+
 // Closing Klipp cancels transfers without sending callbacks to a disposed view.
 {
     var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -332,6 +510,7 @@ sealed class FakeClient : IAppUpdateClient
     public Func<CancellationToken, Task<AppUpdateRelease?>>? Check { get; set; }
     public Func<AppUpdateRelease, Action<int>, CancellationToken, Task>? Download { get; set; }
     public bool PrepareFailure { get; set; }
+    public AppUpdateRelease? Prepared { get; private set; }
     public int CheckCalls;
     public int DownloadCalls;
     public int PrepareCalls;
@@ -353,6 +532,7 @@ sealed class FakeClient : IAppUpdateClient
     {
         Interlocked.Increment(ref PrepareCalls);
         if (PrepareFailure) throw new IOException("Unable to launch helper");
+        Prepared = release;
     }
 }
 

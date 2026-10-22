@@ -14,6 +14,7 @@ namespace Klipp.Desktop.Controls;
 public sealed class UpdateReadyPrompt : UserControl
 {
     private readonly TextBlock _detail;
+    private readonly TextBlock _error;
     private readonly Border _surface;
     private readonly Storyboard _entrance;
     private string? _version;
@@ -50,6 +51,8 @@ public sealed class UpdateReadyPrompt : UserControl
                         <TextBlock Text="Keep working. You can install it later in Settings → Updates."
                                    FontSize="12" TextWrapping="Wrap"
                                    Foreground="{ThemeResource KlippTextSecondaryBrush}" />
+                        <TextBlock x:Name="Error" FontSize="12" TextWrapping="Wrap" Visibility="Collapsed"
+                                   Foreground="{ThemeResource KlippWarningBrush}" />
                     </StackPanel>
                     <Grid ColumnSpacing="8">
                         <Grid.ColumnDefinitions>
@@ -69,6 +72,7 @@ public sealed class UpdateReadyPrompt : UserControl
             """);
         _surface = layout;
         _detail = (TextBlock)layout.FindName("Detail");
+        _error = (TextBlock)layout.FindName("Error");
         ((ContentControl)layout.FindName("BrandHost")).Content = new KlippBrandMark { Width = 24, Height = 24 };
         var later = (Button)layout.FindName("LaterButton");
         var restart = (Button)layout.FindName("RestartButton");
@@ -78,6 +82,7 @@ public sealed class UpdateReadyPrompt : UserControl
         AutomationProperties.SetName(later, "Later");
         AutomationProperties.SetName(restart, "Restart Klipp to install the update");
         AutomationProperties.SetLiveSetting(_detail, AutomationLiveSetting.Polite);
+        AutomationProperties.SetLiveSetting(_error, AutomationLiveSetting.Polite);
         Content = layout;
 
         var fade = new DoubleAnimation
@@ -93,7 +98,7 @@ public sealed class UpdateReadyPrompt : UserControl
     }
 
     /// <summary>Reveal without activating the window or moving keyboard focus.</summary>
-    public void Show(string version)
+    public void Show(string version, string? errorMessage = null)
     {
         if (string.IsNullOrWhiteSpace(version))
         {
@@ -103,6 +108,9 @@ public sealed class UpdateReadyPrompt : UserControl
 
         version = version.Trim();
         var wasVisible = Visibility == Visibility.Visible;
+        var error = string.IsNullOrWhiteSpace(errorMessage) ? string.Empty : errorMessage.Trim();
+        if (_error.Text != error) _error.Text = error;
+        _error.Visibility = error.Length == 0 ? Visibility.Collapsed : Visibility.Visible;
         if (_version == version && wasVisible) return;
         _version = version;
         _detail.Text = $"Klipp {version} is ready to install.";

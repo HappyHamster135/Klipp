@@ -116,7 +116,8 @@ public sealed class AppUpdateService : IDisposable
             _operation = Task.Run(async () =>
             {
                 using var linked = CancellationTokenSource.CreateLinkedTokenSource(_lifetime.Token, cancellationToken);
-                if (_available is not null && _ready is null) await DownloadCoreAsync(_available, manual, linked.Token).ConfigureAwait(false);
+                if (_available is not null && IsNewerStableRelease(_available, _ready?.Version ?? _client.CurrentVersion))
+                    await DownloadCoreAsync(_available, manual, linked.Token).ConfigureAwait(false);
             });
             return _operation;
         }
@@ -167,13 +168,16 @@ public sealed class AppUpdateService : IDisposable
                 return;
             }
 
-            _ready ??= _client.GetPendingRestart();
-            if (_ready is not null)
+            if (_ready is null && _client.GetPendingRestart() is { } pending)
             {
-                Publish(AppUpdateStatus.Ready, $"Klipp {_ready.Version} is ready. Restart when you have finished editing or recording.", 100, _ready.Version);
+                // Restore the verified package immediately, even offline. Future
+                // idle checks may still replace it with a newer stable release.
+                _ready = pending;
+                PublishReady();
                 return;
             }
-            if (downloadAutomatically && _available is not null)
+            if (downloadAutomatically && _available is not null &&
+                IsNewerStableRelease(_available, _ready?.Version ?? _client.CurrentVersion))
             {
                 await DownloadCoreAsync(_available, manual, token).ConfigureAwait(false);
                 return;
@@ -182,19 +186,26 @@ public sealed class AppUpdateService : IDisposable
             var now = _time.GetUtcNow();
             var interval = manual ? ManualCheckInterval : !_downloadNeedsRetry && _lastCheckedUtc >= _lastAttemptUtc
                 ? AutomaticCheckInterval : FailedCheckRetryInterval;
-            if (_lastAttemptUtc is { } attempted && now - attempted < interval) return;
+            if (_lastAttemptUtc is { } attempted && now - attempted < interval)
+            {
+                PublishKnownUpdate();
+                return;
+            }
             _lastAttemptUtc = now;
             await SaveCheckStateAsync().ConfigureAwait(false);
             Publish(AppUpdateStatus.Checking, "Checking GitHub for updates…");
             var release = await _client.CheckAsync(token).ConfigureAwait(false);
             token.ThrowIfCancellationRequested();
             _lastCheckedUtc = _time.GetUtcNow();
+            if (release is not null && !IsNewerStableRelease(release, _ready?.Version ?? _client.CurrentVersion))
+                release = null;
             if (release is null) _downloadNeedsRetry = false;
             await SaveCheckStateAsync().ConfigureAwait(false);
             _available = release;
             if (release is null)
             {
-                Publish(AppUpdateStatus.UpToDate, "You have the latest version of Klipp.");
+                if (_ready is not null) PublishReady();
+                else Publish(AppUpdateStatus.UpToDate, "You have the latest version of Klipp.");
                 return;
             }
 
@@ -203,32 +214,42 @@ public sealed class AppUpdateService : IDisposable
         }
         catch (OperationCanceledException) when (token.IsCancellationRequested)
         {
-            if (!_disposed && Snapshot.Status == AppUpdateStatus.Checking)
-                Publish(AppUpdateStatus.Idle, "Update check canceled. You can check again later.");
+            if (!_disposed)
+            {
+                if (_ready is not null) PublishReady("The newer-update check was canceled.");
+                else if (Snapshot.Status == AppUpdateStatus.Checking)
+                    Publish(AppUpdateStatus.Idle, "Update check canceled. You can check again later.");
+            }
         }
         catch (Exception exception)
         {
             Debug.WriteLine($"[Klipp] Update check failed: {exception.GetType().Name}");
-            Publish(AppUpdateStatus.Error, DescribeError(exception, downloading: false));
+            if (_ready is not null) PublishReady(DescribeError(exception, downloading: false));
+            else Publish(AppUpdateStatus.Error, DescribeError(exception, downloading: false));
         }
     }
 
     private async Task DownloadCoreAsync(AppUpdateRelease release, bool manual, CancellationToken cancellationToken)
     {
-        cancellationToken.ThrowIfCancellationRequested();
-        var now = _time.GetUtcNow();
-        if (!manual && _lastDownloadAttemptUtc is { } attempted && now - attempted < FailedCheckRetryInterval) return;
-        _lastDownloadAttemptUtc = now;
-        _downloadNeedsRetry = true;
-        await SaveCheckStateAsync().ConfigureAwait(false);
         using var download = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        lock (_sync)
-        {
-            if (_disposed) return;
-            _downloadCancellation = download;
-        }
         try
         {
+            download.Token.ThrowIfCancellationRequested();
+            var now = _time.GetUtcNow();
+            if (!manual && _lastDownloadAttemptUtc is { } attempted && now - attempted < FailedCheckRetryInterval)
+            {
+                if (_ready is not null) PublishReady();
+                return;
+            }
+            lock (_sync)
+            {
+                if (_disposed) return;
+                _downloadCancellation = download;
+            }
+            _lastDownloadAttemptUtc = now;
+            _downloadNeedsRetry = true;
+            await SaveCheckStateAsync().ConfigureAwait(false);
+            download.Token.ThrowIfCancellationRequested();
             Publish(AppUpdateStatus.Downloading, $"Downloading Klipp {release.Version}…", 0, release.Version);
             await _client.DownloadAsync(release, percent =>
             {
@@ -238,20 +259,28 @@ public sealed class AppUpdateService : IDisposable
             download.Token.ThrowIfCancellationRequested();
             // The SDK verifies the package checksum before exposing a prepared
             // full release. Never offer restart based on progress alone.
-            _ready = _client.GetPendingRestart() ?? throw new InvalidDataException("No verified update was prepared.");
+            var prepared = _client.GetPendingRestart();
+            if (prepared is null || !SameVersion(prepared.Version, release.Version) ||
+                !IsNewerStableRelease(prepared, _ready?.Version ?? _client.CurrentVersion))
+                throw new InvalidDataException("The requested verified update was not prepared.");
+            _ready = prepared;
             _downloadNeedsRetry = false;
             await SaveCheckStateAsync().ConfigureAwait(false);
-            Publish(AppUpdateStatus.Ready, $"Klipp {_ready.Version} is ready. Restart when you have finished editing or recording.", 100, _ready.Version);
+            PublishReady();
         }
         catch (OperationCanceledException) when (download.IsCancellationRequested)
         {
             if (!_disposed)
-                Publish(AppUpdateStatus.Available, "Download paused. You can download the update again.", 0, release.Version);
+            {
+                if (_ready is not null) PublishReady("The newer download was paused. You can retry it later.");
+                else Publish(AppUpdateStatus.Available, "Download paused. You can download the update again.", 0, release.Version);
+            }
         }
         catch (Exception exception)
         {
             Debug.WriteLine($"[Klipp] Update download failed: {exception.GetType().Name}");
-            Publish(AppUpdateStatus.Available, DescribeError(exception, downloading: true), 0, release.Version);
+            if (_ready is not null) PublishReady(DescribeError(exception, downloading: true));
+            else Publish(AppUpdateStatus.Available, DescribeError(exception, downloading: true), 0, release.Version);
         }
         finally
         {
@@ -259,6 +288,30 @@ public sealed class AppUpdateService : IDisposable
                 if (ReferenceEquals(_downloadCancellation, download)) _downloadCancellation = null;
         }
     }
+
+    private void PublishKnownUpdate()
+    {
+        if (_available is not null && IsNewerStableRelease(_available, _ready?.Version ?? _client.CurrentVersion))
+            Publish(AppUpdateStatus.Available, $"Klipp {_available.Version} is available.", 0, _available.Version);
+        else if (_ready is not null)
+            PublishReady();
+    }
+
+    private void PublishReady(string? detail = null)
+    {
+        if (_ready is null) return;
+        Publish(AppUpdateStatus.Ready,
+            $"Klipp {_ready.Version} is ready. " + (detail ?? "Restart when you have finished editing or recording."),
+            100, _ready.Version);
+    }
+
+    private static bool IsNewerStableRelease(AppUpdateRelease release, string baseline) =>
+        SemanticVersion.TryParse(release.Version, out var offered) && !offered.IsPrerelease &&
+        SemanticVersion.TryParse(baseline, out var current) && offered.CompareTo(current) > 0;
+
+    private static bool SameVersion(string first, string second) =>
+        SemanticVersion.TryParse(first, out var left) && SemanticVersion.TryParse(second, out var right) &&
+        left.CompareTo(right) == 0;
 
     private void Publish(AppUpdateStatus status, string message, int progress = 0, string? availableVersion = null)
     {

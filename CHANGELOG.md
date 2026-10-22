@@ -6,6 +6,7 @@
 - Wait until capture, editing, video playback, exports, dialogs and file operations are finished and the library is active. Hide the card immediately when work starts or Klipp moves to the background or tray.
 - Remember **Later** for the dismissed version across app restarts. Keep automatic checks enabled and the explicit restart action available in **Settings → Updates**; a newer version may show its own card.
 - Keep capture and playback protected when restarting to update, finish saving work, and recheck activity before starting the native updater.
+- Explain restart failures on the card. Continue discovering newer releases after choosing Later, and keep the prepared update available if a newer check or download fails.
 - Keep code signing disabled.
 
 ## 1.0.8 — 2026-10-22

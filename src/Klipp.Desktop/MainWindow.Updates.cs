@@ -29,6 +29,8 @@ public sealed partial class MainWindow
     private AppUpdatePromptPolicy _updatePromptPolicy = new();
     private bool _updateWindowActive;
     private string? _updateMessageOverride;
+    private string? _updateRestartError;
+    private string? _updateRestartErrorVersion;
 
     private void InitializeUpdates()
     {
@@ -172,7 +174,8 @@ public sealed partial class MainWindow
             activity.CanDownloadAutomatically ? "Download the update in the background." : "Finish capture, editing and exports before downloading.");
 
         if (_updatePromptPolicy.ShouldShow(ready ? state.AvailableVersion : null, CanShowUpdatePrompt(activity)))
-            AppUpdatePrompt.Show(state.AvailableVersion!);
+            AppUpdatePrompt.Show(state.AvailableVersion!,
+                state.AvailableVersion == _updateRestartErrorVersion ? _updateRestartError : null);
         else
             AppUpdatePrompt.Hide();
     }
@@ -265,6 +268,7 @@ public sealed partial class MainWindow
         var restartPrepared = false;
         _updateRestarting = true;
         _updateMessageOverride = null;
+        _updateRestartError = null;
         _captureWindowClosing = true;
         _captureSessionReady = false;
         _captureSourceTimer?.Stop();
@@ -293,6 +297,8 @@ public sealed partial class MainWindow
             System.Diagnostics.Debug.WriteLine($"[Klipp] Update restart was canceled: {exception.GetType().Name}");
             _updateMessageOverride = exception is InvalidOperationException ? exception.Message
                 : "Could not finish saving your work. Klipp stayed open. Check free disk space and try again.";
+            _updateRestartError = _updateMessageOverride;
+            _updateRestartErrorVersion = _appUpdates.Snapshot.AvailableVersion;
         }
         finally
         {

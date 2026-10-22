@@ -68,6 +68,18 @@ internal static class UpdateReadyPromptChecks
             var buttons = Descendants<Button>(prompt).ToArray();
             var laterButton = buttons.Single(button => Equals(button.Content, "Later"));
             var restartButton = buttons.Single(button => !ReferenceEquals(button, laterButton));
+            const string restartFailure = "Your project could not be saved. Keep working and try again when the project folder is available.";
+            prompt.Show(version, restartFailure);
+            var warning = Descendants<TextBlock>(prompt).Single(text => text.Text == restartFailure);
+            Require(warning.Visibility == Visibility.Visible && warning.FontSize == 12,
+                "A failed restart did not add compact feedback to the already visible update card.");
+            Require(surface.Opacity > .99, "Failure feedback replayed the update card's entrance animation.");
+            Require(laterButton.IsEnabled && restartButton.IsEnabled, "Failure feedback disabled an update action.");
+            Require(ReferenceEquals(FocusManager.GetFocusedElement(root.XamlRoot), focused), "Failure feedback moved keyboard focus.");
+            prompt.Show(version);
+            Require(warning.Visibility == Visibility.Collapsed && warning.Text.Length == 0,
+                "Clearing restart failure feedback left the warning visible.");
+            Require(surface.Opacity > .99, "Clearing failure feedback replayed the entrance animation.");
             Invoke(restartButton);
             await Task.Delay(20);
             Require(restarts == 1 && later == 0, "Restart invoked an incorrect or repeated action.");
@@ -90,6 +102,8 @@ internal static class UpdateReadyPromptChecks
             // A narrow app window should wrap the copy/actions rather than
             // forcing a fixed-width card beyond its available library area.
             appWindow.Resize(new Windows.Graphics.SizeInt32(340, 600));
+            const string longFailure = "The update could not be installed because your project could not be saved. Keep working, check that the project folder is available, then try restarting again.";
+            prompt.Show("1.2.4", longFailure);
             await Task.Delay(180);
             Require(prompt.ActualWidth <= root.ActualWidth - 47,
                 "The update card overflowed a narrow app window.");
@@ -97,9 +111,12 @@ internal static class UpdateReadyPromptChecks
                 "Narrow layout clipped an update action.");
             foreach (var text in Descendants<TextBlock>(prompt).Where(text => text.Text.Length > 0))
                 Require(text.ActualWidth <= prompt.ActualWidth - 31, "Update text overflowed the card's available width.");
+            Require(warning.Visibility == Visibility.Visible && warning.Text == longFailure && warning.ActualHeight > 24,
+                "A long restart failure did not wrap in the narrow update card.");
+            Require(laterButton.IsEnabled && restartButton.IsEnabled, "Narrow failure feedback disabled an update action.");
             prompt.Hide();
             Require(prompt.Visibility == Visibility.Collapsed, "Explicit hide did not collapse the card immediately.");
-            Console.WriteLine("PASS: production update card focus preservation, ready/busy safety, repeated refresh, synchronous hide, action events, Later/new-version policy and responsive layout");
+            Console.WriteLine("PASS: production update card focus preservation, ready/busy safety, repeated refresh, synchronous hide, failure feedback, action events, Later/new-version policy and responsive layout");
         }
         finally { window.Close(); }
     }
