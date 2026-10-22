@@ -31,10 +31,11 @@ public sealed record AppUpdateSnapshot(
     string? AvailableVersion,
     int ProgressPercent,
     string Message,
-    DateTimeOffset? LastCheckedUtc);
+    DateTimeOffset? LastCheckedUtc,
+    string? ReleaseNotesMarkdown = null);
 
 /// <summary>An SDK release remains opaque to the state machine and its tests.</summary>
-public sealed record AppUpdateRelease(string Version, object Handle);
+public sealed record AppUpdateRelease(string Version, object Handle, string? ReleaseNotesMarkdown = null);
 
 public interface IAppUpdateClient
 {
@@ -349,11 +350,23 @@ public sealed class AppUpdateService : IDisposable
         lock (_sync)
         {
             if (_disposed) return;
-            next = new(status, _client.CurrentVersion, availableVersion, progress, message, _lastCheckedUtc);
+            next = new(status, _client.CurrentVersion, availableVersion, progress, message, _lastCheckedUtc,
+                GetReleaseNotes(availableVersion));
             if (next == _snapshot) return;
             Volatile.Write(ref _snapshot, next);
         }
         StateChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    private string? GetReleaseNotes(string? version)
+    {
+        if (version is null) return null;
+        // Prepared-package metadata is authoritative. A failed replacement
+        // must never pair the older ready version with the newer feed's notes.
+        var ready = _ready;
+        if (ready is not null && SameVersion(ready.Version, version)) return ready.ReleaseNotesMarkdown;
+        var available = _available;
+        return available is not null && SameVersion(available.Version, version) ? available.ReleaseNotesMarkdown : null;
     }
 
     private void ReadCheckState()
@@ -431,13 +444,13 @@ public sealed class VelopackAppUpdateClient : IAppUpdateClient
             accessToken: null, prerelease: false, downloader: new KlippUpdateDownloader()),
             new UpdateOptions { ExplicitChannel = "win", AllowVersionDowngrade = false });
         var version = Assembly.GetEntryAssembly()?.GetName().Version;
-        _fallbackVersion = version is null ? "1.0.9" : $"{version.Major}.{version.Minor}.{Math.Max(0, version.Build)}";
+        _fallbackVersion = version is null ? "1.0.10" : $"{version.Major}.{version.Minor}.{Math.Max(0, version.Build)}";
     }
 
     public AppUpdateRelease? GetPendingRestart()
     {
         var release = IsInstalled ? _manager.UpdatePendingRestart : null;
-        return release is null ? null : new(release.Version.ToString(), release);
+        return release is null ? null : new(release.Version.ToString(), release, release.NotesMarkdown);
     }
 
     public async Task<AppUpdateRelease?> CheckAsync(CancellationToken cancellationToken)
@@ -445,7 +458,8 @@ public sealed class VelopackAppUpdateClient : IAppUpdateClient
         cancellationToken.ThrowIfCancellationRequested();
         var update = await _manager.CheckForUpdatesAsync().ConfigureAwait(false);
         cancellationToken.ThrowIfCancellationRequested();
-        return update is null ? null : new(update.TargetFullRelease.Version.ToString(), update);
+        return update is null ? null : new(update.TargetFullRelease.Version.ToString(), update,
+            update.TargetFullRelease.NotesMarkdown);
     }
 
     public Task DownloadAsync(AppUpdateRelease release, Action<int> progress, CancellationToken cancellationToken) =>

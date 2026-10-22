@@ -3,10 +3,11 @@ param(
     [Parameter(Mandatory = $true)]
     [string]$PackageDirectory,
     [ValidatePattern('^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$')]
-    [string]$Version = '1.0.9',
+    [string]$Version = '1.0.10',
     [string]$OutputDirectory = '',
     [string]$PreviousReleaseDirectory = '',
     [string]$VelopackToolDirectory = '',
+    [string]$ReleaseNotesPath = '',
     [string]$SignTemplate = '',
     [string]$ExpectedPublisher = '',
     [switch]$RequireSigning
@@ -43,6 +44,9 @@ if ($OutputDirectory.Equals($PackageDirectory, [StringComparison]::OrdinalIgnore
 }
 if (Test-Path -LiteralPath $OutputDirectory) { throw 'Installer output must be a new directory.' }
 New-Item -ItemType Directory -Path $OutputDirectory | Out-Null
+
+$releaseNotes = & (Join-Path $PSScriptRoot 'New-KlippReleaseNotes.ps1') -Version $Version `
+    -OutputPath (Join-Path ([IO.Path]::GetDirectoryName($OutputDirectory)) 'ReleaseNotes.md') -SourcePath $ReleaseNotesPath
 
 if (!$VelopackToolDirectory) { $VelopackToolDirectory = Join-Path $repoRoot "artifacts/tools/vpk/$velopackVersion" }
 $VelopackToolDirectory = [IO.Path]::GetFullPath($VelopackToolDirectory)
@@ -84,6 +88,7 @@ $packArguments = @(
     '--splashProgressColor', '#8EAED0',
     '--aumid', $packageId, '--shortcuts', 'Desktop,StartMenuRoot'
 )
+if ($releaseNotes) { $packArguments += @('--releaseNotes', $releaseNotes.Path) }
 if ($SignTemplate) {
     # Only Klipp binaries and installer helpers are submitted to our provider.
     # Upstream libraries retain their existing signatures. Foundation approval
@@ -117,7 +122,7 @@ if (Test-Path -LiteralPath $assetManifest) {
 $updateFeed = Join-Path $OutputDirectory "releases.$channel.json"
 $updatePackages = @(Get-ChildItem -LiteralPath $OutputDirectory -File -Filter "$packageId-$Version-*.nupkg")
 if (!(Test-Path -LiteralPath $updateFeed) -or !$updatePackages.Count) { throw 'Update feed or versioned packages are missing.' }
-$feed = Get-Content -LiteralPath $updateFeed -Raw | ConvertFrom-Json
+$feed = [IO.File]::ReadAllText($updateFeed) | ConvertFrom-Json
 $currentFull = @($feed.Assets | Where-Object { $_.PackageId -eq $packageId -and $_.Version -eq $Version -and $_.Type -eq 'Full' })
 if ($currentFull.Count -ne 1) { throw 'The update feed must contain one full package for this application version.' }
 $fullPackage = Join-Path $OutputDirectory $currentFull[0].FileName
@@ -129,6 +134,30 @@ if ($currentFull[0].SHA256 -and (Get-FileHash -LiteralPath $fullPackage -Algorit
 if ($currentFull[0].SHA1 -and (Get-FileHash -LiteralPath $fullPackage -Algorithm SHA1).Hash -ne $currentFull[0].SHA1) {
     throw 'Full package checksum does not match the update feed.'
 }
+
+$expectedNotes = if ($releaseNotes) { $releaseNotes.Markdown } else { '' }
+$feedNotes = [string]$currentFull[0].NotesMarkdown
+if ($feedNotes.Replace("`r`n", "`n").Trim() -cne $expectedNotes) { throw "Update feed notes do not match this version's source." }
+Add-Type -AssemblyName System.IO.Compression.FileSystem
+$packageArchive = [IO.Compression.ZipFile]::OpenRead($fullPackage)
+try {
+    $nuspec = @($packageArchive.Entries | Where-Object { $_.FullName.EndsWith('.nuspec', [StringComparison]::OrdinalIgnoreCase) })
+    if ($nuspec.Count -ne 1) { throw 'Expected exactly one package manifest for release notes verification.' }
+    $xmlSettings = [Xml.XmlReaderSettings]::new()
+    $xmlSettings.DtdProcessing = [Xml.DtdProcessing]::Prohibit
+    $xmlSettings.XmlResolver = $null
+    $stream = $nuspec[0].Open()
+    $reader = [Xml.XmlReader]::Create($stream, $xmlSettings)
+    try {
+        $manifestXml = [Xml.XmlDocument]::new()
+        $manifestXml.Load($reader)
+        $noteNode = $manifestXml.SelectSingleNode("/*[local-name()='package']/*[local-name()='metadata']/*[local-name()='releaseNotes']")
+        $packageNotes = if ($noteNode) { $noteNode.InnerText } else { '' }
+        if ($packageNotes.Replace("`r`n", "`n").Trim() -cne $expectedNotes) { throw "Prepared package notes do not match this version's source." }
+    }
+    finally { $reader.Dispose(); $stream.Dispose() }
+}
+finally { $packageArchive.Dispose() }
 
 & (Join-Path $PSScriptRoot 'Test-KlippReleaseIcons.ps1') -PackageDirectory $PackageDirectory -InstallerPath $installer -FullPackagePath $fullPackage
 
@@ -167,4 +196,5 @@ if ($SignTemplate) {
     UpdatePackages = @($updatePackages | ForEach-Object FullName)
     PortableArchive = $portableArchive
     ReleaseAssets = $releaseAssets
+    ReleaseNotesPath = $releaseNotes.Path
 }

@@ -9,12 +9,16 @@ The package ID is **HappyHamster135.Klipp**, channel **win**, with `Klipp.Deskto
 Commit the release source, then run:
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File tools/Publish-KlippRelease.ps1 -Version 1.0.9
+powershell -NoProfile -ExecutionPolicy Bypass -File tools/Publish-KlippRelease.ps1 -Version 1.0.10
 ```
 
 The script creates a fresh directory under `artifacts/releases/`. It publishes the self-contained, untrimmed application, includes native runtimes and license notices, builds the installer and update feed, and calculates SHA-256 checksums. `vpk` installs locally under `artifacts/tools/vpk/1.2.161`; no global tool installation is needed.
 
 Use `-PortableOnly` when only a developer ZIP is needed. `tools/Pack-KlippInstaller.ps1` can package an existing self-contained publish separately, as long as its `release-manifest.json` version matches `-Version`.
+
+Installer packaging extracts only the exact `## <version>` section from `CHANGELOG.md` into the build's `ReleaseNotes.md`. Velopack embeds those Markdown notes in the update feed and full package, and packaging verifies both copies. Use the first three bullets for short user-facing highlights; the app shows these without rendering remote HTML. The popup's **Full release notes** link opens that version's GitHub release rather than whichever release is currently latest.
+
+Custom versions without a matching changelog section have no inline notes; the app offers the full-notes link with a neutral fallback. To supply notes for such a build, pass `-ReleaseNotesPath C:\Builds\CustomNotes.md`. Empty or ambiguous notes fail packaging rather than borrowing another version's changes. `ReleaseNotes.md` is a local build artifact and can be reused as the GitHub release body; it does not add an extra required upload asset. Run `powershell -NoProfile -File tools/Test-KlippReleaseNotes.ps1` for isolated extraction checks.
 
 ## Publish to GitHub
 
@@ -36,7 +40,7 @@ After the first installer release, a previous **published** full package can be 
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File tools/Publish-KlippRelease.ps1 `
-  -Version 1.0.9 -PreviousReleaseDirectory C:\Builds\Klipp-1.0.8\installer
+  -Version 1.0.10 -PreviousReleaseDirectory C:\Builds\Klipp-1.0.9\installer
 ```
 
 The previous directory should contain the previous full `.nupkg` and its `releases.win.json`. The script copies these into the new staging directory and asks Velopack to build the delta. Upload the newly generated delta alongside the new full package and feed. Full packages remain available as the fallback for clients that cannot use a delta. Never seed a public release from private QA fixture packages.
@@ -52,6 +56,8 @@ The installer fast callback repairs existing shortcuts after creation. Normal st
 Check a fresh install, Start menu launch, Windows Installed apps entry, and uninstall using an isolated test installation. Confirm that `%LOCALAPPDATA%\Klipp` and the user's recordings are unchanged. For update testing, install an older private fixture and point a test updater at a local feed containing the new real package; do not create dummy public releases.
 
 Test the update-ready card in the active library, with unchanged keyboard focus and working **Restart to update** and **Later** actions. It should wait during recording, instant capture, editing, playback, exports, dialogs and background/tray use, and disappear immediately when work starts. Confirm that **Later** stays dismissed for that version after reopening, while **Settings → Updates** still offers restart and automatic checks remain enabled. A newer version should be eligible for its own card.
+
+Confirm that **What's new** shows at most three readable highlights from the prepared version, retains them when restoring a downloaded package offline, and clears old highlights when the version changes. **Full release notes** must target that exact version. Missing notes should show the neutral fallback; long or formatted notes should remain plain text and keep both update actions accessible.
 
 Test both idle update/restart and blocked restart while recording, editing, playing video or exporting. Restart must finish saving preferences and projects, then recheck activity before handing off to the native updater. Also test an offline check and a corrupted download. A rejected or unavailable update should leave the installed version usable.
 

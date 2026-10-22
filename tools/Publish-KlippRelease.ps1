@@ -1,11 +1,12 @@
 [CmdletBinding()]
 param(
     [ValidatePattern('^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$')]
-    [string]$Version = '1.0.9',
+    [string]$Version = '1.0.10',
     [string]$OutputRoot = '',
     [string]$VisualStudioDirectory = '',
     [string]$VcRuntimeDirectory = '',
     [string]$PreviousReleaseDirectory = '',
+    [string]$ReleaseNotesPath = '',
     [switch]$PortableOnly,
     [string]$SignTemplate = '',
     [string]$ExpectedPublisher = '',
@@ -213,7 +214,7 @@ $checksumPath = Join-Path $runDirectory 'SHA256SUMS.txt'
 $installerPackage = $null
 if (!$PortableOnly) {
     $installerPackage = & (Join-Path $PSScriptRoot 'Pack-KlippInstaller.ps1') -PackageDirectory $packageDirectory -Version $Version -PreviousReleaseDirectory $PreviousReleaseDirectory `
-        -SignTemplate $SignTemplate -ExpectedPublisher $ExpectedPublisher -RequireSigning:$RequireSigning
+        -SignTemplate $SignTemplate -ExpectedPublisher $ExpectedPublisher -RequireSigning:$RequireSigning -ReleaseNotesPath $ReleaseNotesPath
 }
 else { & (Join-Path $PSScriptRoot 'Test-KlippReleaseIcons.ps1') -PackageDirectory $packageDirectory }
 if ($SignTemplate) { Move-Item -LiteralPath $installerPackage.PortableArchive -Destination $zipPath }
@@ -234,6 +235,7 @@ $artifactManifest = [ordered]@{
     packageDirectory = $packageDirectory
     installer = $installerPackage.Installer
     updateFeed = $installerPackage.UpdateFeed
+    releaseNotes = $installerPackage.ReleaseNotesPath
     signing = [ordered]@{ requested = [bool]$SignTemplate; verified = $false; publisher = $ExpectedPublisher }
     releaseAssets = @($releaseAssets | ForEach-Object {
         [ordered]@{
@@ -262,4 +264,5 @@ if ($SignTemplate) {
     UpdateFeed = $installerPackage.UpdateFeed
     UpdatePackages = @($installerPackage.UpdatePackages)
     ReleaseAssets = $releaseAssets
+    ReleaseNotesPath = $installerPackage.ReleaseNotesPath
 }

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -31,6 +32,10 @@ public sealed partial class MainWindow
     private string? _updateMessageOverride;
     private string? _updateRestartError;
     private string? _updateRestartErrorVersion;
+    private string? _updatePromptVersion;
+    private string? _updateHighlightsVersion;
+    private string? _updateHighlightsMarkdown;
+    private IReadOnlyList<string> _updateHighlights = Array.Empty<string>();
 
     private void InitializeUpdates()
     {
@@ -73,7 +78,7 @@ public sealed partial class MainWindow
         _updateWindowActive && !_hiddenInTray && !_sideMenuOpen &&
         LibraryView.Visibility == Visibility.Visible && SideMenuOverlay.Visibility != Visibility.Visible &&
         InlineFullscreenHost.Visibility != Visibility.Visible && activity.RestartBlockedReason is null &&
-        AppRoot.XamlRoot is { } root && VisualTreeHelper.GetOpenPopupsForXamlRoot(root).Count == 0;
+        AppRoot.XamlRoot is { } root && VisualTreeHelper.GetOpenPopupsForXamlRoot(root).All(popup => popup.Child is ToolTip);
 
     private async Task CheckAutomaticUpdateAsync()
     {
@@ -174,26 +179,55 @@ public sealed partial class MainWindow
             activity.CanDownloadAutomatically ? "Download the update in the background." : "Finish capture, editing and exports before downloading.");
 
         if (_updatePromptPolicy.ShouldShow(ready ? state.AvailableVersion : null, CanShowUpdatePrompt(activity)))
+        {
+            if (_updateHighlightsVersion != state.AvailableVersion || _updateHighlightsMarkdown != state.ReleaseNotesMarkdown)
+            {
+                _updateHighlightsVersion = state.AvailableVersion;
+                _updateHighlightsMarkdown = state.ReleaseNotesMarkdown;
+                _updateHighlights = AppUpdateReleaseNotes.Summarize(state.ReleaseNotesMarkdown);
+            }
+            _updatePromptVersion = state.AvailableVersion;
             AppUpdatePrompt.Show(state.AvailableVersion!,
-                state.AvailableVersion == _updateRestartErrorVersion ? _updateRestartError : null);
+                state.AvailableVersion == _updateRestartErrorVersion ? _updateRestartError : null, _updateHighlights);
+        }
         else
+        {
+            _updatePromptVersion = null;
             AppUpdatePrompt.Hide();
+        }
     }
 
     private async void OnUpdateLaterRequested(object? sender, EventArgs args)
     {
         // Dismiss only this verified version. Checks stay enabled and Settings
         // keeps its explicit restart action, including after reopening Klipp.
-        if (_updatesDisposed || _updateRestarting || _appUpdates.Snapshot.Status != AppUpdateStatus.Ready) return;
-        var version = _appUpdates.Snapshot.AvailableVersion;
+        if (_updatesDisposed || _updateRestarting || _updatePromptVersion is not { } version) return;
         _updatePromptPolicy.Defer(version);
         _settings.Current.DeferredUpdateVersion = version;
         RefreshUpdateUi();
         await _settings.SaveAsync();
     }
 
-    private void OnUpdateRestartRequested(object? sender, EventArgs args) =>
+    private void OnUpdateRestartRequested(object? sender, EventArgs args)
+    {
+        // The version whose changes were reviewed must still be the prepared
+        // update. Refresh rather than approving an unseen replacement.
+        if (_updatePromptVersion is null || _updatePromptVersion != _appUpdates.Snapshot.AvailableVersion)
+        {
+            RefreshUpdateUi();
+            return;
+        }
         OnRestartForUpdateClicked(sender ?? this, new RoutedEventArgs());
+    }
+
+    private async void OnUpdatePromptReleaseNotesRequested(object? sender, EventArgs args)
+    {
+        if (_updatesDisposed || _updateRestarting || _updatePromptVersion is not { } version) return;
+        await OpenUpdateLinkAsync(GetVersionReleaseNotesUri(version));
+    }
+
+    private static Uri GetVersionReleaseNotesUri(string version) =>
+        new(AppUpdateService.RepositoryUrl + "/releases/tag/v" + Uri.EscapeDataString(version));
 
     private async void OnAutomaticUpdatesToggled(object sender, RoutedEventArgs args)
     {
@@ -234,7 +268,8 @@ public sealed partial class MainWindow
         await OpenUpdateLinkAsync(AppUpdateService.InstallerUri);
 
     private async void OnUpdateReleaseNotesClicked(object sender, RoutedEventArgs args) =>
-        await OpenUpdateLinkAsync(AppUpdateService.ReleasesUri);
+        await OpenUpdateLinkAsync(_appUpdates.Snapshot.AvailableVersion is { } version
+            ? GetVersionReleaseNotesUri(version) : AppUpdateService.ReleasesUri);
 
     private async Task OpenUpdateLinkAsync(Uri uri)
     {

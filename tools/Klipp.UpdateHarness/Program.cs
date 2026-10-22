@@ -476,6 +476,145 @@ foreach (var cache in new[] { "{broken", new string(' ', 4097), "{\"LastAttemptU
     Assert(service.Snapshot.Status == AppUpdateStatus.UpToDate, "An unwritable poll cache must not prevent a check.");
 }
 
+// Notes follow the displayed release throughout check/download/verification,
+// including when the verified package carries different notes from the feed.
+{
+    const string readyNotes = "- Keep game and microphone audio separate.";
+    const string feedNotes = "- Preview the next transition before applying it.";
+    const string verifiedNotes = "- Preview transitions with smoother playback.";
+    var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+    var finish = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+    var client = new FakeClient
+    {
+        Pending = FakeClient.Release("1.0.9", readyNotes),
+        Offered = FakeClient.Release("1.0.10", feedNotes)
+    };
+    client.Download = async (release, _, token) =>
+    {
+        entered.TrySetResult();
+        await finish.Task.WaitAsync(token);
+        client.Pending = FakeClient.Release(release.Version, verifiedNotes);
+    };
+    using var service = new AppUpdateService(client, State("notes-version-association"));
+    Assert(service.Snapshot.ReleaseNotesMarkdown is null, "An idle service invented release notes.");
+    await service.CheckAsync(false);
+    Assert(service.Snapshot.Status == AppUpdateStatus.Ready && service.Snapshot.AvailableVersion == "1.0.9" &&
+        service.Snapshot.ReleaseNotesMarkdown == readyNotes && client.CheckCalls == 0,
+        "A restored package lost its own offline release notes.");
+    await service.CheckAsync(false, manual: true);
+    Assert(service.Snapshot.Status == AppUpdateStatus.Available && service.Snapshot.AvailableVersion == "1.0.10" &&
+        service.Snapshot.ReleaseNotesMarkdown == feedNotes,
+        "A newer available version displayed the older package's notes.");
+    var download = service.DownloadAsync();
+    await entered.Task.WaitAsync(TimeSpan.FromSeconds(5));
+    Assert(service.Snapshot.Status == AppUpdateStatus.Downloading && service.Snapshot.AvailableVersion == "1.0.10" &&
+        service.Snapshot.ReleaseNotesMarkdown == feedNotes,
+        "A downloading version displayed notes for another release.");
+    finish.SetResult();
+    await download;
+    Assert(service.Snapshot.Status == AppUpdateStatus.Ready && service.Snapshot.AvailableVersion == "1.0.10" &&
+        service.Snapshot.ReleaseNotesMarkdown == verifiedNotes,
+        "Ready did not use the requested verified package's authoritative release notes.");
+    client.PrepareFailure = true;
+    Assert(!service.PrepareRestart() && service.Snapshot.Status == AppUpdateStatus.Ready &&
+        service.Snapshot.ReleaseNotesMarkdown == verifiedNotes,
+        "A restart failure discarded the ready package's release notes.");
+}
+
+// Older notes remain paired with the older ready package after offline checks
+// and after reopening. They are sourced from the package, not the poll cache.
+{
+    const string notes = "- Restore unfinished recordings from the library.";
+    var client = new FakeClient { Pending = FakeClient.Release("1.0.9", notes), Check = _ => throw new HttpRequestException("offline") };
+    var state = State("notes-offline-reopen");
+    using (var service = new AppUpdateService(client, state))
+    {
+        await service.CheckAsync(false);
+        await service.CheckAsync(false, manual: true);
+        Assert(service.Snapshot.Status == AppUpdateStatus.Ready && service.Snapshot.ReleaseNotesMarkdown == notes,
+            "An offline metadata check discarded the verified package's release notes.");
+    }
+    var checkCount = client.CheckCalls;
+    using var reopened = new AppUpdateService(client, state);
+    await reopened.CheckAsync(false);
+    Assert(reopened.Snapshot.Status == AppUpdateStatus.Ready && reopened.Snapshot.ReleaseNotesMarkdown == notes &&
+        client.CheckCalls == checkCount,
+        "Restoring release notes after reopening required a network request.");
+}
+
+// Failed/canceled replacements must not mix the candidate's notes with the
+// retained old package, or advertise notes for an unexpected prepared package.
+foreach (var mode in new[] { "retained", "removed", "mismatched", "cancel" })
+{
+    const string oldNotes = "- Improve recording recovery.";
+    const string nextNotes = "- Improve transition previews.";
+    const string wrongNotes = "- Notes for an unrelated prepared version.";
+    var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+    var client = new FakeClient { Pending = FakeClient.Release("1.0.9", oldNotes), Offered = FakeClient.Release("1.0.10", nextNotes) };
+    client.Download = async (_, _, token) =>
+    {
+        entered.TrySetResult();
+        if (mode == "cancel") await Task.Delay(Timeout.Infinite, token);
+        if (mode == "removed") client.Pending = null;
+        if (mode == "mismatched") client.Pending = FakeClient.Release("1.0.11", wrongNotes);
+        throw new IOException("download failed");
+    };
+    using var service = new AppUpdateService(client, State("notes-replacement-" + mode));
+    var snapshots = new ConcurrentQueue<AppUpdateSnapshot>();
+    service.StateChanged += (_, _) => snapshots.Enqueue(service.Snapshot);
+    await service.CheckAsync(false);
+    var download = service.CheckAsync(true, manual: true);
+    if (mode == "cancel")
+    {
+        await entered.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        service.CancelDownload();
+    }
+    await download;
+    var retained = mode is "retained" or "cancel";
+    Assert(service.Snapshot.AvailableVersion == (retained ? "1.0.9" : "1.0.10") &&
+        service.Snapshot.ReleaseNotesMarkdown == (retained ? oldNotes : nextNotes),
+        "Replacement recovery paired a displayed version with the wrong notes: " + mode);
+    Assert(snapshots.All(snapshot => snapshot.AvailableVersion switch
+        {
+            "1.0.9" => snapshot.ReleaseNotesMarkdown == oldNotes,
+            "1.0.10" => snapshot.ReleaseNotesMarkdown == nextNotes,
+            null => snapshot.ReleaseNotesMarkdown is null,
+            _ => false
+        }), "A state transition briefly exposed notes from another release: " + mode);
+}
+
+// A release without Markdown has no fabricated highlights, even when an older
+// prepared version had notes. The UI can still offer the exact release link.
+{
+    var client = new FakeClient { Pending = FakeClient.Release("1.0.9", "- Older changes."), Offered = FakeClient.Release("1.0.10") };
+    using var service = new AppUpdateService(client, State("notes-missing"));
+    await service.CheckAsync(false);
+    await service.CheckAsync(true, manual: true);
+    Assert(service.Snapshot.Status == AppUpdateStatus.Ready && service.Snapshot.AvailableVersion == "1.0.10" &&
+        service.Snapshot.ReleaseNotesMarkdown is null, "A newer release inherited older highlights when its notes were absent.");
+}
+
+// Exercise the real SDK adapter's Markdown fields directly: packaged pending
+// assets and feed targets both expose NotesMarkdown, without fetching HTML.
+{
+    const string notes = "- **Smoother playback** with separate audio tracks.";
+    var asset = new VelopackAsset
+    {
+        PackageId = AppUpdateService.ApplicationId, Version = SemanticVersion.Parse("1.0.10"),
+        Type = VelopackAssetType.Full, FileName = "HappyHamster135.Klipp-1.0.10-full.nupkg",
+        NotesMarkdown = notes, NotesHTML = "<p>Do not render or substitute this HTML.</p>"
+    };
+    var client = new VelopackAppUpdateClient(new NotesUpdateManager(asset, root));
+    Assert(client.IsInstalled && client.GetPendingRestart()?.ReleaseNotesMarkdown == notes,
+        "The SDK adapter did not read the pending package's Markdown metadata.");
+    var available = await client.CheckAsync(CancellationToken.None);
+    Assert(available?.Version == "1.0.10" && available.ReleaseNotesMarkdown == notes,
+        "The SDK adapter did not read the feed target's Markdown metadata.");
+    asset.NotesMarkdown = null!;
+    Assert(client.GetPendingRestart()?.ReleaseNotesMarkdown is null,
+        "HTML-only metadata was substituted for missing Markdown.");
+}
+
 // The SDK adapter refuses another application's installation ownership.
 {
     var packages = Path.Combine(root, "wrong-app-packages");
@@ -518,6 +657,10 @@ static async Task RunInstalledCheckAsync(string[] arguments)
     if (snapshot.Status is not (AppUpdateStatus.Ready or AppUpdateStatus.UpToDate)) throw new InvalidOperationException("Native SDK update check/download failed.");
     var expectedIndex = Array.IndexOf(arguments, "--expected-version");
     if (expectedIndex >= 0 && snapshot.AvailableVersion != arguments[expectedIndex + 1]) throw new InvalidOperationException("Unexpected prepared version.");
+    var notesIndex = Array.IndexOf(arguments, "--expected-notes");
+    if (notesIndex >= 0 && (notesIndex + 1 >= arguments.Length ||
+        snapshot.ReleaseNotesMarkdown?.Contains(arguments[notesIndex + 1], StringComparison.Ordinal) != true))
+        throw new InvalidOperationException("Expected notes were not preserved in the prepared package.");
     if (arguments.Contains("--apply"))
     {
         var running = Process.GetProcessesByName("Klipp.Desktop");
@@ -551,7 +694,7 @@ sealed class FakeClient : IAppUpdateClient
     public int CheckCalls;
     public int DownloadCalls;
     public int PrepareCalls;
-    public static AppUpdateRelease Release(string version) => new(version, new object());
+    public static AppUpdateRelease Release(string version, string? notes = null) => new(version, new object(), notes);
     public AppUpdateRelease? GetPendingRestart() => Pending;
     public Task<AppUpdateRelease?> CheckAsync(CancellationToken cancellationToken)
     {
@@ -571,6 +714,13 @@ sealed class FakeClient : IAppUpdateClient
         if (PrepareFailure) throw new IOException("Unable to launch helper");
         Prepared = release;
     }
+}
+
+sealed class NotesUpdateManager(VelopackAsset asset, string packages) : UpdateManager(packages,
+    new UpdateOptions { ExplicitChannel = "win" }, new TestVelopackLocator(AppUpdateService.ApplicationId, "1.0.6", packages))
+{
+    public override VelopackAsset? UpdatePendingRestart => asset;
+    public override Task<UpdateInfo?> CheckForUpdatesAsync() => Task.FromResult<UpdateInfo?>(new UpdateInfo(asset, false));
 }
 
 sealed class InstalledProcess(string executable, string installedRoot) : IProcessImpl

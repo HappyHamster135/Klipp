@@ -641,7 +641,8 @@
 
         <controls:UpdateReadyPrompt x:Name="AppUpdatePrompt" Grid.Row="1" Canvas.ZIndex="5"
                                     MaxWidth="360" Margin="24" HorizontalAlignment="Right" VerticalAlignment="Bottom"
-                                    RestartRequested="OnUpdateRestartRequested" LaterRequested="OnUpdateLaterRequested" />
+                                    RestartRequested="OnUpdateRestartRequested" LaterRequested="OnUpdateLaterRequested"
+                                    ReleaseNotesRequested="OnUpdatePromptReleaseNotesRequested" />
 
         <Grid x:Name="InlineFullscreenHost" Grid.RowSpan="2" Visibility="Collapsed" Canvas.ZIndex="10"
               PointerWheelChanged="OnInlinePreviewPointerWheelChanged">

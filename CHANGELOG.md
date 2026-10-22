@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.0.10 — 2026-10-22
+
+- See what's new in the update popup before restarting.
+- Open the full release notes for the downloaded version.
+- Keep update highlights after reopening Klipp, with prompts waiting until recording and editing finish.
+- Package release notes with the matching update so offline highlights stay accurate.
+- Keep automatic updates enabled and code signing disabled.
+
 ## 1.0.9 — 2026-10-22
 
 - Add a compact, nonmodal update-ready card with **Restart to update** and **Later**, using the existing Klipp design and a short fade that respects Windows animation preferences. Showing the card does not move keyboard focus.
