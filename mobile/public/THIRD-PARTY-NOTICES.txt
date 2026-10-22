@@ -44,28 +44,5 @@ Lucide React 1.61.0
   The complete upstream text retains both Lucide and Cole Bemis/Feather notices:
     licenses/lucide-react-1.61.0-LICENSE.txt
 
-Mediabunny 1.62.0
-  TypeScript library license: Mozilla Public License 2.0.
-  Copyright: Vanilagy and contributors; see the original source file headers.
-  Text: licenses/mediabunny-1.62.0-LICENSE.txt
-  Source for the library is available at the exact npm gitHead:
-    https://github.com/Vanilagy/mediabunny/tree/03d524ffa1a1429616bcd4434f97714a77432bd7
-  Source archive:
-    https://github.com/Vanilagy/mediabunny/archive/03d524ffa1a1429616bcd4434f97714a77432bd7.tar.gz
-  Upstream release:
-    https://github.com/Vanilagy/mediabunny/releases/tag/v1.62.0
-  Local copy of upstream development/build instructions:
-    licenses/mediabunny-1.62.0-README.md
-  Klipp uses the published package without editing its upstream sources.
-  The bundler transforms its JavaScript for delivery. The source links and
-  MPL text above cover those upstream files; no Mediabunny trademark rights
-  are asserted.
-
-Media preparation uses the browser's own WebCodecs implementations and can
-copy existing encoded AAC packets. No @mediabunny/aac-encoder, FFmpeg binary,
-or Emscripten/WASM encoder is included in this mobile distribution.
-See licenses/MEDIABUNNY-SOURCE-AND-BUILD.txt for source/download provenance.
-
 PACKAGE-LICENSE-MANIFEST.json in licenses/ records SHA-256 hashes of the exact
-installed package license texts copied for this distribution. Additional
-source/download provenance is recorded in MEDIABUNNY-SOURCE-AND-BUILD.txt.
+installed package license texts copied for this distribution.

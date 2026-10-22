@@ -3,17 +3,14 @@ import { browserSessionStorage, createConfig } from './config';
 import {
   cancelled, CommunityError, mediaLimits, unavailable, type CommunityBlockedUser, type CommunityClip,
   type CommunityComment, type CommunityConfig, type CommunityCursor, type CommunityPage, type CommunityProfile,
-  type CommunityUpload, type CommunityUploadProgress, type CommunityUser, type StorageLike,
+  type CommunityUser, type StorageLike,
 } from './models';
 
 type Context = { generation: number; userId: string | null; signal: AbortSignal; wroteSession?: boolean; dispose(): void };
-type UploadTransport = (url: string, headers: Record<string, string>, blob: Blob, signal: AbortSignal,
-  progress: (bytes: number) => void) => Promise<Response>;
 export interface CommunityApiOptions {
   rememberDevice?: boolean;
   storage?: StorageLike;
   fetch?: typeof fetch;
-  uploadTransport?: UploadTransport;
 }
 
 /** The SDK owns Auth protocols; all public state excludes sessions, tokens and signed URLs. */
@@ -23,7 +20,6 @@ export class CommunityApi {
   private readonly storage: StorageLike;
   private readonly storageKey: string;
   private readonly requestFetch: typeof fetch;
-  private readonly uploadTransport: UploadTransport;
   private listeners = new Set<() => void>();
   private generation = 0;
   private epoch = new AbortController();
@@ -42,7 +38,6 @@ export class CommunityApi {
     this.storage = options.storage ?? browserSessionStorage(options.rememberDevice ?? false);
     this.storageKey = `klipp-community-${new URL(this.config.projectUrl).host}-auth`;
     this.requestFetch = options.fetch ?? globalThis.fetch.bind(globalThis);
-    this.uploadTransport = options.uploadTransport ?? ((...args) => browserUpload(this.requestFetch, ...args));
     const guardedStorage: StorageLike = {
       getItem: async key => {
         try { return await this.storage.getItem(key); }
@@ -260,53 +255,6 @@ export class CommunityApi {
   }
   getPlaybackUrl(id: string, signal?: AbortSignal): Promise<string> { return this.assetUrl(id, false, signal); }
   getPosterUrl(id: string, signal?: AbortSignal): Promise<string> { return this.assetUrl(id, true, signal); }
-
-  uploadClip(upload: CommunityUpload, progress?: (value: CommunityUploadProgress) => void, signal?: AbortSignal): Promise<CommunityClip> {
-    const title = validateText(upload.title, 1, 120, 'invalid_title', 'Enter a title of 1–120 characters.');
-    const description = validateText(upload.description, 0, 500, 'invalid_description', 'Keep the description to 500 characters.', true);
-    if (!(upload.video instanceof Blob) || !(upload.poster instanceof Blob) || upload.video.size < 1 || upload.video.size > mediaLimits.videoBytes
-      || upload.poster.size < 1 || upload.poster.size > mediaLimits.posterBytes || upload.video.type !== 'video/mp4' || upload.poster.type !== 'image/jpeg')
-      throw new CommunityError('invalid_file', 'Choose an MP4 up to 16 MiB and a JPEG thumbnail up to 256 KiB.');
-    if (!Number.isFinite(upload.durationSeconds) || upload.durationSeconds <= 0 || upload.durationSeconds > 60)
-      throw new CommunityError('invalid_duration', 'Choose a clip up to 60 seconds long.');
-    return this.identity(async context => {
-      const deadline = linkedSignal([context.signal], 180000);
-      const uploading = { ...context, signal: deadline.signal };
-      let reservation: string | null = null;
-      const total = upload.video.size + upload.poster.size;
-      const report = (bytes: number, status: string) => { try { progress?.({ completedBytes: bytes, totalBytes: total, status }); } catch { /* Presentation cannot strand a reservation. */ } };
-      try {
-        report(0, 'Preparing upload');
-        await this.token(uploading, 240);
-        const pending = parseClip(await this.rpc('community_begin_upload', { p_title: title, p_description: description,
-          p_duration_seconds: upload.durationSeconds, p_byte_size: upload.video.size }, uploading), context.userId!);
-        if (pending.ownerId !== context.userId || pending.status !== 'uploading') throw unavailable();
-        reservation = pending.id;
-        for (const poster of [false, true]) {
-          const blob = poster ? upload.poster : upload.video;
-          const bucket = poster ? 'community-posters' : 'community-videos';
-          const token = await this.token(uploading);
-          const response = await this.uploadTransport(`${this.config.projectUrl}/storage/v1/object/${bucket}/${assetPath(context.userId!, pending.id, poster)}`,
-            { ...this.headers(token), 'Content-Type': blob.type, 'x-upsert': 'false' }, blob, uploading.signal,
-            bytes => report((poster ? upload.video.size : 0) + Math.min(blob.size, bytes), poster ? 'Uploading thumbnail' : 'Uploading video'));
-          this.assert(uploading);
-          await responseJson(response, 128 * 1024, uploading.signal, 'storage');
-        }
-        report(total, 'Publishing clip');
-        const clip = parseClip(await this.rpc('community_publish_clip', { p_clip_id: pending.id }, uploading), context.userId!);
-        if (clip.id !== pending.id || clip.ownerId !== context.userId || clip.status !== 'published') throw unavailable();
-        this.assert(uploading); report(total, 'Uploaded'); return clip;
-      } catch (error) {
-        if (reservation && this.isCurrent(context)) {
-          const cleanup = this.context(undefined, 20000);
-          try { await this.deleteCore(reservation, cleanup); } catch { /* My uploads retains the hidden reservation for retry. */ }
-          finally { cleanup.dispose(); }
-        }
-        if (deadline.signal.aborted && !context.signal.aborted) throw new CommunityError('timeout', 'The upload took too long. Try a steadier connection.');
-        throw error;
-      } finally { deadline.dispose(); }
-    }, signal);
-  }
 
   dispose(): void {
     this.disposed = true; this.fence(); this.unsubscribe(); this.listeners.clear();
@@ -580,32 +528,4 @@ function safeError(value: unknown, path = ''): CommunityError {
   if (row.status === 403) return new CommunityError('access_denied', 'Your account cannot access this Media feature.');
   if (row.name === 'AuthRetryableFetchError' || value instanceof TypeError) return new CommunityError('offline', 'Could not connect to Media. Check your connection and try again.');
   return unavailable();
-}
-
-async function browserUpload(fetcher: typeof fetch, url: string, headers: Record<string, string>, blob: Blob,
-  signal: AbortSignal, progress: (bytes: number) => void): Promise<Response> {
-  if (typeof XMLHttpRequest === 'undefined') {
-    const response = await fetcher(url, { method: 'POST', headers, body: blob, signal, redirect: 'error', cache: 'no-store' });
-    if (response.ok) progress(blob.size); return response;
-  }
-  return new Promise<Response>((resolve, reject) => {
-    const xhr = new XMLHttpRequest(); let settled = false;
-    const finish = (operation: () => void) => { if (!settled) { settled = true; signal.removeEventListener('abort', abort); operation(); } };
-    const abort = () => { finish(() => reject(cancelled())); xhr.abort(); };
-    if (signal.aborted) { abort(); return; }
-    xhr.open('POST', url); xhr.withCredentials = false; xhr.timeout = 180000;
-    for (const [key, value] of Object.entries(headers)) xhr.setRequestHeader(key, value);
-    signal.addEventListener('abort', abort, { once: true });
-    xhr.upload.onprogress = event => progress(Math.min(event.loaded, blob.size));
-    xhr.onprogress = event => { if (event.loaded > 128 * 1024) { finish(() => reject(unavailable())); xhr.abort(); } };
-    xhr.onload = () => finish(() => {
-      if (xhr.status < 100 || xhr.status > 599 || xhr.responseURL && new URL(xhr.responseURL).origin !== new URL(url).origin) { reject(unavailable()); return; }
-      if (xhr.responseText.length > 128 * 1024) { reject(unavailable()); return; }
-      resolve(new Response(xhr.responseText || null, { status: xhr.status, headers: { 'content-type': 'application/json' } }));
-    });
-    xhr.onerror = () => finish(() => reject(new CommunityError('offline', 'Could not upload the clip. Check your connection.')));
-    xhr.ontimeout = () => finish(() => reject(new CommunityError('timeout', 'The upload took too long. Try a steadier connection.')));
-    xhr.onabort = () => finish(() => reject(cancelled()));
-    xhr.send(blob);
-  });
 }

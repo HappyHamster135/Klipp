@@ -17,6 +17,33 @@ declare v_count bigint;
 begin execute p_sql; get diagnostics v_count = row_count;
     if v_count <> p_expected then raise exception 'Expected % affected rows, got %', p_expected, v_count; end if;
 end $$;
+-- A request without HTTP context must not silently count as the native app.
+select pg_temp.assert_true(not klipp_private.community_upload_client_allowed(), 'missing request header context denied');
+select pg_temp.expect_sqlstate('select public.community_begin_upload(''Missing HTTP context'', '''', 1, 1)', 'KM014');
+select set_config('request.headers', '', true);
+select pg_temp.assert_true(not klipp_private.community_upload_client_allowed(), 'empty request header context denied');
+select pg_temp.expect_sqlstate('select public.community_begin_upload(''Empty HTTP context'', '''', 1, 1)', 'KM014');
+select set_config('request.headers', 'null', true);
+select pg_temp.assert_true(not klipp_private.community_upload_client_allowed(), 'JSON null request header context denied');
+select set_config('request.headers', '[]', true);
+select pg_temp.assert_true(not klipp_private.community_upload_client_allowed(), 'nonobject request header context denied');
+select set_config('request.headers', '{}', true);
+select pg_temp.assert_true(klipp_private.community_upload_client_allowed(), 'native header context allowed');
+select set_config('request.headers', '{"origin":"null"}', true);
+select pg_temp.assert_true(not klipp_private.community_upload_client_allowed(), 'opaque browser origin denied');
+select pg_temp.expect_sqlstate('select public.community_begin_upload(''Opaque browser origin'', '''', 1, 1)', 'KM014');
+select set_config('request.headers', '{"origin":null}', true);
+select pg_temp.assert_true(not klipp_private.community_upload_client_allowed(), 'origin key presence denied even with JSON null');
+select set_config('request.headers', '{"origin":""}', true);
+select pg_temp.assert_true(not klipp_private.community_upload_client_allowed(), 'empty origin header denied');
+select set_config('request.headers', '{"sec-fetch-mode":"cors"}', true);
+select pg_temp.assert_true(not klipp_private.community_upload_client_allowed(), 'fetch mode denied without origin');
+select pg_temp.expect_sqlstate('select public.community_begin_upload(''Browser without origin'', '''', 1, 1)', 'KM014');
+select set_config('request.headers', '{"sec-fetch-site":"cross-site"}', true);
+select pg_temp.assert_true(not klipp_private.community_upload_client_allowed(), 'fetch site denied without origin');
+select set_config('request.headers', '{"sec-fetch-dest":"empty"}', true);
+select pg_temp.assert_true(not klipp_private.community_upload_client_allowed(), 'fetch destination denied without origin');
+select set_config('request.headers', '{}', true);
 insert into storage.buckets(id, public, file_size_limit, allowed_mime_types) values
     ('community-videos', false, 16777216, array['video/mp4']),
     ('community-posters', false, 262144, array['image/jpeg']);
@@ -40,6 +67,12 @@ select pg_temp.assert_true((select count(*) = 6 from pg_policies where
     (schemaname = 'public' or schemaname = 'klipp_private') and policyname like 'community_%_rpc_only'
     and permissive = 'RESTRICTIVE' and cmd = 'ALL' and roles @> array['anon', 'authenticated']::name[]
     and qual = 'false' and with_check = 'false'), 'explicit restrictive client deny policies');
+select pg_temp.assert_true((select count(*) = 1 from pg_policies where schemaname = 'storage'
+    and tablename = 'objects' and policyname = 'community_storage_browser_upload_guard'
+    and permissive = 'RESTRICTIVE' and cmd = 'INSERT' and roles = array['authenticated']::name[]),
+    'browser upload guard restricts Storage inserts without changing read or delete');
+select pg_temp.assert_true(not has_function_privilege('anon', 'klipp_private.community_upload_client_allowed()', 'EXECUTE'),
+    'anonymous callers cannot execute upload client helper');
 
 set local role anon;
 select pg_temp.expect_sqlstate('select public.community_feed()', '42501');
@@ -62,6 +95,18 @@ select pg_temp.expect_sqlstate('select public.community_begin_upload(''Bad'', ''
 select pg_temp.expect_sqlstate('select public.community_feed(0)', 'KM003');
 select pg_temp.expect_sqlstate('select public.community_feed(13, now(), null, false)', 'KM003');
 select set_config('test.clip', public.community_begin_upload('First', 'A small test', 10, 1024)->>'id', true);
+select set_config('request.headers', '{"origin":"https://happyhamster135.github.io"}', true);
+select pg_temp.expect_sqlstate('select public.community_begin_upload(''Browser upload'', '''', 10, 1024)', 'KM014');
+select pg_temp.expect_sqlstate('select public.community_publish_clip(current_setting(''test.clip'')::uuid)', 'KM014');
+select pg_temp.expect_sqlstate($q$insert into storage.objects(bucket_id,name,owner_id,metadata)
+    values('community-videos','10000000-0000-0000-0000-000000000001/' || current_setting('test.clip') || '/video.mp4',auth.uid()::text,
+        '{"size":1024,"mimetype":"video/mp4"}')$q$, '42501');
+select pg_temp.expect_sqlstate($q$insert into storage.objects(bucket_id,name,owner_id,metadata)
+    values('community-posters','10000000-0000-0000-0000-000000000001/' || current_setting('test.clip') || '/poster.jpg',auth.uid()::text,
+        '{"size":200,"mimetype":"image/jpeg"}')$q$, '42501');
+select pg_temp.assert_true(jsonb_array_length(public.community_feed(p_mine => true)) = 1
+    and (select count(*) = 0 from storage.objects), 'browser denials neither reserve another slot nor create objects');
+select set_config('request.headers', '{}', true);
 select pg_temp.assert_true((public.community_get_clip(current_setting('test.clip')::uuid)->>'status') = 'uploading', 'owner sees own pending upload');
 select pg_temp.assert_true(jsonb_array_length(public.community_feed()) = 0 and jsonb_array_length(public.community_feed(p_mine => true)) = 1, 'pending only in My Uploads');
 select pg_temp.expect_sqlstate('update public.community_clips set owner_id = gen_random_uuid()', '42501');
@@ -84,6 +129,11 @@ reset role;
 update storage.objects set metadata = '{"size":1024,"mimetype":"video/mp4"}' where bucket_id = 'community-videos';
 set local role authenticated;
 select pg_temp.assert_true(public.community_publish_clip(current_setting('test.clip')::uuid)->>'status' = 'published', 'metadata checked before publish');
+-- Keep browser context for all subsequent viewing, interactions and cleanup.
+select set_config('request.headers', '{"origin":"https://happyhamster135.github.io"}', true);
+select pg_temp.expect_sqlstate('select public.community_publish_clip(current_setting(''test.clip'')::uuid)', 'KM014');
+select pg_temp.assert_true(public.community_get_clip(current_setting('test.clip')::uuid)->>'status' = 'published'
+    and jsonb_array_length(public.community_feed()) = 1, 'browser can still view published clip and feed');
 select pg_temp.assert_true((select count(*) = 2 from storage.objects), 'owner reads files');
 select pg_temp.expect_affected('delete from storage.objects', 0);
 reset role;
@@ -188,6 +238,7 @@ update public.profiles set username = 'member_03' where id = '10000000-0000-0000
 set local role authenticated;
 
 -- Full slot accounting is independent of the tiny declared byte size.
+select set_config('request.headers', '{}', true);
 select public.community_begin_upload('Quota', '', 1, 1) from generate_series(1,5);
 select pg_temp.expect_sqlstate('select public.community_begin_upload(''Quota'', '''', 1, 1)', 'KM004');
 reset role;

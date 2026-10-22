@@ -1,16 +1,12 @@
 # Klipp mobile
 
-Klipp mobile is an installable React/Vite web app for Android and iPhone. It uses the same optional Klipp account, profiles, private Media feed, uploads, likes, comments, reports, and blocking as the desktop app. The first mobile version shares existing videos; it does not record or edit mobile gameplay.
+Klipp mobile is an installable React/Vite web app for Android, iPhone and desktop browsers. Sign in to watch the private Media feed, like and comment on clips, manage your profile, report content and block or unblock members. **Publishing clips belongs to the installed Klipp Windows app.** The web app has no video file picker, upload screen or media-preparation worker.
 
-The free mobile beta is live at **[happyhamster135.github.io/Klipp/](https://happyhamster135.github.io/Klipp/)**. Open that address in Safari or Chrome to use it or add it to your home screen.
-
-Recording and editing in the Windows app continue to work without an account. Online Media requires a verified, permanent account and a completed username.
+The free beta address is **[happyhamster135.github.io/Klipp/](https://happyhamster135.github.io/Klipp/)**. Recording, editing, exporting and the local Library in the Windows app continue to work without an account. Online Media requires a verified, permanent account and a completed username.
 
 ## Run locally
 
-Use Node.js 24.19.0 and **pnpm 11.25.0**, the package manager pinned in `package.json`. Dependencies and their lockfile are pinned; use a frozen install rather than upgrading packages as part of setup.
-
-From the repository root:
+Use Node.js 24.19.0 and **pnpm 11.25.0**, pinned in `package.json`. From the repository root:
 
 ```sh
 cd mobile
@@ -19,16 +15,16 @@ pnpm configure
 pnpm dev
 ```
 
-`pnpm configure` copies only the public project URL and `sb_publishable_` key from the ignored `backend/community.json` into the ignored `mobile/.env.local`. It refuses additional configuration fields. Do not put a service-role key, database password, email-provider key, or session token into any `VITE_` variable: Vite embeds those variables into browser JavaScript.
+`pnpm configure` copies only the public project URL and `sb_publishable_` key from the ignored `backend/community.json` into the ignored `mobile/.env.local`; additional fields are refused. Never put a service-role key, database password, email-provider key or session token into a `VITE_` variable, because Vite embeds it in browser JavaScript.
 
-If the desktop configuration is unavailable, create `mobile/.env.local` yourself:
+If the desktop configuration is unavailable, create `mobile/.env.local`:
 
 ```dotenv
 VITE_SUPABASE_URL=https://YOUR_PROJECT_REF.supabase.co
 VITE_SUPABASE_PUBLISHABLE_KEY=sb_publishable_YOUR_PUBLIC_KEY
 ```
 
-Open the localhost URL printed by Vite. The development server binds to `127.0.0.1` by default. A phone cannot reach the PC through its own `localhost`; phone testing needs a reachable HTTPS preview or deployment. Do not disable browser security to test encoding over plain HTTP on a LAN.
+The development server binds to `127.0.0.1`. A phone cannot reach the PC through its own `localhost`; use the deployed HTTPS site for phone checks.
 
 ```sh
 pnpm test
@@ -36,69 +32,43 @@ pnpm build
 pnpm preview
 ```
 
-The production website is `mobile/dist/`. Serve it over HTTPS, preserving its directory structure. Relative asset, manifest, icon, and service-worker paths support a repository subdirectory such as `/Klipp/`; the app does not require server-side route rewrites.
+The production files are in `mobile/dist/`. Preserve the directory structure when serving them over HTTPS. Relative assets, manifest and service-worker paths support a repository subdirectory such as `/Klipp/`; no server-side route rewrite is required.
 
 ## Use it on a phone
 
-Open the deployed HTTPS address in current Safari on iPhone or Chrome on Android. Sign in using the numeric code from the same Klipp account email; there is no magic-link redirect or additional mobile password. Leave **Remember me on this device** unchecked on a shared device. The default session uses browser session storage; checking the box explicitly chooses persistent local storage. Browser lifecycle behavior can vary, so use **Sign out** when finished on a shared device.
+Open the HTTPS address in current Safari on iPhone or Chrome on Android. Create an account or sign in with the numeric email code; there is no additional mobile password. Returning from Mail recalculates the resend wait using elapsed time. **Remember me on this device** explicitly selects persistent local storage; otherwise the app uses browser session storage. Browser restoration behavior varies, so sign out when finished on a shared device.
 
-To install on iPhone, open the site in Safari, use its Share menu, choose **Add to Home Screen**, and enable **Open as Web App** if offered. On Android, use Chrome’s **Install app** or **Add to Home screen** menu entry. Menu wording varies by browser version. This web installation needs no Apple or Google developer account and no app-store submission. [Apple’s installation instructions](https://support.apple.com/guide/iphone/bookmark-a-website-iph42ab2f3a7/ios), [Chrome’s web-app instructions](https://support.google.com/chrome/answer/9658361?co=GENIE.Platform%3DAndroid).
+On iPhone, use Safari's Share menu and **Add to Home Screen**, enabling **Open as Web App** if offered. On Android, use Chrome's **Install app** or **Add to Home screen** menu. This needs no Apple or Google developer account or app-store submission. [Apple instructions](https://support.apple.com/guide/iphone/bookmark-a-website-iph42ab2f3a7/ios), [Chrome instructions](https://support.google.com/chrome/answer/9658361?co=GENIE.Platform%3DAndroid).
 
-Installation is separate from clip encoding support. Preparing uploads requires a secure context, workers, and browser WebCodecs support for decoding the chosen video and encoding H.264. Capability checks report unsupported formats rather than sending the original large file to a server for conversion. Use a recent Safari/Chrome version and try an H.264 MP4 when a phone cannot read its original video. Exact codec support depends on the browser and device. [Mediabunny’s codec support](https://mediabunny.dev/guide/supported-formats-and-codecs).
+Media uses the browser's video decoder for the H.264/AAC clips published by Klipp on PC. The web app does not encode video, read your photo library or request access to camera/microphone devices. Keep an internet connection for private playback and interactions.
 
-Browser Back and Forward follow the Media, clip, Upload and Profile screens. Returning from a clip keeps the selected feed tab; leaving an unfinished upload asks before discarding its section and details. Upload preparation and transfer keep their screen active until completion or cancellation. This does not prevent the phone from closing or suspending the app.
+## Watch and interact
 
-If a playback link expires or the connection interrupts a clip, **Retry playback** keeps its position, paused/playing state and audio choices. Fullscreen uses the browser's available video mode, with inline playback still available when fullscreen is denied. Returning from Mail recalculates the resend wait using elapsed time. Trim fields support fractional seconds without submitting the form while a value is being edited.
+**Media** shows community clips; **My uploads** shows clips published from your Klipp PC account. Choose a clip to play it, use Like or Comments to interact, and use its actions menu to report or block another member. Owners can delete their own shared clips and comments. **Profile** contains account details, sign-out and reversible **Blocked users** management.
 
-### Physical-phone check
+Browser Back and Forward follow Media, clips and Profile. Returning from a clip keeps the selected feed tab. An old `#upload` bookmark returns to Media and explains: **Upload clips from Klipp on your PC.** Empty feeds use the same guidance without offering file selection.
 
-Run these checks separately on an iPhone and an Android phone; browser emulation does not establish a device result:
+If a playback link expires or a connection interrupts a clip, **Retry playback** keeps its position, paused/playing state and audio choices. Fullscreen uses the available browser video mode; inline playback remains usable when fullscreen is denied. Landscape opening/rotation brings the full player above the navigation bar. Phone browsers may suspend the app in the background; this is not background playback or an offline library.
 
-1. Record the phone model, OS version and browser/version. Sign in, switch to Mail for the code, then return and verify the account.
-2. Choose a 5–10 second video you are happy to share with signed-in beta members. Trim a section, preview it, try **Include audio**, review the title and upload.
-3. Watch the shared clip with sound, seek, rotate the phone, enter/leave fullscreen, then use Back to return to the clips. Confirm the selected feed tab remains correct.
-4. Background and reopen the app. Check playback pauses appropriately and sign-in behavior matches the optional **Remember me on this device** choice. Sign out when finished on a shared device.
+Publishing is intentional in the Windows app: choose **Upload to Media**, review a section and its audio, then confirm. The current free beta accepts up to 60 seconds / 16 MiB of video and a JPEG poster up to 256 KiB, with five reserved clips per account and forty globally. Incomplete uploads/deletions occupy a slot until cleanup succeeds. The web app can retry removal through **My uploads**; it does not upload a replacement. Originals on the PC remain unchanged.
 
-Record pass/failure and the failing step for each device/browser. No email code, token, signed playback link or private recording is needed in a test report. The [QA ledger](design/IMPLEMENTATION.md) records the user-reported Z Flip/Chrome sign-in and viewing result; phone uploads, iPhone behavior and installation remain unverified.
+Signed links expire after a short time; an already-issued link may remain usable until expiry after blocking or sign-out. Do not treat them as permanent share links. The server validates stored metadata, paths, sizes and ownership rather than independently decoding video duration. Upload guards reject requests identified as browser requests through Origin/fetch metadata. This is a browser boundary, not device attestation: a custom client can omit or forge those headers. See [community setup](../docs/COMMUNITY_SETUP.md) and the [privacy policy](../docs/PRIVACY.md).
 
-## What happens to a selected video
+## Physical-phone check
 
-The user chooses an existing MP4, MOV, or WebM file, previews it, and sets the start and end of a section up to 60 seconds long. The original file is read locally and remains unchanged. The initial mobile audio control includes or excludes the source’s primary audio track; separate desktop microphone/game/Discord/music track selection is not part of this first mobile flow.
+Run these separately on iPhone and Android; browser emulation does not establish a device result:
 
-A Mediabunny web worker decodes and compresses the selected section on the user’s device into an H.264 MP4, up to 1280 × 720 at 30 fps without enlarging a smaller source. Devices with native AAC encoding prepare audio at 96 kbps, stereo, 48 kHz. Otherwise, an existing AAC source track can be copied efficiently without re-encoding; its packet boundaries are kept inside the selected range, which can omit a small fraction of a second at either edge. Other source audio formats need native AAC support: choose an H.264/AAC MP4, turn audio off, or prepare the clip in Klipp on your PC. No FFmpeg/WASM encoder is included. A JPEG poster is produced from the share copy. Only the verified share copy and poster are uploaded; the original is not uploaded. Keep the app open until preparation and upload finish—background execution is not guaranteed on phones.
+1. Record the phone model, OS and browser versions. Sign in, switch to Mail for the code, then return and verify the account.
+2. Watch a clip already published from the installed Klipp PC app. Check sound, seeking, rotation, fullscreen and Back returning to the correct feed tab.
+3. Try a like, comment, profile edit and reversible block/unblock. Confirm there is no upload button or file picker, including when opening an old `#upload` link.
+4. Background and reopen the app. Check playback pauses and sign-in behavior matches the optional Remember choice. Sign out on a shared device.
 
-| Limit | Current free beta |
-| --- | --- |
-| Source selected on the device | At most 512 MiB |
-| Uploaded video | At most 60 seconds and 16 MiB |
-| Uploaded poster | JPEG, at most 256 KiB |
-| Upload slots | 5 per member, 40 across the beta |
-| Incomplete uploads/deletions | Continue to occupy a slot until cleanup succeeds |
-| Title / description / comment | 120 / 500 / 500 characters |
+Record pass/failure and the failing step for each device/browser. No email code, token, signed link or private recording is needed in a report. Before web uploading was intentionally removed, the user confirmed Z Flip/Chrome existing-account sign-in, uploading and watching with sound. That upload result describes the previous version. Phone account creation and iPhone testing remain unverified. Current results are recorded in the [QA ledger](design/IMPLEMENTATION.md).
 
-The server reserves a full video-plus-poster slot before file upload, validates stored object size/MIME/path/owner on publication, and protects all media with the existing authenticated RPCs and private Storage policies. It does not decode MP4 bytes to independently measure duration. Signed playback links are short-lived; a link already issued may remain usable until it expires after a block or sign-out. Do not treat a copied signed link as a permanent share link.
+## Free hosting and verification
 
-After cancellation or a connection loss, check **My uploads**. Delete an incomplete entry again if cleanup could not finish. Storage removal happens through the Storage API before the reservation is released.
+GitHub Pages serves public app files for this public repository on GitHub Free; the existing Supabase Free project handles accounts, protected metadata and private clips. No paid encoding server, new domain or app-store account is needed. Provider quotas still apply. [GitHub Pages availability](https://docs.github.com/en/pages/getting-started-with-github-pages/what-is-github-pages).
 
-## Prepare free static hosting
+The [mobile workflow](../.github/workflows/mobile-pages.yml) runs only manually. Configure the public repository variables `KLIPP_SUPABASE_URL` and `KLIPP_SUPABASE_PUBLISHABLE_KEY`. With **deploy unchecked**, it builds a review ZIP and SHA-256 file. With **deploy checked** on reviewed `main`, it deploys to the already-configured Pages site. It does not enable Pages, change DNS, build Windows installers or create releases. Official actions are pinned to verified commit SHAs; only the deployment job receives Pages write/OIDC permissions. Rebuild after changing public configuration.
 
-GitHub Pages is available for a public repository on GitHub Free. It serves the web app files; the existing Free Supabase project continues to handle accounts, protected metadata, and private clip storage. No domain purchase, paid encoding server, or new backend service is required for this first version. Free service quotas still apply. [GitHub Pages availability](https://docs.github.com/en/pages/getting-started-with-github-pages/what-is-github-pages).
-
-The separate [mobile workflow](../.github/workflows/mobile-pages.yml) runs **only manually**. It does not build Windows installers, create releases, push tags, enable Pages, or change DNS.
-
-When the source is reviewed and ready on GitHub:
-
-1. Add two repository **variables**, not server secrets, under **Settings → Secrets and variables → Actions → Variables**: `KLIPP_SUPABASE_URL` and `KLIPP_SUPABASE_PUBLISHABLE_KEY`. Use the same public values as the desktop community configuration.
-2. Run **Mobile web build and optional Pages deployment** with **deploy unchecked**. It installs the locked mobile dependencies, runs mobile client tests, builds, and saves `klipp-mobile-site` for review. The downloaded artifact contains a static-site ZIP and SHA-256 file. Extract the ZIP before serving it; do not open `index.html` with `file://`.
-3. Only when ready to publish, choose **GitHub Actions** as the source in **Settings → Pages**. Review the `github-pages` environment protection rules if present. This repository has one Pages site, so check that it is not already hosting another site.
-4. Run the workflow from the reviewed `main` branch with **deploy checked**. Deployment is restricted to `HappyHamster135/Klipp` on `main`; `configure-pages` explicitly has automatic enablement disabled. The deployment job reports the actual address. This repository's beta is deployed at `https://happyhamster135.github.io/Klipp/`; its [first deployment](https://github.com/HappyHamster135/Klipp/actions/runs/39787692928) succeeded on 22 October 2026.
-
-The workflow’s official actions are pinned to verified commit SHAs. Only its optional deployment job gets `pages: write` and an OIDC identity token. The normal build never publishes. Rebuild to change public Vite configuration; changing repository variables does not rewrite an already-built site.
-
-Alternatively, upload only the contents of `mobile/dist/` to a free static HTTPS host you already use. No server credentials or `.env.local` belong in the deployed files. Keep API responses, tokens, and signed clip URLs out of static-host caches and logs.
-
-## Offline behavior and verification
-
-Media requires an internet connection. The service worker caches only icons and the manifest; it does not cache accounts, email-code responses, API data, signed URLs, or videos, and it does not promise a fully offline app shell.
-
-The design and QA ledger is [design/IMPLEMENTATION.md](design/IMPLEMENTATION.md). A successful desktop-browser build or narrow viewport test does not prove physical iPhone/Android installation, camera-library formats, hardware encoding, or background behavior. Those checks remain explicit device QA items until recorded there. The published beta is a web app; there is no app-store release.
+The service worker caches only icons and the manifest. It does not cache accounts, email-code responses, API data, signed links or videos. See [tests/README.md](tests/README.md) for local fixture checks and [design/IMPLEMENTATION.md](design/IMPLEMENTATION.md) for results and physical-device limitations. The published beta is a web app, not an app-store release.

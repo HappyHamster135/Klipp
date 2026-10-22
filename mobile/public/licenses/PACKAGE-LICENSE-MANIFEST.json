@@ -105,14 +105,6 @@
       "repository": "https://github.com/lucide-icons/lucide",
       "file": "lucide-react-1.61.0-LICENSE.txt",
       "sha256": "b495047bd93a9b06913511076f504daba17d5bbeb3e0650f3bb53a4220329c57"
-    },
-    {
-      "name": "mediabunny",
-      "version": "1.62.0",
-      "license": "MPL-2.0",
-      "repository": "https://github.com/Vanilagy/mediabunny",
-      "file": "mediabunny-1.62.0-LICENSE.txt",
-      "sha256": "3f3d9e0024b1921b067d6f7f88deb4a60cbe7a78e76c64e3f1d7fc3b779b9d04"
     }
   ]
 }

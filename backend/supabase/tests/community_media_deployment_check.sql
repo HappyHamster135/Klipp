@@ -17,6 +17,16 @@ select jsonb_build_object(
                 or has_table_privilege('anon', c.oid, 'select,insert,update,delete'))),
     'storage_policies', (select count(*) from pg_policies where schemaname = 'storage'
         and tablename = 'objects' and policyname like 'community_storage_%'),
+    'browser_upload_guard', (select count(*) from pg_policies where schemaname = 'storage'
+        and tablename = 'objects' and policyname = 'community_storage_browser_upload_guard'
+        and permissive = 'RESTRICTIVE' and cmd = 'INSERT'
+        and roles = array['authenticated']::name[]
+        and with_check like '%community_upload_client_allowed%'),
+    'upload_rpcs_guarded', (select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+        where n.nspname = 'public' and p.proname in ('community_begin_upload', 'community_publish_clip')
+        and not p.prosecdef and pg_get_functiondef(p.oid) like '%community_upload_client_allowed%'),
+    'anonymous_upload_helper_access', has_function_privilege('anon',
+        'klipp_private.community_upload_client_allowed()', 'execute'),
     'rpc_only_deny_policies', (select count(*) from pg_policies where
         schemaname in ('public', 'klipp_private') and policyname like 'community_%_rpc_only'
         and permissive = 'RESTRICTIVE' and cmd = 'ALL' and roles @> array['anon', 'authenticated']::name[]
@@ -29,5 +39,6 @@ select jsonb_build_object(
 ) as deployment_check;
 -- Expected: tables_with_rls=5, public_invoker_rpcs=13,
 -- anonymous_rpc_access=0, client_direct_table_access=0,
--- storage_policies=8, rpc_only_deny_policies=6, correct_private_buckets=2,
--- reserved_slots<=40. Apply community_rpc_only_policies before expecting 6.
+-- storage_policies=9, browser_upload_guard=1, upload_rpcs_guarded=2,
+-- anonymous_upload_helper_access=false, rpc_only_deny_policies=6,
+-- correct_private_buckets=2, reserved_slots<=40. Apply all four migrations.

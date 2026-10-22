@@ -12,10 +12,6 @@ export interface CommunityComment {
 export interface CommunityCursor { createdAt: string; id: string }
 export interface CommunityPage<T> { items: T[]; nextCursor: CommunityCursor | null }
 export interface CommunityBlockedUser { userId: string; username: string; displayName: string }
-export interface CommunityUpload {
-  video: Blob; poster: Blob; title: string; description: string; durationSeconds: number;
-}
-export interface CommunityUploadProgress { completedBytes: number; totalBytes: number; status: string }
 export interface StorageLike {
   getItem(key: string): string | null | Promise<string | null>;
   setItem(key: string, value: string): void | Promise<void>;

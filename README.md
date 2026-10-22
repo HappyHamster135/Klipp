@@ -32,7 +32,7 @@ Public releases are currently unsigned. SignPath Foundation signing is being pre
 
 The optional **Media** workspace adds email-code accounts, profiles, clip sharing, a paged feed, likes, comments, reports and reversible user blocking. Uploads are intentional: the device prepares a share copy of up to 60 seconds / 16 MiB with the audio you select, while recording, editing and the local Library work without signing in. The free beta reserves at most five clips per account and forty globally; storage and viewing traffic still have provider limits. Online services need publisher configuration. See [community setup and free-tier limits](docs/COMMUNITY_SETUP.md) and the [generated-media checks](tools/Klipp.CommunityMediaHarness/README.md).
 
-The [mobile web app](mobile/README.md) uses the same accounts and Media service to watch, upload and interact with clips. It prepares a chosen section on the device, with an option to include its primary audio track. The guide covers local setup, device requirements and optional free HTTPS hosting; the [design and verification notes](mobile/design/IMPLEMENTATION.md) distinguish completed browser checks from physical-phone testing.
+The [mobile web app](mobile/README.md) uses the same accounts and Media service to watch and interact with clips. Publishing stays in the installed Klipp Windows app; the web app has no upload screen or file picker. The guide covers local setup, viewing, device checks and free HTTPS hosting; the [design and verification notes](mobile/design/IMPLEMENTATION.md) distinguish completed browser checks from physical-phone testing.
 
 ## Build from source
 

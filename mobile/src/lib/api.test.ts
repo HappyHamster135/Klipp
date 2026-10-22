@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { CommunityApi } from './api';
 import { browserSessionStorage, createConfig } from './config';
-import { CommunityError, mediaLimits, type StorageLike, type CommunityUploadProgress } from './models';
+import { CommunityError, type StorageLike } from './models';
 
 const owner = '161cd682-c82e-4eac-8776-4ecdf5ef13a0';
 const clipId = '261cd682-c82e-4eac-8776-4ecdf5ef13a0';
@@ -41,10 +41,7 @@ function fixture(storageAdapter?: StorageLike) {
   const api = new CommunityApi(config, { storage: storageAdapter ?? storage, fetch: fetcher }); instances.push(api);
   return { api, requests, storage, set reply(value: typeof reply) { reply = value; }, signIn: () => api.verifyEmailCode('player@example.com', '123456') };
 }
-function generatedUpload() { return { video: new Blob([new Uint8Array(1024)], { type: 'video/mp4' }),
-  poster: new Blob([new Uint8Array(128)], { type: 'image/jpeg' }), title: 'A clip', description: '', durationSeconds: 2 }; }
 function cleanupReply(request: Captured): Response {
-  if (request.path.endsWith('community_begin_upload')) return json(clip({ status: 'uploading' }));
   if (request.path.endsWith('community_remove_clip')) return json(clip({ status: 'deleting' }));
   if (request.path.endsWith('community_finish_delete')) return json({ id: clipId, deleted: true });
   return json([]);
@@ -312,44 +309,40 @@ describe('authenticated Media contract', () => {
   });
 });
 
-describe('intentional browser uploads and cleanup', () => {
-  it('passes Blob bodies without reading entire files and uses no-upsert fixed paths', async () => {
-    const f = fixture(); await f.signIn(); f.reply = request => request.path.endsWith('community_begin_upload') ? json(clip({ status: 'uploading' }))
-      : request.path.endsWith('community_publish_clip') ? json(clip()) : json({ Key: 'ok' });
-    const progress: CommunityUploadProgress[] = []; const upload = generatedUpload();
-    expect((await f.api.uploadClip(upload, value => progress.push(value))).status).toBe('published');
-    const objects = f.requests.filter(request => request.path.startsWith('/storage/v1/object/'));
-    expect(objects).toHaveLength(2); expect(objects[0].body).toBe(upload.video); expect(objects[1].body).toBe(upload.poster);
-    expect(objects[0].headers.get('x-upsert')).toBe('false'); expect(objects[0].path).toBe(`/storage/v1/object/community-videos/${owner}/${clipId}/video.mp4`);
-    expect(progress.at(-1)).toEqual({ completedBytes: 1152, totalBytes: 1152, status: 'Uploaded' });
+describe('viewer-only Media and owned clip cleanup', () => {
+  it('does not expose browser upload or upload-transport capabilities', () => {
+    const f = fixture();
+    expect('uploadClip' in f.api).toBe(false);
+    expect('uploadTransport' in f.api).toBe(false);
+    expect(f.requests).toHaveLength(0);
   });
-  it('rejects oversized or incompatible files before reserving cloud capacity', async () => {
-    const f = fixture(); await f.signIn(); const count = f.requests.length; const upload = generatedUpload();
-    expect(() => f.api.uploadClip({ ...upload, video: new Blob([new Uint8Array(mediaLimits.videoBytes + 1)], { type: 'video/mp4' }) })).toThrow(CommunityError);
-    expect(() => f.api.uploadClip({ ...upload, durationSeconds: NaN })).toThrow(CommunityError);
-    expect(() => f.api.uploadClip({ ...upload, poster: new Blob(['x'], { type: 'image/png' }) })).toThrow(CommunityError);
-    expect(f.requests).toHaveLength(count);
-  });
-  it('cancellation hides and deletes partial objects before releasing a reservation', async () => {
-    const f = fixture(); await f.signIn(); const cancellation = new AbortController();
-    f.reply = request => {
-      if (request.path.startsWith('/storage/v1/object/community-videos/') && request.method === 'POST') { cancellation.abort(); throw new DOMException('Canceled', 'AbortError'); }
-      return cleanupReply(request);
-    };
-    await expect(f.api.uploadClip(generatedUpload(), undefined, cancellation.signal)).rejects.toMatchObject({ name: 'AbortError' });
-    const cleanup = f.requests.slice(-4); expect(cleanup.map(request => request.path)).toEqual([
-      '/rest/v1/rpc/community_remove_clip', '/storage/v1/object/community-videos', '/storage/v1/object/community-posters', '/rest/v1/rpc/community_finish_delete']);
+  it('hides and deletes owned assets before releasing an existing clip slot', async () => {
+    const f = fixture(); await f.signIn(); f.reply = cleanupReply;
+    await f.api.deleteClip(clipId);
+    const cleanup = f.requests.slice(-4);
+    expect(cleanup.map(request => request.path)).toEqual([
+      '/rest/v1/rpc/community_remove_clip', '/storage/v1/object/community-videos',
+      '/storage/v1/object/community-posters', '/rest/v1/rpc/community_finish_delete']);
+    expect(cleanup.map(request => request.method)).toEqual(['POST', 'DELETE', 'DELETE', 'POST']);
+    expect(cleanup[0].body).toEqual({ p_clip_id: clipId });
+    expect(cleanup[1].body).toEqual({ prefixes: [owner + '/' + clipId + '/video.mp4'] });
+    expect(cleanup[2].body).toEqual({ prefixes: [owner + '/' + clipId + '/poster.jpg'] });
     expect(cleanup.every(request => request.headers.get('Authorization') === 'Bearer access-secret')).toBe(true);
   });
-  it('failed physical cleanup retains its reservation and attempts both objects', async () => {
+  it('retains a deletion reservation and tries both assets when physical cleanup fails', async () => {
     const f = fixture(); await f.signIn(); f.reply = request => {
       if (request.path.endsWith('community_remove_clip')) return json(clip({ status: 'deleting' }));
-      if (request.path.endsWith('community_begin_upload')) return json(clip({ status: 'uploading' }));
-      return json({ message: 'private upstream failure' }, 502);
+      return request.path.endsWith('community-videos') ? json({ message: 'private upstream failure' }, 502) : json([]);
     };
-    await expect(f.api.uploadClip(generatedUpload())).rejects.toBeInstanceOf(CommunityError);
+    await expect(f.api.deleteClip(clipId)).rejects.toBeInstanceOf(CommunityError);
     expect(f.requests.filter(request => request.method === 'DELETE')).toHaveLength(2);
     expect(f.requests.some(request => request.path.endsWith('community_finish_delete'))).toBe(false);
+  });
+  it('accepts an already deleted own clip without redundant Storage changes', async () => {
+    const f = fixture(); await f.signIn(); const previous = f.requests.length;
+    f.reply = () => json({ id: clipId, status: 'deleted' });
+    await f.api.deleteClip(clipId);
+    expect(f.requests.slice(previous).map(request => request.path)).toEqual(['/rest/v1/rpc/community_remove_clip']);
   });
   it('cleans owned incomplete-profile reservations using identity/path only', async () => {
     const f = fixture(); await f.signIn(); f.reply = request => request.path.endsWith('community_remove_clip')
