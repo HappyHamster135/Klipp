@@ -35,6 +35,8 @@ public sealed partial class MainWindow
     private string? _updatePromptVersion;
     private string? _updateHighlightsVersion;
     private string? _updateHighlightsMarkdown;
+    private string? _updateNotesOpenError;
+    private string? _updateNotesOpenErrorVersion;
     private IReadOnlyList<string> _updateHighlights = Array.Empty<string>();
 
     private void InitializeUpdates()
@@ -187,8 +189,11 @@ public sealed partial class MainWindow
                 _updateHighlights = AppUpdateReleaseNotes.Summarize(state.ReleaseNotesMarkdown);
             }
             _updatePromptVersion = state.AvailableVersion;
+            var promptError = state.AvailableVersion == _updateRestartErrorVersion ? _updateRestartError : null;
+            if (_updateNotesOpenError is not null && state.AvailableVersion == _updateNotesOpenErrorVersion)
+                promptError = _updateNotesOpenError;
             AppUpdatePrompt.Show(state.AvailableVersion!,
-                state.AvailableVersion == _updateRestartErrorVersion ? _updateRestartError : null, _updateHighlights);
+                promptError, _updateHighlights);
         }
         else
         {
@@ -223,7 +228,10 @@ public sealed partial class MainWindow
     private async void OnUpdatePromptReleaseNotesRequested(object? sender, EventArgs args)
     {
         if (_updatesDisposed || _updateRestarting || _updatePromptVersion is not { } version) return;
-        await OpenUpdateLinkAsync(GetVersionReleaseNotesUri(version));
+        _updateNotesOpenError = null;
+        _updateMessageOverride = null;
+        await OpenUpdateLinkAsync(GetVersionReleaseNotesUri(version), promptVersion: version);
+        RefreshUpdateUi();
     }
 
     private static Uri GetVersionReleaseNotesUri(string version) =>
@@ -271,7 +279,7 @@ public sealed partial class MainWindow
         await OpenUpdateLinkAsync(_appUpdates.Snapshot.AvailableVersion is { } version
             ? GetVersionReleaseNotesUri(version) : AppUpdateService.ReleasesUri);
 
-    private async Task OpenUpdateLinkAsync(Uri uri)
+    private async Task OpenUpdateLinkAsync(Uri uri, string? promptVersion = null)
     {
         try
         {
@@ -279,7 +287,14 @@ public sealed partial class MainWindow
         }
         catch
         {
-            _updateMessageOverride = "Could not open your browser. Get the installer from github.com/HappyHamster135/Klipp/releases.";
+            _updateMessageOverride = promptVersion is null
+                ? "Could not open your browser. View releases at github.com/HappyHamster135/Klipp/releases."
+                : "Could not open release notes. Try again or open GitHub Releases in your browser.";
+            if (promptVersion is not null)
+            {
+                _updateNotesOpenError = _updateMessageOverride;
+                _updateNotesOpenErrorVersion = promptVersion;
+            }
             RefreshUpdateUi();
         }
     }
@@ -304,6 +319,7 @@ public sealed partial class MainWindow
         _updateRestarting = true;
         _updateMessageOverride = null;
         _updateRestartError = null;
+        _updateNotesOpenError = null;
         _captureWindowClosing = true;
         _captureSessionReady = false;
         _captureSourceTimer?.Stop();

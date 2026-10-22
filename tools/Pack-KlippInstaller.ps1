@@ -141,7 +141,9 @@ if ($feedNotes.Replace("`r`n", "`n").Trim() -cne $expectedNotes) { throw "Update
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 $packageArchive = [IO.Compression.ZipFile]::OpenRead($fullPackage)
 try {
-    $nuspec = @($packageArchive.Entries | Where-Object { $_.FullName.EndsWith('.nuspec', [StringComparison]::OrdinalIgnoreCase) })
+    $nuspec = @($packageArchive.Entries | Where-Object {
+        $_.FullName -notmatch '[/\\]' -and $_.FullName.EndsWith('.nuspec', [StringComparison]::OrdinalIgnoreCase)
+    })
     if ($nuspec.Count -ne 1) { throw 'Expected exactly one package manifest for release notes verification.' }
     $xmlSettings = [Xml.XmlReaderSettings]::new()
     $xmlSettings.DtdProcessing = [Xml.DtdProcessing]::Prohibit
@@ -151,6 +153,11 @@ try {
     try {
         $manifestXml = [Xml.XmlDocument]::new()
         $manifestXml.Load($reader)
+        $idNode = $manifestXml.SelectSingleNode("/*[local-name()='package']/*[local-name()='metadata']/*[local-name()='id']")
+        $versionNode = $manifestXml.SelectSingleNode("/*[local-name()='package']/*[local-name()='metadata']/*[local-name()='version']")
+        if (!$idNode -or $idNode.InnerText -cne $packageId -or !$versionNode -or $versionNode.InnerText -cne $Version) {
+            throw 'Release notes package identity/version does not match the requested release.'
+        }
         $noteNode = $manifestXml.SelectSingleNode("/*[local-name()='package']/*[local-name()='metadata']/*[local-name()='releaseNotes']")
         $packageNotes = if ($noteNode) { $noteNode.InnerText } else { '' }
         if ($packageNotes.Replace("`r`n", "`n").Trim() -cne $expectedNotes) { throw "Prepared package notes do not match this version's source." }
