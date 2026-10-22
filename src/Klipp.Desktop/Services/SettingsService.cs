@@ -82,6 +82,8 @@ public sealed class KlippSettings
     public bool AudioLimiterEnabled { get; set; } = true;
     public bool LowDiskProtectionEnabled { get; set; } = true;
     public bool AutomaticUpdatesEnabled { get; set; } = true;
+    /// <summary>Only the version explicitly dismissed with Later; newer updates may still be announced.</summary>
+    public string? DeferredUpdateVersion { get; set; }
     public bool CaptureCursor { get; set; } = true;
     public bool EnableExclusiveGameCapture { get; set; }
 

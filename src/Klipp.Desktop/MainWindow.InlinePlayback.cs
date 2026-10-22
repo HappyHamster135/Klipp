@@ -45,6 +45,7 @@ public sealed partial class MainWindow
         if (frame is null) throw new InvalidOperationException("The preview card is no longer available.");
         _hostedInlineCard = card;
         _hostedInlineFrame = frame;
+        RefreshUpdateUi();
         try
         {
             // Attach before MediaPlayerElement is created. This parent stays the
@@ -145,6 +146,7 @@ public sealed partial class MainWindow
         InlinePreviewCanvas.Children.Clear();
         InlineFullscreenHost.Visibility = Visibility.Collapsed;
         card.RestoreHostedPreviewView();
+        RefreshUpdateUi();
     }
 
     private void OnClipCardFullscreenRequested(object sender, EventArgs args)

@@ -208,6 +208,7 @@ public sealed partial class MainWindow
     {
         if (_reviewingRecovery) return;
         _reviewingRecovery = true;
+        using var updateWork = BeginUpdateBlockingOperation();
         ReviewRecordingRecoveryButton.IsEnabled = false;
         try
         {

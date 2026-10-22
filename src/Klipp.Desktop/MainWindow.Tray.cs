@@ -40,6 +40,7 @@ public sealed partial class MainWindow
         try
         {
             _hiddenInTray = true;
+            RefreshUpdateUi();
             ClipCard.PauseActivePreview();
             _playerView?.PausePlayback();
             _editorView?.PausePlayback();
@@ -52,6 +53,7 @@ public sealed partial class MainWindow
             Debug.WriteLine($"[Klipp] Could not minimize to tray: {exception.Message}");
             _hiddenInTray = false;
             try { _appWindow.IsShownInSwitchers = true; _appWindow.Show(); } catch { }
+            RefreshUpdateUi();
             return false;
         }
     }
@@ -71,6 +73,7 @@ public sealed partial class MainWindow
         }
         _appWindow.Show(activate);
         if (activate) Activate();
+        RefreshUpdateUi();
     }
 
     private TrayMenuState GetTrayMenuState()
@@ -112,6 +115,7 @@ public sealed partial class MainWindow
         if (_trayExitPending) return;
         _trayExitPending = true;
         _captureWindowClosing = true;
+        RefreshUpdateUi();
         _captureSourceTimer?.Stop();
         _instantCaptureRequested = false;
         UpdateTrayStatus();

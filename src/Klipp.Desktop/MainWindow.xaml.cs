@@ -73,6 +73,7 @@ public sealed partial class MainWindow : Window
             new EditorProjectService(),
             _recycleBin);
         InitializeComponent();
+        Activated += OnUpdateWindowActivated;
         ApplyAccessibilityTheme();
         InitializeAppWindow();
 
@@ -891,13 +892,14 @@ public sealed partial class MainWindow : Window
 
     private void ShowSideMenu()
     {
+        _sideMenuOpen = true;
+        RefreshUpdateUi();
         ClipCard.StopActivePreview();
         SyncSettingsExperience();
         RefreshCaptureApplicationUi();
         UpdateOriginalClipRetentionControls();
         _ = RefreshCacheStatusAsync();
         _ = RefreshOriginalClipRetentionStatusAsync();
-        _sideMenuOpen = true;
         UpdateCaptureAudioMeterState();
         SideMenuOverlay.Visibility = Visibility.Visible;
         SideMenuPanel.IsHitTestVisible = true;
@@ -925,6 +927,7 @@ public sealed partial class MainWindow : Window
         MenuButton.Background = (Brush)Application.Current.Resources["KlippSurfaceBrush"];
         SideMenuPanel.IsHitTestVisible = false;
         SideMenuBackdrop.IsHitTestVisible = false;
+        RefreshUpdateUi();
     }
 
     private void OnTopBarSizeChanged(object sender, SizeChangedEventArgs e)
@@ -1334,6 +1337,7 @@ public sealed partial class MainWindow : Window
 
         if (OriginalClipRetentionToggle.IsOn)
         {
+            using var updateWork = BeginUpdateBlockingOperation();
             var retentionDays = GetSelectedOriginalClipRetentionDays();
             var dialog = AccessibleDialogFactory.Create(
                 this.Content.XamlRoot,
@@ -1386,6 +1390,7 @@ public sealed partial class MainWindow : Window
         if (_cacheOperationRunning) return;
 
         _cacheOperationRunning = true;
+        RefreshUpdateUi();
         ClearCacheButton.IsEnabled = false;
         try
         {
@@ -1403,6 +1408,7 @@ public sealed partial class MainWindow : Window
         finally
         {
             _cacheOperationRunning = false;
+            RefreshUpdateUi();
             ClearCacheButton.IsEnabled = true;
             await RefreshCacheStatusAsync();
         }
@@ -1614,6 +1620,7 @@ public sealed partial class MainWindow : Window
         }
 
         _cacheOperationRunning = true;
+        RefreshUpdateUi();
         try
         {
             var budgetMb = CacheMaintenanceService.NormalizeBudgetMb(_settings.Current.CacheBudgetMb);
@@ -1626,6 +1633,7 @@ public sealed partial class MainWindow : Window
         finally
         {
             _cacheOperationRunning = false;
+            RefreshUpdateUi();
             await RefreshCacheStatusAsync();
         }
     }
@@ -1738,6 +1746,7 @@ public sealed partial class MainWindow : Window
         }
 
         _retentionOperationRunning = true;
+        RefreshUpdateUi();
         UpdateOriginalClipRetentionControls();
         try
         {
@@ -1795,6 +1804,7 @@ public sealed partial class MainWindow : Window
         finally
         {
             _retentionOperationRunning = false;
+            RefreshUpdateUi();
             UpdateOriginalClipRetentionControls();
         }
     }
@@ -2852,6 +2862,7 @@ public sealed partial class MainWindow : Window
         SetViewVisibility(PlayerHost, true);
         PlayerView.LoadClip(filePath, startPosition, autoPlay, isMuted, volume);
         UpdatePlayerNavigationButtons(filePath);
+        RefreshUpdateUi();
     }
 
     private async Task ShowEditorAsync(string filePath)
@@ -2947,6 +2958,7 @@ public sealed partial class MainWindow : Window
         finally
         {
             _playerView?.SetHostFullscreenState(_playerFullscreen);
+            RefreshUpdateUi();
         }
     }
 
@@ -3032,6 +3044,7 @@ public sealed partial class MainWindow : Window
             RecordButton.IsEnabled = false;
             SaveClipButton.IsEnabled = false;
         }
+        RefreshUpdateUi();
     }
 
     private void UpdateCaptureHealthUI()
@@ -3460,6 +3473,8 @@ public sealed partial class MainWindow : Window
 
     private async void OnChangeClipsFolderClicked(object sender, RoutedEventArgs e)
     {
+        if (_updateRestarting) return;
+        using var updateWork = BeginUpdateBlockingOperation();
         try
         {
             var picker = new FolderPicker
@@ -3514,6 +3529,7 @@ public sealed partial class MainWindow : Window
 
     private async Task ShowErrorAsync(string title, string message)
     {
+        using var updateWork = BeginUpdateBlockingOperation();
         if (_hiddenInTray) RestoreFromTray();
         var dialog = AccessibleDialogFactory.Create(
             this.Content.XamlRoot,
@@ -3526,6 +3542,7 @@ public sealed partial class MainWindow : Window
 
     private async Task<bool> ShowConfirmAsync(string title, string message)
     {
+        using var updateWork = BeginUpdateBlockingOperation();
         var dialog = AccessibleDialogFactory.Create(
             this.Content.XamlRoot,
             title,
@@ -3540,6 +3557,7 @@ public sealed partial class MainWindow : Window
 
     private async Task<string?> ShowRenameDialogAsync(string currentTitle)
     {
+        using var updateWork = BeginUpdateBlockingOperation();
         var input = new TextBox
         {
             Text = currentTitle,
@@ -3643,6 +3661,7 @@ public sealed partial class MainWindow : Window
 
     private async Task<(TimeSpan Start, TimeSpan End)?> ShowTrimDialogAsync(TimeSpan duration)
     {
+        using var updateWork = BeginUpdateBlockingOperation();
         var selector = new TrimRangeSelector
         {
             Duration = duration,

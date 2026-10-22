@@ -1,4 +1,5 @@
 using Klipp.Desktop.Controls;
+using System.Runtime.ExceptionServices;
 using Microsoft.Windows.ApplicationModel.DynamicDependency;
 
 // Default checks render the actual Win2D graph without showing a window.
@@ -44,6 +45,32 @@ internal static class Program
             });
             Bootstrap.Shutdown();
             if (failure is not null) throw failure;
+            return 0;
+        }
+        if (args.Contains("--update-prompt-checks") || args.Contains("--update-prompt-preview"))
+        {
+            Exception? failure = null;
+            Microsoft.UI.Xaml.Application.Start(_ =>
+            {
+                var app = new HeadlessApplication();
+                var dispatcher = Microsoft.UI.Dispatching.DispatcherQueue.GetForCurrentThread();
+                SynchronizationContext.SetSynchronizationContext(new Microsoft.UI.Dispatching.DispatcherQueueSynchronizationContext(dispatcher));
+                dispatcher.TryEnqueue(async () =>
+                {
+                    try
+                    {
+                        if (args.Contains("--update-prompt-preview")) UpdateReadyPromptChecks.OpenPreview(app);
+                        else
+                        {
+                            await UpdateReadyPromptChecks.RunAsync();
+                            app.Exit();
+                        }
+                    }
+                    catch (Exception exception) { failure = exception; app.Exit(); }
+                });
+            });
+            Bootstrap.Shutdown();
+            if (failure is not null) ExceptionDispatchInfo.Capture(failure).Throw();
             return 0;
         }
         if (args.Contains("--capture-source-targets"))
@@ -111,4 +138,13 @@ internal static class Program
     }
 }
 
-internal sealed class HeadlessApplication : Microsoft.UI.Xaml.Application;
+// Code-only resource loading needs the same built-in metadata provider that
+// WinUI normally adds to an App.xaml application's generated type information.
+internal sealed class HeadlessApplication : Microsoft.UI.Xaml.Application, Microsoft.UI.Xaml.Markup.IXamlMetadataProvider
+{
+    private readonly Microsoft.UI.Xaml.XamlTypeInfo.XamlControlsXamlMetaDataProvider _metadata = new();
+
+    public Microsoft.UI.Xaml.Markup.IXamlType GetXamlType(Type type) => _metadata.GetXamlType(type);
+    public Microsoft.UI.Xaml.Markup.IXamlType GetXamlType(string fullName) => _metadata.GetXamlType(fullName);
+    public Microsoft.UI.Xaml.Markup.XmlnsDefinition[] GetXmlnsDefinitions() => _metadata.GetXmlnsDefinitions();
+}

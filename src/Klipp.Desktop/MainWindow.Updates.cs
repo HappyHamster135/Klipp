@@ -8,6 +8,7 @@ using Klipp.Desktop.Models;
 using Klipp.Desktop.Services;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Media;
 using Windows.System;
 
 namespace Klipp.Desktop;
@@ -25,12 +26,14 @@ public sealed partial class MainWindow
     private bool _updateDownloadPauseRequested;
     private bool _updateDownloadPausedByUser;
     private int _updateBlockingOperations;
-    private string? _announcedUpdateVersion;
+    private AppUpdatePromptPolicy _updatePromptPolicy = new();
+    private bool _updateWindowActive;
     private string? _updateMessageOverride;
 
     private void InitializeUpdates()
     {
         if (_updatesInitialized || _updatesDisposed) return;
+        _updatePromptPolicy = new AppUpdatePromptPolicy(_settings.Current.DeferredUpdateVersion);
         _updatesInitialized = true;
         _appUpdates.StateChanged += OnAppUpdateStateChanged;
         // Capture's status timer stops while idle. Keep restart availability and
@@ -55,8 +58,20 @@ public sealed partial class MainWindow
         catch (OperationCanceledException) { }
     }
 
-    private bool CanDownloadUpdate() => GetUpdateActivity().CanDownloadAutomatically &&
-        !ClipCard.HasActivePreview && PlayerHost.Visibility != Visibility.Visible;
+    private bool CanDownloadUpdate() => GetUpdateActivity().CanDownloadAutomatically;
+
+    private void OnUpdateWindowActivated(object sender, WindowActivatedEventArgs args)
+    {
+        _updateWindowActive = args.WindowActivationState != WindowActivationState.Deactivated;
+        RefreshUpdateUi();
+    }
+
+    private bool CanShowUpdatePrompt(AppUpdateActivity activity) =>
+        _updatesInitialized && !_updateRestarting && !_captureWindowClosing && !_trayExitPending &&
+        _updateWindowActive && !_hiddenInTray && !_sideMenuOpen &&
+        LibraryView.Visibility == Visibility.Visible && SideMenuOverlay.Visibility != Visibility.Visible &&
+        InlineFullscreenHost.Visibility != Visibility.Visible && activity.RestartBlockedReason is null &&
+        AppRoot.XamlRoot is { } root && VisualTreeHelper.GetOpenPopupsForXamlRoot(root).Count == 0;
 
     private async Task CheckAutomaticUpdateAsync()
     {
@@ -104,12 +119,21 @@ public sealed partial class MainWindow
             FileOperation: _updateBlockingOperations != 0 || _reviewingRecovery,
             CaptureChanging: !_updatesInitialized || _isSwitchingMode ||
                 !ignoreCaptureGate && _captureOperationGate.CurrentCount == 0,
-            Maintenance: _cacheOperationRunning || _retentionOperationRunning);
+            Maintenance: _cacheOperationRunning || _retentionOperationRunning,
+            // PreviewStarting runs before ClipCard publishes its active player.
+            // The persistent preview host closes that one-frame safety gap.
+            Playback: _hostedInlineCard is not null || ClipCard.HasActivePreview ||
+                PlayerHost.Visibility == Visibility.Visible || InlineFullscreenHost.Visibility == Visibility.Visible);
     }
 
     private void RefreshUpdateUi()
     {
         if (_updatesDisposed || SettingsUpdateStatusText is null) return;
+        if (!_updatesInitialized)
+        {
+            AppUpdatePrompt?.Hide();
+            return;
+        }
         var state = _appUpdates.Snapshot;
         var activity = GetUpdateActivity();
         if (state.Status == AppUpdateStatus.Downloading && !CanDownloadUpdate())
@@ -147,20 +171,26 @@ public sealed partial class MainWindow
         ToolTipService.SetToolTip(SettingsUpdateDownloadButton,
             activity.CanDownloadAutomatically ? "Download the update in the background." : "Finish capture, editing and exports before downloading.");
 
-        AppUpdateRestartButton.IsEnabled = ready && !_updateRestarting && reason is null;
-        AppUpdateInfoBar.Message = $"Klipp {state.AvailableVersion} is ready. {reason ?? "Restart when you are ready."}";
-        if (ready && state.AvailableVersion != _announcedUpdateVersion)
-        {
-            _announcedUpdateVersion = state.AvailableVersion;
-            AppUpdateInfoBar.Visibility = Visibility.Visible;
-            AppUpdateInfoBar.IsOpen = true;
-        }
-        else if (!ready)
-        {
-            AppUpdateInfoBar.IsOpen = false;
-            AppUpdateInfoBar.Visibility = Visibility.Collapsed;
-        }
+        if (_updatePromptPolicy.ShouldShow(ready ? state.AvailableVersion : null, CanShowUpdatePrompt(activity)))
+            AppUpdatePrompt.Show(state.AvailableVersion!);
+        else
+            AppUpdatePrompt.Hide();
     }
+
+    private async void OnUpdateLaterRequested(object? sender, EventArgs args)
+    {
+        // Dismiss only this verified version. Checks stay enabled and Settings
+        // keeps its explicit restart action, including after reopening Klipp.
+        if (_updatesDisposed || _updateRestarting || _appUpdates.Snapshot.Status != AppUpdateStatus.Ready) return;
+        var version = _appUpdates.Snapshot.AvailableVersion;
+        _updatePromptPolicy.Defer(version);
+        _settings.Current.DeferredUpdateVersion = version;
+        RefreshUpdateUi();
+        await _settings.SaveAsync();
+    }
+
+    private void OnUpdateRestartRequested(object? sender, EventArgs args) =>
+        OnRestartForUpdateClicked(sender ?? this, new RoutedEventArgs());
 
     private async void OnAutomaticUpdatesToggled(object sender, RoutedEventArgs args)
     {
@@ -303,6 +333,8 @@ public sealed partial class MainWindow
     {
         if (_updatesDisposed) return;
         _updatesDisposed = true;
+        AppUpdatePrompt.Hide();
+        Activated -= OnUpdateWindowActivated;
         _updateTimer?.Stop();
         _updateUiTimer?.Stop();
         _updateLifetime.Cancel();

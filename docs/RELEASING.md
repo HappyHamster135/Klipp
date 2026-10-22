@@ -9,7 +9,7 @@ The package ID is **HappyHamster135.Klipp**, channel **win**, with `Klipp.Deskto
 Commit the release source, then run:
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File tools/Publish-KlippRelease.ps1 -Version 1.0.8
+powershell -NoProfile -ExecutionPolicy Bypass -File tools/Publish-KlippRelease.ps1 -Version 1.0.9
 ```
 
 The script creates a fresh directory under `artifacts/releases/`. It publishes the self-contained, untrimmed application, includes native runtimes and license notices, builds the installer and update feed, and calculates SHA-256 checksums. `vpk` installs locally under `artifacts/tools/vpk/1.2.161`; no global tool installation is needed.
@@ -36,7 +36,7 @@ After the first installer release, a previous **published** full package can be 
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File tools/Publish-KlippRelease.ps1 `
-  -Version 1.0.8 -PreviousReleaseDirectory C:\Builds\Klipp-1.0.7\installer
+  -Version 1.0.9 -PreviousReleaseDirectory C:\Builds\Klipp-1.0.8\installer
 ```
 
 The previous directory should contain the previous full `.nupkg` and its `releases.win.json`. The script copies these into the new staging directory and asks Velopack to build the delta. Upload the newly generated delta alongside the new full package and feed. Full packages remain available as the fallback for clients that cannot use a delta. Never seed a public release from private QA fixture packages.
@@ -51,7 +51,9 @@ The installer fast callback repairs existing shortcuts after creation. Normal st
 
 Check a fresh install, Start menu launch, Windows Installed apps entry, and uninstall using an isolated test installation. Confirm that `%LOCALAPPDATA%\Klipp` and the user's recordings are unchanged. For update testing, install an older private fixture and point a test updater at a local feed containing the new real package; do not create dummy public releases.
 
-Test both idle update/restart and blocked restart while recording or exporting. Also test an offline check and a corrupted download. A rejected or unavailable update should leave the installed version usable.
+Test the update-ready card in the active library, with unchanged keyboard focus and working **Restart to update** and **Later** actions. It should wait during recording, instant capture, editing, playback, exports, dialogs and background/tray use, and disappear immediately when work starts. Confirm that **Later** stays dismissed for that version after reopening, while **Settings → Updates** still offers restart and automatic checks remain enabled. A newer version should be eligible for its own card.
+
+Test both idle update/restart and blocked restart while recording, editing, playing video or exporting. Restart must finish saving preferences and projects, then recheck activity before handing off to the native updater. Also test an offline check and a corrupted download. A rejected or unavailable update should leave the installed version usable.
 
 Application binaries and Setup are currently unsigned. No developer certificate is included or installed. The [SignPath setup and code signing policy](SIGNING.md) describe the pending provider approval and the manual signing workflow.
 

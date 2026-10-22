@@ -33,6 +33,8 @@
     <Compile Include="../../src/Klipp.Desktop/Controls/SafeClipEditorView.TimelineEffectMask.cs" Link="Renderer/TimelineEffectMask.cs" />
     <Compile Include="../../src/Klipp.Desktop/CaptureNotificationWindow.cs" Link="Notifications/CaptureNotificationWindow.cs" />
     <Compile Include="../../src/Klipp.Desktop/Controls/KlippBrandMark.cs" Link="Notifications/KlippBrandMark.cs" />
+    <Compile Include="../../src/Klipp.Desktop/Controls/UpdateReadyPrompt.cs" Link="Updates/UpdateReadyPrompt.cs" />
+    <Content Include="../../src/Klipp.Desktop/Resources/Theme.xaml" Link="Resources/Theme.xaml" CopyToOutputDirectory="PreserveNewest" />
     <Compile Include="../../src/Klipp.Desktop/CaptureNotificationOverlay.cs" Link="Notifications/CaptureNotificationOverlay.cs" />
     <Compile Include="../../src/Klipp.Desktop/Services/CaptureNotificationService.cs" Link="Notifications/CaptureNotificationService.cs" />
     <Compile Include="../../src/Klipp.Desktop/Services/CaptureGameNotificationPresenter.cs" Link="Notifications/CaptureGameNotificationPresenter.cs" />

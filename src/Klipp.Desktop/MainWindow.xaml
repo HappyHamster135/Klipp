@@ -500,11 +500,6 @@
                         </InfoBar.ActionButton>
                     </InfoBar>
                     <InfoBar x:Name="CaptureSafetyInfoBar" IsOpen="False" Visibility="Collapsed" Margin="0,12,0,0" Closed="OnLibraryNoticeClosed" Severity="Warning" IsClosable="True" />
-                    <InfoBar x:Name="AppUpdateInfoBar" IsOpen="False" Visibility="Collapsed" Margin="0,12,0,0" Closed="OnLibraryNoticeClosed" Severity="Informational" Title="Update ready" IsClosable="True">
-                        <InfoBar.ActionButton>
-                            <Button x:Name="AppUpdateRestartButton" Content="Restart to update" Click="OnRestartForUpdateClicked" />
-                        </InfoBar.ActionButton>
-                    </InfoBar>
                     </StackPanel>
                 </Grid>
 
@@ -643,6 +638,10 @@
                 </Grid.RenderTransform>
             </Grid>
         </Grid>
+
+        <controls:UpdateReadyPrompt x:Name="AppUpdatePrompt" Grid.Row="1" Canvas.ZIndex="5"
+                                    MaxWidth="360" Margin="24" HorizontalAlignment="Right" VerticalAlignment="Bottom"
+                                    RestartRequested="OnUpdateRestartRequested" LaterRequested="OnUpdateLaterRequested" />
 
         <Grid x:Name="InlineFullscreenHost" Grid.RowSpan="2" Visibility="Collapsed" Canvas.ZIndex="10"
               PointerWheelChanged="OnInlinePreviewPointerWheelChanged">

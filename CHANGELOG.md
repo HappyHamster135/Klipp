@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.0.9 — 2026-10-22
+
+- Add a compact, nonmodal update-ready card with **Restart to update** and **Later**, using the existing Klipp design and a short fade that respects Windows animation preferences. Showing the card does not move keyboard focus.
+- Wait until capture, editing, video playback, exports, dialogs and file operations are finished and the library is active. Hide the card immediately when work starts or Klipp moves to the background or tray.
+- Remember **Later** for the dismissed version across app restarts. Keep automatic checks enabled and the explicit restart action available in **Settings → Updates**; a newer version may show its own card.
+- Keep capture and playback protected when restarting to update, finish saving work, and recheck activity before starting the native updater.
+- Keep code signing disabled.
+
 ## 1.0.8 — 2026-10-22
 
 - Repair shortcut icon paths after installation and before the updated app opens, including Windows installations created through a redirected filesystem context.

@@ -14,7 +14,7 @@ public sealed class AppUpdateActivityTests
     }
 
     public static IEnumerable<object[]> BusyCombinations =>
-        Enumerable.Range(1, 127).Select(mask => new object[] { mask });
+        Enumerable.Range(1, 255).Select(mask => new object[] { mask });
 
     [Theory]
     [MemberData(nameof(BusyCombinations))]
@@ -27,7 +27,8 @@ public sealed class AppUpdateActivityTests
             Editing: (mask & 8) != 0,
             FileOperation: (mask & 16) != 0,
             CaptureChanging: (mask & 32) != 0,
-            Maintenance: (mask & 64) != 0);
+            Maintenance: (mask & 64) != 0,
+            Playback: (mask & 128) != 0);
 
         activity.CanDownloadAutomatically.ShouldBeFalse();
         activity.RestartBlockedReason.ShouldNotBeNullOrWhiteSpace();
@@ -71,5 +72,18 @@ public sealed class AppUpdateActivityTests
 
         activity.CanDownloadAutomatically.ShouldBeFalse();
         activity.RestartBlockedReason!.ShouldContain("exports");
+    }
+
+    [Fact]
+    public void Returning_from_the_editor_does_not_authorize_restart_over_active_playback()
+    {
+        var activity = new AppUpdateActivity(Editing: true, Playback: true);
+
+        activity = activity with { Editing = false };
+
+        activity.CanDownloadAutomatically.ShouldBeFalse();
+        activity.RestartBlockedReason!.ShouldContain("Close video playback");
+        activity = activity with { Playback = false };
+        activity.RestartBlockedReason.ShouldBeNull();
     }
 }

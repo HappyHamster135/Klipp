@@ -36,6 +36,7 @@ void CheckDefaults(KlippSettings value)
     Check(value.AudioLimiterEnabled && value.LowDiskProtectionEnabled,
         "Audio limiting and recording disk protection should default on.");
     Check(value.AutomaticUpdatesEnabled, "Automatic updates should default on for new and legacy settings.");
+    Check(value.DeferredUpdateVersion is null, "A legacy installation must not silently dismiss a ready update.");
     Check(value.CaptureGameProcessNames.Count == 0 && value.CaptureMonitorId == "" &&
         value.CaptureWindowProcessName == "" && value.CaptureWindowTitle == "", "A source identity was invented.");
 }
@@ -86,6 +87,7 @@ service.Current.MusicAudioGain = 1.18;
 service.Current.AudioLimiterEnabled = false;
 service.Current.LowDiskProtectionEnabled = false;
 service.Current.AutomaticUpdatesEnabled = false;
+service.Current.DeferredUpdateVersion = "1.0.9";
 await service.SaveAsync();
 var reloaded = new SettingsService(path);
 await reloaded.LoadAsync();
@@ -114,6 +116,14 @@ Check(reloaded.Current.CaptureDiscordAudio && reloaded.Current.CaptureMusicAudio
 Check(!reloaded.Current.AudioLimiterEnabled && !reloaded.Current.LowDiskProtectionEnabled,
     "Limiter/disk protection opt-outs did not round-trip.");
 Check(!reloaded.Current.AutomaticUpdatesEnabled, "Automatic update opt-out did not round-trip.");
+Check(reloaded.Current.DeferredUpdateVersion == "1.0.9", "Later did not survive reopening the app.");
+
+reloaded.Current.AutomaticUpdatesEnabled = true;
+await reloaded.SaveAsync();
+var deferredReload = new SettingsService(path);
+await deferredReload.LoadAsync();
+Check(deferredReload.Current.AutomaticUpdatesEnabled && deferredReload.Current.DeferredUpdateVersion == "1.0.9",
+    "Dismissing a version must be independent of automatic update checks.");
 
 await File.WriteAllTextAsync(path, """
 {"CaptureSourceMode":"unknown","CaptureMonitorId":null,"CaptureWindowProcessName":null,"CaptureWindowTitle":null,"CaptureGameProcessNames":null,"CaptureNotificationDurationSeconds":999}

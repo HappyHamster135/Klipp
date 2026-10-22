@@ -1,6 +1,6 @@
 # Code signing policy
 
-**Status: signing disabled.** Klipp 1.0.8 and earlier public releases are unsigned. SignPath setup is deferred. The repository retains signing and verification support, but no production certificate or SignPath account has been configured. Do not describe those releases as signed or install a development certificate on users' computers.
+**Status: signing disabled.** Klipp 1.0.9 and earlier public releases are unsigned. SignPath setup is deferred. The repository retains signing and verification support, but no production certificate or SignPath account has been configured. Do not describe those releases as signed or install a development certificate on users' computers.
 
 ## Proposed provider and responsibilities
 

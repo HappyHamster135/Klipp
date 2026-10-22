@@ -3,7 +3,7 @@ param(
     [Parameter(Mandatory = $true)]
     [string]$PackageDirectory,
     [ValidatePattern('^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$')]
-    [string]$Version = '1.0.8',
+    [string]$Version = '1.0.9',
     [string]$OutputDirectory = '',
     [string]$PreviousReleaseDirectory = '',
     [string]$VelopackToolDirectory = '',

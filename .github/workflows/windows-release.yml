@@ -6,7 +6,7 @@ on:
       version:
         description: Candidate version (use a new version for a signed release)
         required: true
-        default: '1.0.8'
+        default: '1.0.9'
         type: string
       sign:
         description: Request SignPath signing (requires prior Foundation approval and configuration)
