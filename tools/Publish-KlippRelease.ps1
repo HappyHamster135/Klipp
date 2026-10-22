@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [ValidatePattern('^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$')]
-    [string]$Version = '1.0.7',
+    [string]$Version = '1.0.8',
     [string]$OutputRoot = '',
     [string]$VisualStudioDirectory = '',
     [string]$VcRuntimeDirectory = '',
@@ -215,6 +215,7 @@ if (!$PortableOnly) {
     $installerPackage = & (Join-Path $PSScriptRoot 'Pack-KlippInstaller.ps1') -PackageDirectory $packageDirectory -Version $Version -PreviousReleaseDirectory $PreviousReleaseDirectory `
         -SignTemplate $SignTemplate -ExpectedPublisher $ExpectedPublisher -RequireSigning:$RequireSigning
 }
+else { & (Join-Path $PSScriptRoot 'Test-KlippReleaseIcons.ps1') -PackageDirectory $packageDirectory }
 if ($SignTemplate) { Move-Item -LiteralPath $installerPackage.PortableArchive -Destination $zipPath }
 else { [IO.Compression.ZipFile]::CreateFromDirectory($packageDirectory, $zipPath, [IO.Compression.CompressionLevel]::Optimal, $true) }
 $checksum = (Get-FileHash -LiteralPath $zipPath -Algorithm SHA256).Hash.ToLowerInvariant()

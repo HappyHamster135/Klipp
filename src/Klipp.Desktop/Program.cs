@@ -13,7 +13,12 @@ public static class Program
     {
         // Installer hooks must finish before WinUI, capture and single-instance
         // startup. Pending updates are applied only after a safe user restart.
-        Velopack.VelopackApp.Build().SetAutoApplyOnStartup(false).Run();
+        Velopack.VelopackApp.Build().SetAutoApplyOnStartup(false)
+            .OnAfterInstallFastCallback(_ => Services.ShortcutIconService.RepairCurrentInstallation())
+            .Run();
+        // The native updater rewrites shortcuts after its update callback.
+        // Repair on launch as well, before the shell sees our first window.
+        Services.ShortcutIconService.RepairCurrentInstallation();
 
 #if !MICROSOFT_WINDOWSAPPSDK_SELFCONTAINED
         InitializeWindowsAppSdk();

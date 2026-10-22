@@ -6,7 +6,7 @@ on:
       version:
         description: Candidate version (use a new version for a signed release)
         required: true
-        default: '1.0.7'
+        default: '1.0.8'
         type: string
       sign:
         description: Request SignPath signing (requires prior Foundation approval and configuration)
@@ -66,6 +66,9 @@ jobs:
         shell: pwsh
       - name: Run core checks
         run: dotnet test tests/Klipp.Tests/Klipp.Tests.csproj -c Release
+        shell: pwsh
+      - name: Check Windows shortcut icon repair
+        run: dotnet run --project tools/Klipp.ShortcutHarness/Klipp.ShortcutHarness.csproj -c Release
         shell: pwsh
       - name: Build review or signed candidate
         id: build

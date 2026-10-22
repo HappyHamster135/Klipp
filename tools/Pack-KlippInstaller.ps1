@@ -3,7 +3,7 @@ param(
     [Parameter(Mandatory = $true)]
     [string]$PackageDirectory,
     [ValidatePattern('^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$')]
-    [string]$Version = '1.0.7',
+    [string]$Version = '1.0.8',
     [string]$OutputDirectory = '',
     [string]$PreviousReleaseDirectory = '',
     [string]$VelopackToolDirectory = '',
@@ -129,6 +129,8 @@ if ($currentFull[0].SHA256 -and (Get-FileHash -LiteralPath $fullPackage -Algorit
 if ($currentFull[0].SHA1 -and (Get-FileHash -LiteralPath $fullPackage -Algorithm SHA1).Hash -ne $currentFull[0].SHA1) {
     throw 'Full package checksum does not match the update feed.'
 }
+
+& (Join-Path $PSScriptRoot 'Test-KlippReleaseIcons.ps1') -PackageDirectory $PackageDirectory -InstallerPath $installer -FullPackagePath $fullPackage
 
 $releaseAssets = @($installer) + @($updatePackages | ForEach-Object FullName) + @($updateFeed)
 foreach ($extraName in @("assets.$channel.json", 'RELEASES')) {

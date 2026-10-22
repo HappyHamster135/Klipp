@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <Platforms>x64</Platforms>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Velopack" Version="1.2.161" />
+    <Compile Include="../../src/Klipp.Desktop/Services/ShortcutIconService.cs" Link="Services/ShortcutIconService.cs" />
+    <Compile Include="../../src/Klipp.Desktop/Services/AppUpdateService.cs" Link="Services/AppUpdateService.cs" />
+  </ItemGroup>
+</Project>

@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.0.8 — 2026-10-22
+
+- Repair shortcut icon paths after installation and before the updated app opens, including Windows installations created through a redirected filesystem context.
+- Keep Desktop, Start menu, Startup and pinned shortcuts tied to the physical installed files. Preserve shortcut names, arguments, hotkeys and window preferences; leave deleted and unrelated shortcuts alone.
+- Check the installer, app executable, update launcher and packaged artwork before releasing. Add native Windows regression checks for shortcut repair, redirected paths, long Unicode paths and update replacement.
+- Keep automatic updates available and code signing disabled.
+
 ## 1.0.7 — 2026-10-22
 
 - Release the latest Windows x64 installer, automatic-update packages and portable ZIP with production signing disabled. Existing installed copies can update through Settings → Updates.

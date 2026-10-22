@@ -9,7 +9,7 @@ The package ID is **HappyHamster135.Klipp**, channel **win**, with `Klipp.Deskto
 Commit the release source, then run:
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File tools/Publish-KlippRelease.ps1 -Version 1.0.7
+powershell -NoProfile -ExecutionPolicy Bypass -File tools/Publish-KlippRelease.ps1 -Version 1.0.8
 ```
 
 The script creates a fresh directory under `artifacts/releases/`. It publishes the self-contained, untrimmed application, includes native runtimes and license notices, builds the installer and update feed, and calculates SHA-256 checksums. `vpk` installs locally under `artifacts/tools/vpk/1.2.161`; no global tool installation is needed.
@@ -36,12 +36,18 @@ After the first installer release, a previous **published** full package can be 
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File tools/Publish-KlippRelease.ps1 `
-  -Version 1.0.7 -PreviousReleaseDirectory C:\Builds\Klipp-1.0.6\installer
+  -Version 1.0.8 -PreviousReleaseDirectory C:\Builds\Klipp-1.0.7\installer
 ```
 
 The previous directory should contain the previous full `.nupkg` and its `releases.win.json`. The script copies these into the new staging directory and asks Velopack to build the delta. Upload the newly generated delta alongside the new full package and feed. Full packages remain available as the fallback for clients that cannot use a delta. Never seed a public release from private QA fixture packages.
 
 ## Validate before publishing
+
+`Pack-KlippInstaller.ps1` runs `Test-KlippReleaseIcons.ps1` automatically. It checks the shipped ICO sizes and uses native Windows icon extraction/rendering to compare the app, installer and update launcher with the source artwork. Missing or incorrect icons stop packaging.
+
+Run `dotnet run --project tools/Klipp.ShortcutHarness/Klipp.ShortcutHarness.csproj -c Release` for disposable native shortcut checks. These exercise real Shell Links, redirected paths, long Unicode paths, shortcut customization, deleted/foreign links and update replacement without changing the user's shortcuts.
+
+The installer fast callback repairs existing shortcuts after creation. Normal startup repairs them again before opening the main window, because Velopack rewrites shortcuts after its update callback. Canonical paths come from existing file handles rather than assumptions about AppData. The repair refreshes only changed shell entries; it does not recreate deleted shortcuts or restart Explorer.
 
 Check a fresh install, Start menu launch, Windows Installed apps entry, and uninstall using an isolated test installation. Confirm that `%LOCALAPPDATA%\Klipp` and the user's recordings are unchanged. For update testing, install an older private fixture and point a test updater at a local feed containing the new real package; do not create dummy public releases.
 

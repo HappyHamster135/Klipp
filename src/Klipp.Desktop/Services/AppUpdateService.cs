@@ -348,7 +348,7 @@ public sealed class VelopackAppUpdateClient : IAppUpdateClient
             accessToken: null, prerelease: false, downloader: new KlippUpdateDownloader()),
             new UpdateOptions { ExplicitChannel = "win", AllowVersionDowngrade = false });
         var version = Assembly.GetEntryAssembly()?.GetName().Version;
-        _fallbackVersion = version is null ? "1.0.7" : $"{version.Major}.{version.Minor}.{Math.Max(0, version.Build)}";
+        _fallbackVersion = version is null ? "1.0.8" : $"{version.Major}.{version.Minor}.{Math.Max(0, version.Build)}";
     }
 
     public AppUpdateRelease? GetPendingRestart()
