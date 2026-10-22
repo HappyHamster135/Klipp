@@ -2,6 +2,8 @@
 
 Klipp mobile is an installable React/Vite web app for Android and iPhone. It uses the same optional Klipp account, profiles, private Media feed, uploads, likes, comments, reports, and blocking as the desktop app. The first mobile version shares existing videos; it does not record or edit mobile gameplay.
 
+The free mobile beta is live at **[happyhamster135.github.io/Klipp/](https://happyhamster135.github.io/Klipp/)**. Open that address in Safari or Chrome to use it or add it to your home screen.
+
 Recording and editing in the Windows app continue to work without an account. Online Media requires a verified, permanent account and a completed username.
 
 ## Run locally
@@ -74,7 +76,7 @@ When the source is reviewed and ready on GitHub:
 1. Add two repository **variables**, not server secrets, under **Settings → Secrets and variables → Actions → Variables**: `KLIPP_SUPABASE_URL` and `KLIPP_SUPABASE_PUBLISHABLE_KEY`. Use the same public values as the desktop community configuration.
 2. Run **Mobile web build and optional Pages deployment** with **deploy unchecked**. It installs the locked mobile dependencies, runs mobile client tests, builds, and saves `klipp-mobile-site` for review. The downloaded artifact contains a static-site ZIP and SHA-256 file. Extract the ZIP before serving it; do not open `index.html` with `file://`.
 3. Only when ready to publish, choose **GitHub Actions** as the source in **Settings → Pages**. Review the `github-pages` environment protection rules if present. This repository has one Pages site, so check that it is not already hosting another site.
-4. Run the workflow from the reviewed `main` branch with **deploy checked**. Deployment is restricted to `HappyHamster135/Klipp` on `main`; `configure-pages` explicitly has automatic enablement disabled. The deployment job reports the actual address. The usual project address is `https://happyhamster135.github.io/Klipp/`, but it is not live merely because these files exist.
+4. Run the workflow from the reviewed `main` branch with **deploy checked**. Deployment is restricted to `HappyHamster135/Klipp` on `main`; `configure-pages` explicitly has automatic enablement disabled. The deployment job reports the actual address. This repository's beta is deployed at `https://happyhamster135.github.io/Klipp/`; its [first deployment](https://github.com/HappyHamster135/Klipp/actions/runs/39787692928) succeeded on 22 October 2026.
 
 The workflow’s official actions are pinned to verified commit SHAs. Only its optional deployment job gets `pages: write` and an OIDC identity token. The normal build never publishes. Rebuild to change public Vite configuration; changing repository variables does not rewrite an already-built site.
 
@@ -84,4 +86,4 @@ Alternatively, upload only the contents of `mobile/dist/` to a free static HTTPS
 
 Media requires an internet connection. The service worker caches only icons and the manifest; it does not cache accounts, email-code responses, API data, signed URLs, or videos, and it does not promise a fully offline app shell.
 
-The design and QA ledger is [design/IMPLEMENTATION.md](design/IMPLEMENTATION.md). A successful desktop-browser build or narrow viewport test does not prove physical iPhone/Android installation, camera-library formats, hardware encoding, or background behavior. Those checks remain explicit device QA items until recorded there. No published mobile site or app-store release is implied by this source checkout.
+The design and QA ledger is [design/IMPLEMENTATION.md](design/IMPLEMENTATION.md). A successful desktop-browser build or narrow viewport test does not prove physical iPhone/Android installation, camera-library formats, hardware encoding, or background behavior. Those checks remain explicit device QA items until recorded there. The published beta is a web app; there is no app-store release.

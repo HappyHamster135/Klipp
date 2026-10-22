@@ -34,7 +34,8 @@ The service worker caches only bundled icons and the manifest. It does not cache
 | Windows WebKit encoding | Required WebCodecs unavailable; encoding-dependent cases skipped explicitly, useful guidance verified. This is not an iPhone encoding result |
 | Live service versus local fixtures | Live backend/native desktop checks were performed separately and shared cloud clips exist. This mobile browser suite used in-memory fixtures only; it does not establish live mobile upload or cloud cleanup |
 | Physical phones | No physical iPhone or Android tested. Installation, photo-library formats, hardware codecs, real email delivery and interruption/low-memory behavior remain unverified on phones |
-| Hosting workflow | Manual build/optional Pages workflow prepared and actionlint checked; Pages configured with HTTPS, first deployment pending |
+| Hosting workflow | [First Pages deployment](https://github.com/HappyHamster135/Klipp/actions/runs/39787692928) succeeded from source commit `f0d0215`; the free beta is live at [happyhamster135.github.io/Klipp/](https://happyhamster135.github.io/Klipp/) with HTTPS |
+| Published-site smoke check | Actual HTTPS page, manifest, icons, styles, notices, lazy upload chunk and preparation worker returned 200; deployed public backend configuration matched. At 390 × 844, sign-in/create-account and Remember toggles worked with zero runtime console errors and no horizontal overflow. No login email or upload was sent by this smoke check |
 
 Repeatable tests and fixture setup are in [tests/README.md](../tests/README.md). Local evidence is in the ignored `artifacts/community-mobile-qa/final-aac-browser-run/` directory and `browser-results.json`. The Browser plugin was unavailable; the first inspection used the in-app browser, followed by Playwright for repeatable phone-sized checks. Screenshots and emulation do not prove physical-device compatibility.
 
