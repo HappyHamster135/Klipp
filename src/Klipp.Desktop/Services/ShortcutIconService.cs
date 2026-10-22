@@ -24,12 +24,15 @@ internal static class ShortcutIconService
         {
             var locator = VelopackLocator.Current;
             if (locator.IsPortable || locator.AppId != AppUpdateService.ApplicationId || locator.RootAppDir is null) return;
-            RepairInstallation(locator.RootAppDir, FindShortcuts());
+            var files = FindShortcuts().ToArray();
+            var repaired = RepairInstallation(locator.RootAppDir, files);
+            locator.Log.Log(Velopack.Logging.VelopackLogLevel.Information,
+                $"Shortcut icons: repaired {repaired} of {files.Length} existing shell entries.", null);
         }
         catch (Exception exception)
         {
             // Shell integration must not prevent installation, updates or capture.
-            Debug.WriteLine($"[Klipp] Shortcut icon repair: {exception.Message}");
+            LogFailure("Shortcut icon repair could not finish.", exception);
         }
     }
 
@@ -76,7 +79,7 @@ internal static class ShortcutIconService
             catch (Exception exception)
             {
                 // One stale, read-only or damaged shortcut must not block others.
-                Debug.WriteLine($"[Klipp] Could not repair shortcut {file}: {exception.Message}");
+                LogFailure($"Could not repair shortcut {file}.", exception);
             }
         }
         return repaired;
@@ -96,6 +99,17 @@ internal static class ShortcutIconService
 
     private static bool Same(string? left, string? right) => left is not null && right is not null &&
         string.Equals(left, right, StringComparison.OrdinalIgnoreCase);
+
+    private static void LogFailure(string message, Exception exception)
+    {
+        Debug.WriteLine($"[Klipp] {message} {exception.Message}");
+        try
+        {
+            if (VelopackLocator.IsCurrentSet)
+                VelopackLocator.Current.Log.Log(Velopack.Logging.VelopackLogLevel.Warning, message, exception);
+        }
+        catch { /* A shell/logging failure must never stop the application. */ }
+    }
 
     private static IEnumerable<string> FindShortcuts()
     {
@@ -200,7 +214,20 @@ internal sealed class NativeShellLink : IDisposable
         {
             var key = AppIdKey;
             Marshal.ThrowExceptionForHR(((IPropertyStore)_com).GetValue(ref key, out var value));
-            try { return value.Type == 31 ? Marshal.PtrToStringUni(value.Pointer) : null; }
+            try
+            {
+                // Windows/Velopack may persist a single-value string vector;
+                // the shell's parsed property reader normalizes it to a string.
+                // Read both forms without rewriting the shortcut's identity.
+                return value.Type switch
+                {
+                    31 => Marshal.PtrToStringUni(value.Pointer),
+                    8 => value.Pointer == 0 ? null : Marshal.PtrToStringBSTR(value.Pointer),
+                    0x101F when value.Count == 1 && value.Values != 0 =>
+                        Marshal.PtrToStringUni(Marshal.ReadIntPtr(value.Values)),
+                    _ => null
+                };
+            }
             finally { PropVariantClear(ref value); }
         }
         set
@@ -222,7 +249,12 @@ internal sealed class NativeShellLink : IDisposable
     private static PropertyKey AppIdKey => new() { FormatId = new Guid("9F4C2855-9F79-4B39-A8D0-E1D42DE1D5F3"), Id = 5 };
     [StructLayout(LayoutKind.Sequential)] private struct PropertyKey { public Guid FormatId; public uint Id; }
     [StructLayout(LayoutKind.Explicit, Size = 24)] private struct PropVariant
-    { [FieldOffset(0)] public ushort Type; [FieldOffset(8)] public nint Pointer; }
+    {
+        [FieldOffset(0)] public ushort Type;
+        [FieldOffset(8)] public nint Pointer;
+        [FieldOffset(8)] public uint Count;
+        [FieldOffset(16)] public nint Values;
+    }
     [DllImport("ole32.dll")] private static extern int PropVariantClear(ref PropVariant value);
     [ComImport, Guid("886D8EEB-8CF2-4446-8D02-CDBA1DBDCF99"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
     private interface IPropertyStore

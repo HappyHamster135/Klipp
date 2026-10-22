@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using System.Buffers.Binary;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text;
@@ -17,11 +18,25 @@ internal static class Program
     {
         if (!OperatingSystem.IsWindows()) throw new PlatformNotSupportedException("Native shell-link checks require Windows.");
         if (args.Contains("--verify-release-icons")) return ReleaseIconChecks.Run(args);
+        if (args.Length == 2 && args[0] == "--inspect-link")
+        {
+            var path = Path.GetFullPath(args[1]);
+            using var link = new NativeShellLink(path);
+            Console.WriteLine(System.Text.Json.JsonSerializer.Serialize(new
+            {
+                Path = path, link.Target, link.WorkingDirectory, link.IconPath, link.IconIndex, link.AppUserModelId,
+                CanonicalTarget = CanonicalPath.TryResolveFile(link.Target),
+                DirectProperty = IndependentShell.ReadDirectAppUserModelId(link),
+                ParsedProperty = IndependentShell.ReadAppUserModelId(path)
+            }, new System.Text.Json.JsonSerializerOptions { WriteIndented = true }));
+            return 0;
+        }
         _root = Path.Combine(Path.GetTempPath(), "Klipp-Shortcut-QA-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(_root);
         _iconSource = FindIcon();
 
         RepairBrokenShortcut();
+        RepairVectorIdentityShortcut();
         PreserveRemovedAndUnrelatedShortcuts();
         RecoverAfterCorruptLink();
         RepairRenamedPinnedLink();
@@ -132,6 +147,45 @@ internal static class Program
         var emptyIdentityHash = Hash(emptyIdentity);
         Require(ShortcutIconService.RepairInstallation(install, [emptyIdentity]) == 0 && Hash(emptyIdentity) == emptyIdentityHash,
             "A link without the Klipp application identity was claimed.");
+    }
+
+    private static void RepairVectorIdentityShortcut()
+    {
+        var install = NewInstallation("native vector identity");
+        var linkPath = LinkPath("Velopack vector identity", "Klipp.lnk");
+        using (var link = CreateLink(linkPath, install))
+        {
+            link.Save();
+        }
+        IndependentShell.WriteVectorPropertyBlock(linkPath, AppId);
+        using (var rawLink = new NativeShellLink(linkPath))
+        {
+            var raw = System.Text.Json.JsonSerializer.SerializeToElement(IndependentShell.ReadDirectAppUserModelId(rawLink));
+            Require(raw.GetProperty("VariantType").GetInt32() == 0x101F && raw.GetProperty("Count").GetInt32() == 1,
+                "The native-installer fixture did not preserve its one-element string-vector representation.");
+        }
+        Require(IndependentShell.ReadAppUserModelId(linkPath) == AppId,
+            "Windows' shell property reader did not normalize the native vector application identity.");
+        Require(ShortcutIconService.RepairInstallation(install, [linkPath]) == 1,
+            "An actual native-installer string-vector application identity prevented shortcut repair.");
+        using (var repaired = new NativeShellLink(linkPath)) AssertIconMetadata(repaired, install);
+        AssertIndependentMetadata(linkPath, install);
+
+        var ambiguous = LinkPath("Ambiguous vector identity", "Klipp.lnk");
+        using (var link = CreateLink(ambiguous, install))
+        {
+            link.Save();
+        }
+        IndependentShell.WriteVectorPropertyBlock(ambiguous, AppId, "AnotherCompany.App");
+        using (var rawLink = new NativeShellLink(ambiguous))
+        {
+            var raw = System.Text.Json.JsonSerializer.SerializeToElement(IndependentShell.ReadDirectAppUserModelId(rawLink));
+            Require(raw.GetProperty("VariantType").GetInt32() == 0x101F && raw.GetProperty("Count").GetInt32() == 2,
+                "The ambiguous fixture did not preserve its two-element string-vector representation.");
+        }
+        var original = Hash(ambiguous);
+        Require(ShortcutIconService.RepairInstallation(install, [ambiguous]) == 0 && Hash(ambiguous) == original,
+            "A multi-value application identity was incorrectly claimed.");
     }
 
     private static void RecoverAfterCorruptLink()
@@ -501,6 +555,94 @@ internal static class Program
 
     private static class IndependentShell
     {
+        internal static object ReadDirectAppUserModelId(NativeShellLink link)
+        {
+            var valueObject = typeof(NativeShellLink).GetField("_com", System.Reflection.BindingFlags.NonPublic |
+                System.Reflection.BindingFlags.Instance)!.GetValue(link)!;
+            var store = (IPropertyStore)valueObject;
+            var key = new PropertyKey { FormatId = new Guid("9F4C2855-9F79-4B39-A8D0-E1D42DE1D5F3"), Id = 5 };
+            Marshal.ThrowExceptionForHR(store.GetValue(ref key, out var value));
+            try
+            {
+                var text = value.Type switch
+                {
+                    31 => Marshal.PtrToStringUni(value.Pointer),
+                    8 => Marshal.PtrToStringBSTR(value.Pointer),
+                    0x101F when value.ElementCount == 1 && value.VectorArray != 0 =>
+                        Marshal.PtrToStringUni(Marshal.ReadIntPtr(value.VectorArray)),
+                    _ => null
+                };
+                return new { VariantType = value.Type, Text = text, Count = value.Type == 0x101F ? value.ElementCount : (uint?)null };
+            }
+            finally { PropVariantClear(ref value); }
+        }
+
+        internal static void WriteVectorPropertyBlock(string path, params string[] values)
+        {
+            if (!Path.GetFullPath(path).StartsWith(Path.GetFullPath(_root) + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
+                throw new InvalidOperationException("Only disposable harness links may receive a native property-store fixture.");
+            // Match MS-PROPSTORE/MS-SHLLINK on disk, rather than COM SetValue,
+            // which normalizes a one-element vector to a scalar when saved.
+            using var propertyValue = new MemoryStream();
+            using (var writer = new BinaryWriter(propertyValue, Encoding.Unicode, leaveOpen: true))
+            {
+                writer.Write(0u); // Serialized Property Value size, filled below.
+                writer.Write(5u); // System.AppUserModel.ID
+                writer.Write((byte)0);
+                writer.Write(0x101Fu); // VT_VECTOR | VT_LPWSTR, plus padding.
+                writer.Write((uint)values.Length);
+                foreach (var value in values)
+                {
+                    writer.Write((uint)(value.Length + 1));
+                    var bytes = Encoding.Unicode.GetBytes(value + '\0');
+                    writer.Write(bytes);
+                    writer.Write(new byte[(4 - bytes.Length % 4) % 4]);
+                }
+                propertyValue.Position = 0;
+                writer.Write(checked((uint)propertyValue.Length));
+            }
+            using var block = new MemoryStream();
+            using (var writer = new BinaryWriter(block, Encoding.Unicode, leaveOpen: true))
+            {
+                writer.Write(checked((uint)(8 + 24 + propertyValue.Length + 4 + 4)));
+                writer.Write(0xA0000009u); // PropertyStoreDataBlock
+                writer.Write(checked((uint)(24 + propertyValue.Length + 4)));
+                writer.Write(0x53505331u);
+                writer.Write(new Guid("9F4C2855-9F79-4B39-A8D0-E1D42DE1D5F3").ToByteArray());
+                writer.Write(propertyValue.ToArray());
+                writer.Write(0u); // Serialized Property Value terminal.
+                writer.Write(0u); // Serialized Property Storage terminal.
+            }
+
+            var source = File.ReadAllBytes(path);
+            if (source.Length < 76 || BinaryPrimitives.ReadUInt32LittleEndian(source) != 76)
+                throw new InvalidOperationException("The fixture is not a Shell Link.");
+            var flags = BinaryPrimitives.ReadUInt32LittleEndian(source.AsSpan(20));
+            var extra = 76;
+            if ((flags & 1) != 0) extra += 2 + BinaryPrimitives.ReadUInt16LittleEndian(source.AsSpan(extra));
+            if ((flags & 2) != 0) extra += checked((int)BinaryPrimitives.ReadUInt32LittleEndian(source.AsSpan(extra)));
+            foreach (var flag in new uint[] { 4, 8, 16, 32, 64 })
+                if ((flags & flag) != 0)
+                {
+                    var characters = BinaryPrimitives.ReadUInt16LittleEndian(source.AsSpan(extra));
+                    extra += 2 + characters * ((flags & 128) != 0 ? 2 : 1);
+                }
+            using var destination = new MemoryStream();
+            destination.Write(source, 0, extra);
+            while (extra + 4 <= source.Length)
+            {
+                var size = checked((int)BinaryPrimitives.ReadUInt32LittleEndian(source.AsSpan(extra)));
+                if (size == 0) break;
+                if (size < 8 || extra + size > source.Length) throw new InvalidOperationException("Malformed fixture ExtraData block.");
+                var signature = BinaryPrimitives.ReadUInt32LittleEndian(source.AsSpan(extra + 4));
+                if (signature != 0xA0000009) destination.Write(source, extra, size);
+                extra += size;
+            }
+            destination.Write(block.ToArray());
+            destination.Write(new byte[4]);
+            File.WriteAllBytes(path, destination.ToArray());
+        }
+
         internal static string? ReadAppUserModelId(string linkPath)
         {
             var interfaceId = typeof(IPropertyStore).GUID;
@@ -522,6 +664,8 @@ internal static class Program
         {
             [FieldOffset(0)] public ushort Type;
             [FieldOffset(8)] public nint Pointer;
+            [FieldOffset(8)] public uint ElementCount;
+            [FieldOffset(16)] public nint VectorArray;
         }
         [ComImport, Guid("886D8EEB-8CF2-4446-8D02-CDBA1DBDCF99"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
         private interface IPropertyStore
@@ -529,6 +673,8 @@ internal static class Program
             [PreserveSig] int GetCount(out uint count);
             [PreserveSig] int GetAt(uint index, out PropertyKey key);
             [PreserveSig] int GetValue(ref PropertyKey key, out PropVariant value);
+            [PreserveSig] int SetValue(ref PropertyKey key, ref PropVariant value);
+            [PreserveSig] int Commit();
         }
         [DllImport("shell32.dll", CharSet = CharSet.Unicode, PreserveSig = true)]
         private static extern int SHGetPropertyStoreFromParsingName(string path, nint bindingContext, uint flags,
