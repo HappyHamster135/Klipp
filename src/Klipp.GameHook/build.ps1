@@ -1,7 +1,7 @@
 param(
     [string]$OutputDirectory = "$PSScriptRoot/bin/x64/Release",
     [ValidatePattern('^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$')]
-    [string]$Version = '1.0.6'
+    [string]$Version = '1.0.7'
 )
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot '../Klipp.NativeVersion.ps1')

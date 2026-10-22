@@ -44,7 +44,7 @@ Open `Klipp.sln` in Visual Studio, select **x64**, set `Klipp.Desktop` as the st
 To build an installer, update packages and portable ZIP in a new directory under `artifacts/releases/`:
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File tools/Publish-KlippRelease.ps1 -Version 1.0.6
+powershell -NoProfile -ExecutionPolicy Bypass -File tools/Publish-KlippRelease.ps1 -Version 1.0.7
 ```
 
 The script publishes untrimmed Release binaries with .NET and Windows App SDK dependencies, adds the local VC++ redistributable DLLs, then uses a pinned local Velopack tool to create `Klipp-Setup.exe`, a full update package and `releases.win.json`. It also writes a portable ZIP, `SHA256SUMS.txt` and a `release-artifacts.json` manifest listing all files to upload. It never uploads a release or includes user recordings, settings or certificates. See [release instructions](docs/RELEASING.md) for publishing updates and optional delta packages.

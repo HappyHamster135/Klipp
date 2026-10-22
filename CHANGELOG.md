@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.0.7 — 2026-10-22
+
+- Release the latest Windows x64 installer, automatic-update packages and portable ZIP with production signing disabled. Existing installed copies can update through Settings → Updates.
+- Add smaller delta update packages while retaining the complete package as a fallback.
+- Keep product and version metadata consistent across app libraries and native capture/audio components. Reject stale build output before packaging.
+- Retain the optional SignPath workflow and signature verification tools for later setup; no signing service or development certificate is used for this release.
+
 ## 1.0.6 — 2026-10-21
 
 - Add a per-user Windows installer with Start menu/Desktop shortcuts and an uninstaller. Application files live separately from existing recordings, projects and preferences.
