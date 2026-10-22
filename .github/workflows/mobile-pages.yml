@@ -1,0 +1,112 @@
+name: Mobile web build and optional Pages deployment
+
+on:
+  workflow_dispatch:
+    inputs:
+      deploy:
+        description: Publish the reviewed mobile site to GitHub Pages (requires Pages setup)
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: klipp-mobile-pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      pages: read
+    defaults:
+      run:
+        working-directory: mobile
+    env:
+      VITE_SUPABASE_URL: ${{ vars.KLIPP_SUPABASE_URL }}
+      VITE_SUPABASE_PUBLISHABLE_KEY: ${{ vars.KLIPP_SUPABASE_PUBLISHABLE_KEY }}
+    steps:
+      - name: Check out source without persisting credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24.19.0'
+      - name: Set up pinned pnpm
+        uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+        with:
+          version: '11.25.0'
+          package_json_file: mobile/package.json
+          run_install: false
+      - name: Check public configuration without printing it
+        run: |
+          node --input-type=module <<'NODE'
+          const url = process.env.VITE_SUPABASE_URL ?? '';
+          const key = process.env.VITE_SUPABASE_PUBLISHABLE_KEY ?? '';
+          if (!/^https:\/\/[a-z0-9-]+\.supabase\.co$/.test(url) || !/^sb_publishable_[A-Za-z0-9_-]{11,}$/.test(key)) {
+            console.error('Set the KLIPP_SUPABASE_URL and KLIPP_SUPABASE_PUBLISHABLE_KEY repository variables. Only public project configuration is accepted.');
+            process.exit(1);
+          }
+          console.log('Public mobile configuration validated.');
+          NODE
+      - name: Require the reviewed main branch before publishing
+        if: inputs.deploy
+        run: |
+          if [ "$GITHUB_REPOSITORY" != 'HappyHamster135/Klipp' ] || [ "$GITHUB_REF" != 'refs/heads/main' ]; then
+            echo 'Pages deployment is restricted to the reviewed main branch of HappyHamster135/Klipp.' >&2
+            exit 1
+          fi
+      - name: Read existing Pages configuration without enabling Pages
+        if: inputs.deploy
+        uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
+        with:
+          enablement: false
+      - name: Install exactly the locked mobile dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Check mobile client behavior
+        run: pnpm test
+      - name: Build the static mobile app
+        run: pnpm build
+      - name: Create a downloadable static-site ZIP
+        run: |
+          cd dist
+          zip -rq "$RUNNER_TEMP/klipp-mobile-site.zip" .
+          cd "$RUNNER_TEMP"
+          sha256sum klipp-mobile-site.zip > klipp-mobile-site.sha256
+      - name: Save the mobile build for review
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: klipp-mobile-site
+          path: |
+            ${{ runner.temp }}/klipp-mobile-site.zip
+            ${{ runner.temp }}/klipp-mobile-site.sha256
+          if-no-files-found: error
+          retention-days: 7
+      - name: Prepare the Pages artifact only when publishing was selected
+        if: inputs.deploy
+        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          path: mobile/dist
+          retention-days: 1
+
+  deploy:
+    if: inputs.deploy
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy the reviewed mobile app
+        id: deployment
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1

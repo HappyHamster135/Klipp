@@ -28,6 +28,12 @@ Public releases are currently unsigned. SignPath Foundation signing is being pre
 - Multitrack video/audio timeline with trimming, splitting, group dragging, snapping, ripple editing, audio fades and volume automation.
 - Effects, filters, editable effect regions, keyframes, transitions with previews, text and captions. Projects, backups and an export queue preserve editable work.
 
+## Media and mobile
+
+The optional **Media** workspace adds email-code accounts, profiles, clip sharing, a paged feed, likes, comments, reports and reversible user blocking. Uploads are intentional: the device prepares a share copy of up to 60 seconds / 16 MiB with the audio you select, while recording, editing and the local Library work without signing in. The free beta reserves at most five clips per account and forty globally; storage and viewing traffic still have provider limits. Online services need publisher configuration. See [community setup and free-tier limits](docs/COMMUNITY_SETUP.md) and the [generated-media checks](tools/Klipp.CommunityMediaHarness/README.md).
+
+The [mobile web app](mobile/README.md) uses the same accounts and Media service to watch, upload and interact with clips. It prepares a chosen section on the device, with an option to include its primary audio track. The guide covers local setup, device requirements and optional free HTTPS hosting; the [design and verification notes](mobile/design/IMPLEMENTATION.md) distinguish completed browser checks from physical-phone testing.
+
 ## Build from source
 
 Install the .NET 10 SDK and Visual Studio with the Windows App SDK/.NET desktop workload, a Windows SDK and the x64 C++ build tools. The C++ tools build the native capture hook and audio gain effect. The development app uses Windows App Runtime 1.6 x64.
@@ -61,6 +67,7 @@ The script publishes untrimmed Release binaries with .NET and Windows App SDK de
 | `Klipp.AudioEffects` | Native playback gain processing |
 | `Klipp.GameHook` | Optional DirectX game overlay/capture support |
 | `Klipp.Tests` | Core regression tests |
+| `mobile/` | Installable web frontend for accounts and Media |
 
 ## License
 

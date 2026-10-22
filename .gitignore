@@ -3,6 +3,13 @@
 # ============================================================
 
 # Build outputs
+node_modules/
+mobile/dist/
+mobile/.env*.local
+mobile/playwright-report/
+mobile/test-results/
+mobile/.qa/
+*.tsbuildinfo
 [Bb]in/
 [Oo]bj/
 [Oo]ut/
@@ -49,6 +56,7 @@ artifacts/
 .signing/
 .signpath-tools/
 signing.local.json
+backend/community.json
 
 # Klipp-specifika filer (ska aldrig committas)
 *.raw

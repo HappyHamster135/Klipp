@@ -1,0 +1,118 @@
+{
+  "generatedFrom": "Unmodified installed mobile package licenses",
+  "date": "2026-10-22",
+  "packages": [
+    {
+      "name": "react",
+      "version": "19.3.1",
+      "license": "MIT",
+      "repository": "https://github.com/react/react",
+      "file": "react-19.3.1-LICENSE.txt",
+      "sha256": "da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93"
+    },
+    {
+      "name": "react-dom",
+      "version": "19.3.1",
+      "license": "MIT",
+      "repository": "https://github.com/react/react",
+      "file": "react-dom-19.3.1-LICENSE.txt",
+      "sha256": "da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93"
+    },
+    {
+      "name": "scheduler",
+      "version": "0.28.0",
+      "license": "MIT",
+      "repository": "https://github.com/react/react",
+      "file": "scheduler-0.28.0-LICENSE.txt",
+      "sha256": "da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93"
+    },
+    {
+      "name": "supabase-js",
+      "version": "2.118.0",
+      "license": "MIT",
+      "repository": "https://github.com/supabase/supabase-js",
+      "file": "supabase-js-2.118.0-LICENSE.txt",
+      "sha256": "334dd6820e2eaeab2064e7c59001b810566728a28a41a7c1dbf69bbee17d0936"
+    },
+    {
+      "name": "supabase-auth-js",
+      "version": "2.118.0",
+      "license": "MIT",
+      "repository": "https://github.com/supabase/supabase-js",
+      "file": "supabase-auth-js-2.118.0-LICENSE.txt",
+      "sha256": "334dd6820e2eaeab2064e7c59001b810566728a28a41a7c1dbf69bbee17d0936"
+    },
+    {
+      "name": "supabase-functions-js",
+      "version": "2.118.0",
+      "license": "MIT",
+      "repository": "https://github.com/supabase/supabase-js",
+      "file": "supabase-functions-js-2.118.0-LICENSE.txt",
+      "sha256": "334dd6820e2eaeab2064e7c59001b810566728a28a41a7c1dbf69bbee17d0936"
+    },
+    {
+      "name": "supabase-postgrest-js",
+      "version": "2.118.0",
+      "license": "MIT",
+      "repository": "https://github.com/supabase/supabase-js",
+      "file": "supabase-postgrest-js-2.118.0-LICENSE.txt",
+      "sha256": "334dd6820e2eaeab2064e7c59001b810566728a28a41a7c1dbf69bbee17d0936"
+    },
+    {
+      "name": "supabase-realtime-js",
+      "version": "2.118.0",
+      "license": "MIT",
+      "repository": "https://github.com/supabase/supabase-js",
+      "file": "supabase-realtime-js-2.118.0-LICENSE.txt",
+      "sha256": "334dd6820e2eaeab2064e7c59001b810566728a28a41a7c1dbf69bbee17d0936"
+    },
+    {
+      "name": "supabase-storage-js",
+      "version": "2.118.0",
+      "license": "MIT",
+      "repository": "https://github.com/supabase/supabase-js",
+      "file": "supabase-storage-js-2.118.0-LICENSE.txt",
+      "sha256": "334dd6820e2eaeab2064e7c59001b810566728a28a41a7c1dbf69bbee17d0936"
+    },
+    {
+      "name": "supabase-phoenix",
+      "version": "0.4.5",
+      "license": "MIT",
+      "repository": "https://github.com/supabase/phoenix",
+      "file": "supabase-phoenix-0.4.5-LICENSE.txt",
+      "sha256": "41a686069f0199ff369d7e5277d5267385cc54d9199f1efc960bacbe2e799255"
+    },
+    {
+      "name": "iceberg-js",
+      "version": "0.8.1",
+      "license": "MIT",
+      "repository": "https://github.com/supabase/iceberg-js",
+      "file": "iceberg-js-0.8.1-LICENSE.txt",
+      "sha256": "e6e972dba808fb9d80863fe90ca222a47710cb850f6e6e2af95cdc0d022f79bd"
+    },
+    {
+      "name": "tslib",
+      "version": "2.8.1",
+      "license": "0BSD",
+      "repository": "https://github.com/microsoft/tslib",
+      "file": "tslib-2.8.1-LICENSE.txt",
+      "sha256": "210b19e543130388c68654b7497e967119ce17145f66ab7d85688fbd70f08751"
+    },
+    {
+      "name": "lucide-react",
+      "version": "1.61.0",
+      "license": "ISC; includes MIT Feather attribution",
+      "repository": "https://github.com/lucide-icons/lucide",
+      "file": "lucide-react-1.61.0-LICENSE.txt",
+      "sha256": "b495047bd93a9b06913511076f504daba17d5bbeb3e0650f3bb53a4220329c57"
+    },
+    {
+      "name": "mediabunny",
+      "version": "1.62.0",
+      "license": "MPL-2.0",
+      "repository": "https://github.com/Vanilagy/mediabunny",
+      "file": "mediabunny-1.62.0-LICENSE.txt",
+      "sha256": "3f3d9e0024b1921b067d6f7f88deb4a60cbe7a78e76c64e3f1d7fc3b779b9d04"
+    }
+  ]
+}

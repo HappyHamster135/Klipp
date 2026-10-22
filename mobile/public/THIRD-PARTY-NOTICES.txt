@@ -1,0 +1,71 @@
+Klipp mobile - third-party notices
+=================================
+
+This distribution uses the following open-source components. Full license and
+copyright texts are supplied in the adjacent licenses/ directory. License
+conditions and warranty disclaimers in those texts apply to their components.
+Versions below correspond to the pinned mobile production dependencies.
+
+React 19.3.1 and React DOM 19.3.1; Scheduler 0.28.0
+  License: MIT
+  Source: https://github.com/react/react
+  Texts: licenses/react-19.3.1-LICENSE.txt
+         licenses/react-dom-19.3.1-LICENSE.txt
+         licenses/scheduler-0.28.0-LICENSE.txt
+
+Supabase JavaScript client 2.118.0
+  Includes @supabase/auth-js, @supabase/functions-js, @supabase/postgrest-js,
+  @supabase/realtime-js and @supabase/storage-js, all 2.118.0.
+  License: MIT
+  Source: https://github.com/supabase/supabase-js
+  Texts: licenses/supabase-js-2.118.0-LICENSE.txt
+         licenses/supabase-auth-js-2.118.0-LICENSE.txt
+         licenses/supabase-functions-js-2.118.0-LICENSE.txt
+         licenses/supabase-postgrest-js-2.118.0-LICENSE.txt
+         licenses/supabase-realtime-js-2.118.0-LICENSE.txt
+         licenses/supabase-storage-js-2.118.0-LICENSE.txt
+
+Supabase client's production dependency graph also contains:
+  @supabase/phoenix 0.4.5 (MIT)
+    Source: https://github.com/supabase/phoenix
+    Text: licenses/supabase-phoenix-0.4.5-LICENSE.txt
+  iceberg-js 0.8.1 (MIT)
+    Source: https://github.com/supabase/iceberg-js
+    Text: licenses/iceberg-js-0.8.1-LICENSE.txt
+  tslib 2.8.1 (0BSD)
+    Source: https://github.com/microsoft/tslib
+    Texts: licenses/tslib-2.8.1-LICENSE.txt
+           licenses/tslib-2.8.1-CopyrightNotice.txt
+  Build tree shaking can omit unused portions of these packages.
+
+Lucide React 1.61.0
+  License: ISC; specified Feather-derived icons are under MIT.
+  Source: https://github.com/lucide-icons/lucide
+  The complete upstream text retains both Lucide and Cole Bemis/Feather notices:
+    licenses/lucide-react-1.61.0-LICENSE.txt
+
+Mediabunny 1.62.0
+  TypeScript library license: Mozilla Public License 2.0.
+  Copyright: Vanilagy and contributors; see the original source file headers.
+  Text: licenses/mediabunny-1.62.0-LICENSE.txt
+  Source for the library is available at the exact npm gitHead:
+    https://github.com/Vanilagy/mediabunny/tree/03d524ffa1a1429616bcd4434f97714a77432bd7
+  Source archive:
+    https://github.com/Vanilagy/mediabunny/archive/03d524ffa1a1429616bcd4434f97714a77432bd7.tar.gz
+  Upstream release:
+    https://github.com/Vanilagy/mediabunny/releases/tag/v1.62.0
+  Local copy of upstream development/build instructions:
+    licenses/mediabunny-1.62.0-README.md
+  Klipp uses the published package without editing its upstream sources.
+  The bundler transforms its JavaScript for delivery. The source links and
+  MPL text above cover those upstream files; no Mediabunny trademark rights
+  are asserted.
+
+Media preparation uses the browser's own WebCodecs implementations and can
+copy existing encoded AAC packets. No @mediabunny/aac-encoder, FFmpeg binary,
+or Emscripten/WASM encoder is included in this mobile distribution.
+See licenses/MEDIABUNNY-SOURCE-AND-BUILD.txt for source/download provenance.
+
+PACKAGE-LICENSE-MANIFEST.json in licenses/ records SHA-256 hashes of the exact
+installed package license texts copied for this distribution. Additional
+source/download provenance is recorded in MEDIABUNNY-SOURCE-AND-BUILD.txt.
