@@ -47,6 +47,7 @@ export function Feed({api,version,watchId,onWatchChange}:{api:Api;version:number
   const [notice,setNotice]=useState(''),[selected,setSelected]=useState<CommunityClip|null>(null);
   const [action,setAction]=useState<{clip:CommunityClip;type:'menu'|'delete'|'report'|'block'}|null>(null),[reason,setReason]=useState(''),[busy,setBusy]=useState(false);
   const [actionError,setActionError]=useState('');
+  const [watchLoad,setWatchLoad]=useState<{api:Api;id:string|null;error:string}>({api,id:null,error:''}),[watchRetry,setWatchRetry]=useState(0);
   const [feed,setFeed]=useState<FeedState>(()=>({api,mine:false,cursor:null,items:[],next:null,loading:true,loaded:false,error:''}));
   const communityTab=useRef<HTMLButtonElement>(null),ownTab=useRef<HTMLButtonElement>(null),actionLock=useRef(false),dialogRequest=useRef(false);
   const mutations=useRef({epoch:0,clips:new Map<string,{epoch:number;clip:CommunityClip|null}>(),blocked:new Map<string,number>()});
@@ -56,7 +57,9 @@ export function Feed({api,version,watchId,onWatchChange}:{api:Api;version:number
   const items=sameScope?feed.items:[],next=sameScope?feed.next:null,loading=!sameScope||feed.loading;
   const error=sameScope?feed.error:'',loaded=sameScope&&feed.loaded;
   const watching=selected?.id===watchId?selected:null;
-  const browseScroll=useRef(0),wasWatching=useRef(false);
+  const browseScroll=useRef(0),wasWatching=useRef(false),browseOpener=useRef<HTMLButtonElement|null>(null),clickedControl=useRef<HTMLButtonElement|null>(null);
+  const browse=useRef<HTMLElement>(null),feedPanel=useRef<HTMLDivElement>(null),pageVisit=useRef({api,mine,page}),pageFocus=useRef(false);
+  const watchError=watchLoad.api===api&&watchLoad.id===watchId?watchLoad.error:'';
   useEffect(()=>{
     const scope:FeedLifetime={api,actor:api.user?.id??null,active:true};lifetime.current=scope;
     mutations.current={epoch:0,clips:new Map(),blocked:new Map()};
@@ -67,17 +70,35 @@ export function Feed({api,version,watchId,onWatchChange}:{api:Api;version:number
     if(!watchId){setSelected(null);return;}
     if(selected?.id===watchId)return;
     const abort=new AbortController();
+    setWatchLoad({api,id:watchId,error:''});
     void api.getClip(watchId,abort.signal).then(clip=>{if(!abort.signal.aborted)setSelected(clip);})
-      .catch(error=>{if(!abort.signal.aborted){setNotice(messageFor(error));onWatchChange(null);}});
+      .catch(error=>{if(!abort.signal.aborted)setWatchLoad({api,id:watchId,error:messageFor(error)});});
     return()=>abort.abort();
-  },[api,watchId]);
+  },[api,watchId,watchRetry]);
   useEffect(()=>{
     if(watchId){wasWatching.current=true;return;}
     if(!wasWatching.current)return;
     wasWatching.current=false;
-    const frame=requestAnimationFrame(()=>window.scrollTo({top:browseScroll.current}));
+    const frame=requestAnimationFrame(()=>{
+      const opener=browseOpener.current;
+      (opener?.isConnected&&!opener.disabled?opener:(mine?ownTab:communityTab).current)?.focus({preventScroll:true});
+      window.scrollTo({top:browseScroll.current});
+    });
     return()=>cancelAnimationFrame(frame);
   },[watchId]);
+  useEffect(()=>{
+    const previous=pageVisit.current;
+    if(previous.api!==api||previous.mine!==mine)pageFocus.current=false;
+    else if(previous.page!==page)pageFocus.current=true;
+    pageVisit.current={api,mine,page};
+    if(!pageFocus.current||loading)return;
+    pageFocus.current=false;
+    const frame=requestAnimationFrame(()=>{
+      feedPanel.current?.focus({preventScroll:true});
+      browse.current?.scrollIntoView({block:'start'});
+    });
+    return()=>cancelAnimationFrame(frame);
+  },[api,mine,page,loading]);
   useEffect(()=>{
     const abort=new AbortController(),epoch=mutations.current.epoch;
     setFeed(previous=>previous.api===api&&previous.mine===mine&&previous.cursor===cursor
@@ -115,7 +136,7 @@ export function Feed({api,version,watchId,onWatchChange}:{api:Api;version:number
     }catch(error){if(current(scope))setNotice(messageFor(error));}
     finally{if(current(scope)){actionLock.current=false;setBusy(false);}}
   }
-  function select(clip:CommunityClip){if(clip.status!=='published')return;if(!watchId)browseScroll.current=window.scrollY;setSelected(clip);onWatchChange(clip.id);window.scrollTo({top:0});}
+  function select(clip:CommunityClip){if(clip.status!=='published')return;if(!watchId){browseScroll.current=window.scrollY;browseOpener.current=clickedControl.current;}setSelected(clip);onWatchChange(clip.id);window.scrollTo({top:0});}
   function switchTab(value:boolean){if(mine===value)return;setMine(value);setHistory([null]);setPage(0);}
   function openActions(clip:CommunityClip){setActionError('');setReason('');setAction({clip,type:'menu'});}
   function closeActions(){if(!dialogRequest.current){setAction(null);setReason('');setActionError('');}}
@@ -151,8 +172,8 @@ export function Feed({api,version,watchId,onWatchChange}:{api:Api;version:number
     <div className="page-title"><div><h1>Media</h1><p className="caption">Upload from Klipp on PC. Watch and connect here.</p></div></div>
     {notice?<Notice onClose={()=>setNotice('')}>{notice}</Notice>:null}
     {watching?<Watch key={watching.id} api={api} clip={watching} onBack={()=>onWatchChange(null)} onChanged={updateClip} onLike={()=>void like(watching)} onMore={()=>openActions(watching)} busy={busy}/>:watchId?
-      <section className="watch"><button className="back" onClick={()=>onWatchChange(null)}><ArrowLeft size={18}/>Back to clips</button><div className="watch-player"><div className="video-loading" role="status">Opening clip...</div></div></section>:null}
-    <section className="browse" aria-label="Browse clips">
+      <section className="watch"><button className="back" onClick={()=>onWatchChange(null)}><ArrowLeft size={18}/>Back to clips</button><div className="watch-player">{watchError?<div className="playback-error" role="alert"><h2>Clip could not open</h2><p>{watchError}</p><button onClick={()=>setWatchRetry(value=>value+1)}>Retry clip</button></div>:<div className="video-loading" role="status">Opening clip...</div>}</div></section>:null}
+    <section ref={browse} className="browse" aria-label="Browse clips">
       <div className="feed-toolbar">
         <div className="tabs" role="tablist" aria-label="Clip collection">
           <button ref={communityTab} id="community-clips-tab" role="tab" aria-controls="clip-feed" aria-selected={!mine} tabIndex={mine?-1:0} onKeyDown={tabKey} onClick={()=>switchTab(false)}>Community</button>
@@ -160,11 +181,11 @@ export function Feed({api,version,watchId,onWatchChange}:{api:Api;version:number
         </div>
         <button className="icon-button" aria-label="Refresh clips" disabled={loading} onClick={()=>setRefresh(value=>value+1)}><RefreshCw size={18}/></button>
       </div>
-      <div id="clip-feed" role="tabpanel" aria-labelledby={mine?'my-clips-tab':'community-clips-tab'} aria-busy={loading}>
+      <div ref={feedPanel} id="clip-feed" role="tabpanel" tabIndex={-1} aria-labelledby={mine?'my-clips-tab':'community-clips-tab'} aria-busy={loading}>
         {loading?<p className="caption" role="status">Loading clips...</p>:null}
         {error?<div className="feed-error" role="alert"><div><h2>{loaded?'Could not refresh clips':'Could not load clips'}</h2><p>{error}{loaded&&items.length?' Your current clips are still shown.':''}</p></div><button onClick={()=>setRefresh(value=>value+1)}>Retry clips</button></div>:null}
         {!loading&&loaded&&!error&&!items.length?<Empty title={mine?'No uploads yet':'No clips shared yet'}><p>Upload clips from Klipp on your PC.</p></Empty>:null}
-        <div className="feed-grid">{items.map(clip=><article className={watching?.id===clip.id?'clip-card selected':'clip-card'} key={clip.id}>
+        <div className="feed-grid">{items.map(clip=><article className={watching?.id===clip.id?'clip-card selected':'clip-card'} key={clip.id} onClickCapture={event=>{const target=(event.target as Element).closest('button');if(target)clickedControl.current=target;}}>
           <button className="poster-button" aria-label={`Watch ${clip.title}`} disabled={clip.status!=='published'} onClick={()=>select(clip)}><Poster api={api} clip={clip} generation={`${version}:${refresh}`}/></button>
           <div className="clip-meta"><button className="clip-title" onClick={()=>select(clip)} disabled={clip.status!=='published'}>{clip.title}</button><p className="author">@{clip.username||clip.displayName}<time dateTime={clip.createdAt}>{new Date(clip.createdAt).toLocaleDateString(undefined,{month:'short',day:'numeric'})}</time></p>
             {clip.status!=='published'?<p className="caption">{clip.status==='deleting'?'Deletion incomplete. Use Delete again to finish cleanup.':'Upload incomplete. Delete it to free this slot.'}</p>:null}

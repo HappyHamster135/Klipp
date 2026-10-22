@@ -6,7 +6,7 @@ import {CommunityError} from '../lib/models';
 import {Notice} from './Primitives';
 
 type AuthScope={controller:AbortController;active:boolean;kind:'send'|'verify'|null};
-export function Auth({api,remember,onRemember,initializing=false}:{api:Api;remember:boolean;onRemember:(value:boolean)=>void;initializing?:boolean}) {
+export function Auth({api,remember,onRemember,initializing=false,restoreError='',onRetryRestore}:{api:Api;remember:boolean;onRemember:(value:boolean)=>void;initializing?:boolean;restoreError?:string;onRetryRestore?:()=>void}) {
   const [email,setEmail]=useState(''),[code,setCode]=useState(''),[sent,setSent]=useState(false),[create,setCreate]=useState(false),[pending,setPending]=useState(false),[error,setError]=useState('');
   const [retry,setRetry]=useState({email:'',until:0}),[clock,setClock]=useState(()=>Date.now());
   const lifetime=useRef<AuthScope|null>(null),requestBusy=useRef(false);
@@ -51,6 +51,7 @@ export function Auth({api,remember,onRemember,initializing=false}:{api:Api;remem
     <img src="./icons/klipp.svg" alt="" width="42" height="42"/>
     <h1>{sent?'Check your email':create?'Create your Klipp account':'Sign in to Klipp'}</h1>
     <p>{sent?`Enter the code sent to ${email}.`:'Your clips and your community, across devices.'}</p>
+    {restoreError&&onRetryRestore?<div className="auth-recovery" role="status"><h2>Saved sign-in could not be checked</h2><p>{restoreError}</p><p>Retry without requesting another email code, or sign in below.</p><button type="button" disabled={busy} onClick={onRetryRestore}>{initializing?'Checking saved sign-in...':'Retry saved sign-in'}</button></div>:null}
     {error?<Notice>{error}</Notice>:null}
     <form onSubmit={submit}>
       {sent?<label>Email code<input inputMode="numeric" autoComplete="one-time-code" autoFocus value={code} disabled={busy} onChange={event=>setCode(event.target.value.replace(/\D/g,'').slice(0,10))} required minLength={6} maxLength={10} pattern="[0-9]{6,10}"/></label>:<>

@@ -20,6 +20,8 @@ The suite uses 390 × 844 Android Chromium and iPhone WebKit emulation with exte
 
 Recovery specs inject deferred and failing in-memory API responses through the QA-only `window.__klippQA.api` and pre-render `window.__klippQASetup` hooks. They check that old feed pages and delayed mutations cannot replace newer interactions, thumbnails and comments can retry, failed actions explain themselves inside their dialog, sharing exposes only an app link, and unsaved profile edits survive failed saves and guarded navigation. The hooks are absent from the production entry.
 
+`feed-navigation.pw.ts` checks exact opener/scroll restoration, visible page changes and direct-link retries. `playback-polish.pw.ts` checks blocked autoplay/resume, delayed buffering feedback, background pause intent and unobscured transport controls. `session-recovery.pw.ts` checks saved-login retries without email requests, draft preservation, duplicate-request protection and clearing an obsolete recovery error after fresh sign-in/sign-out. All account actions remain in-memory fixtures.
+
 No source file is selected, prepared or uploaded by these tests. Mobile encoding tests and their worker have been removed along with the web upload feature. Desktop upload processing is covered separately by the [Windows Media harness](../../tools/Klipp.CommunityMediaHarness/README.md).
 
 By default screenshots/traces use ignored `artifacts/community-mobile-qa/playwright/`; use a separate output path for parallel targeted checks. Browser emulation does not prove physical-phone fullscreen gestures, installation, background lifecycle or real email delivery. Record device results separately in [the QA ledger](../design/IMPLEMENTATION.md).

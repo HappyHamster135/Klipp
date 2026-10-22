@@ -43,6 +43,25 @@ Repeatable checks are in [tests/README.md](../tests/README.md); the combined usa
 
 Fresh published-site screenshots are saved locally at `%TEMP%/klipp-usability-live-android-390.png` and `%TEMP%/klipp-usability-live-iphone-390.png`.
 
+## Feed and playback follow-up on 2026-10-22
+
+The next usability batch passed **132/132 browser cases** across eleven specs in 3.4 minutes, with zero failures/skips, plus the unchanged **64 unit tests** and production TypeScript/Vite build. Phone checks use Android Chromium and iPhone WebKit emulation at 390 x 844, landscape at 844 x 390, and a short desktop at 1265 x 713. These results do not establish a physical iPhone result; the user is testing that separately.
+
+| Before | After | Why |
+| --- | --- | --- |
+| Back lost focus and pagination left the viewer at the old page's bottom | Back restores the exact poster/title/Comments opener and scroll; requested pages/errors move into view | Continue browsing from the intended place |
+| A failed direct clip link closed itself | Scoped Retry clip and Back keep its route available; stale requests are ignored | Recover a connection failure without finding the link again |
+| Safari-blocked autoplay/resume had little feedback | Metadata-stage play attempt and a Play video fallback retain the current source/position | A tap can start the existing player without waiting for canplay |
+| Waiting had no status and a background retry could resume unexpectedly | Brief waits stay quiet, buffering appears after 700 ms, prolonged stalls offer manual retry after 8 seconds, and backgrounding cancels playback intent | Explain recovery while respecting pause and avoiding automatic requests |
+| Fixed navigation could cover the native transport | Initial/width-change positioning brings the player above navigation | Keep controls reachable in short viewports |
+| A temporary saved-session check failure only offered another email code | Explicit Retry saved sign-in retains an entered email, serializes attempts and clears obsolete errors after accepted sign-in/sign-out | Recheck an existing session without sending another email |
+
+Initial video loading remains metadata-only; explicit playback retries use auto preload for the current clip so WebKit can restore a paused position after decoding. No other clip is prefetched. Likes/comments/sharing retain the same video and source. Delayed player timers are canceled on pause, playback recovery, source changes and unmount.
+
+The new regressions are `feed-navigation.pw.ts` (12 cases), `playback-polish.pw.ts` (14) and `session-recovery.pw.ts` (8). Run: `pnpm test`, `pnpm build`, and `pnpm exec playwright test --reporter=line --output C:/Users/xlent/AppData/Local/Temp/klipp-feed-playback-final-qa`. External requests are blocked in fixtures, all account/social actions stay in memory, and the actual decoded MP4 is synthetic. Root's in-app browser check also exercised opening native playback and returning focus to the original poster. The Browser plugin remains unavailable, so repeatable phone checks use Playwright.
+
+The final local bundle is `index-BB-jx94C.js` (508.56 kB / 146.31 kB gzip) with `index-BWu4FYOX.css`; the existing 500 kB Vite advisory remains. No dependencies or paid services were added. Thirteen retained license hashes match. Production scans found no upload RPC, preparation/encoding worker or QA hooks. Strict UTF-8 and whitespace checks passed for the changed mobile files. PC upload restrictions and backend configuration are unchanged.
+
 ## Distribution
 
 The [manual workflow](../../.github/workflows/mobile-pages.yml) builds a review ZIP unless Pages deployment is explicitly selected. It uses the existing free hosting/services and does not enable hosting, change DNS or modify Windows releases. Native wrappers and app-store distribution are separate decisions.

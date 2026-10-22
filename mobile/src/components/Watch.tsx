@@ -1,5 +1,5 @@
 import {useEffect,useRef,useState,type FormEvent} from 'react';
-import {ArrowLeft,Trash2,Maximize,Share2} from 'lucide-react';
+import {ArrowLeft,Trash2,Maximize,Share2,Play} from 'lucide-react';
 import type {Api} from '../lib/service';
 import {messageFor} from '../lib/service';
 import type {CommunityClip,CommunityComment,CommunityCursor} from '../lib/models';
@@ -14,6 +14,8 @@ interface CommentLoadError{message:string;older:boolean}
 export function Watch({api,clip,onBack,onLike,onMore,onChanged,busy}:Props){
   const video=useRef<HTMLVideoElement>(null),playerFrame=useRef<HTMLDivElement>(null),resume=useRef<PlaybackPosition|null>(null),commentInput=useRef<HTMLTextAreaElement>(null),shareButton=useRef<HTMLButtonElement>(null);
   const [source,setSource]=useState({url:'',request:0}),[playError,setPlayError]=useState(''),[fullscreenNotice,setFullscreenNotice]=useState(''),[retry,setRetry]=useState(0);
+  const [needsPlay,setNeedsPlay]=useState(false),[buffering,setBuffering]=useState<''|'waiting'|'stalled'>('');
+  const initialPlay=useRef(true),bufferTimers=useRef<ReturnType<typeof setTimeout>[]>([]);
   const [comments,setComments]=useState<CommunityComment[]>([]),[cursor,setCursor]=useState<CommunityCursor|null>(null),[loading,setLoading]=useState(true),[loaded,setLoaded]=useState(false),[commentError,setCommentError]=useState<CommentLoadError|null>(null);
   const [body,setBody]=useState(''),[actionError,setActionError]=useState(''),[posting,setPosting]=useState(false),[deleteComment,setDeleteComment]=useState<string|null>(null);
   const [syncing,setSyncing]=useState(false),[syncNotice,setSyncNotice]=useState(''),[shareNotice,setShareNotice]=useState(''),[manualLink,setManualLink]=useState(''),[sharing,setSharing]=useState(false);
@@ -101,30 +103,66 @@ export function Watch({api,clip,onBack,onLike,onMore,onChanged,busy}:Props){
   useEffect(()=>{
     let width=window.innerWidth,frame=0;
     const reveal=()=>{
-      if(window.innerWidth<=window.innerHeight||window.innerHeight>600)return;
       cancelAnimationFrame(frame);frame=requestAnimationFrame(()=>{
-        const player=playerFrame.current;if(player)window.scrollTo({top:window.scrollY+player.getBoundingClientRect().top-12});
+        const player=playerFrame.current;if(!player)return;
+        const bounds=player.getBoundingClientRect(),nav=document.querySelector('.bottom-nav')?.getBoundingClientRect();
+        const bottom=(nav?.top??window.innerHeight)-12;
+        const landscape=window.innerWidth>window.innerHeight&&window.innerHeight<=600;
+        const offset=landscape?bounds.top-12:Math.max(0,Math.min(bounds.top-12,bounds.bottom-bottom));
+        if(offset)window.scrollTo({top:Math.max(0,window.scrollY+offset)});
       });
     };
     const resize=()=>{if(window.innerWidth!==width){width=window.innerWidth;reveal();}};
     reveal();window.addEventListener('resize',resize);return()=>{cancelAnimationFrame(frame);window.removeEventListener('resize',resize);};
   },[]);
-  useEffect(()=>{const abort=new AbortController();setPlayError('');void api.getPlaybackUrl(clip.id,abort.signal).then(url=>{if(!abort.signal.aborted)setSource({url,request:retry});}).catch(error=>{if(!abort.signal.aborted)setPlayError(messageFor(error));});return()=>abort.abort();},[api,clip.id,retry]);
-  useEffect(()=>{const element=video.current;const escape=(event:KeyboardEvent)=>{if(event.key==='Escape'&&document.fullscreenElement===element)void document.exitFullscreen().catch(()=>{});};const visibility=()=>{if(document.hidden)element?.pause();};document.addEventListener('keydown',escape);document.addEventListener('visibilitychange',visibility);return()=>{document.removeEventListener('keydown',escape);document.removeEventListener('visibilitychange',visibility);if(element){element.pause();element.removeAttribute('src');element.load();}};},[url]);
-  function failedPlayback(){if(video.current&&!resume.current)resume.current=rememberPlayback(video.current);setPlayError('This clip could not play. Retry to get a fresh playback link.');}
-  function retryPlayback(){if(!resume.current)resume.current=video.current?rememberPlayback(video.current):{time:0,playing:true,muted:false,volume:1,rate:1};resumeAttempts.current=0;setPlayError('');setRetry(value=>value+1);}
+  useEffect(()=>{const abort=new AbortController();initialPlay.current=retry===0;setPlayError('');setNeedsPlay(false);stopBuffering();void api.getPlaybackUrl(clip.id,abort.signal).then(url=>{if(!abort.signal.aborted)setSource({url,request:retry});}).catch(error=>{if(!abort.signal.aborted)setPlayError(messageFor(error));});return()=>abort.abort();},[api,clip.id,retry]);
+  useEffect(()=>{
+    const element=video.current;
+    const escape=(event:KeyboardEvent)=>{if(event.key==='Escape'&&document.fullscreenElement===element)void document.exitFullscreen().catch(()=>{});};
+    const pauseInBackground=()=>{
+      const wanted=initialPlay.current||resume.current?.playing||Boolean(element&&!element.paused&&!element.ended);
+      initialPlay.current=false;if(resume.current)resume.current.playing=false;
+      if(wanted)setNeedsPlay(true);stopBuffering();element?.pause();
+    };
+    const visibility=()=>{if(document.hidden)pauseInBackground();};
+    document.addEventListener('keydown',escape);document.addEventListener('visibilitychange',visibility);window.addEventListener('pagehide',pauseInBackground);
+    return()=>{document.removeEventListener('keydown',escape);document.removeEventListener('visibilitychange',visibility);window.removeEventListener('pagehide',pauseInBackground);clearBufferTimers();if(element){element.pause();element.removeAttribute('src');element.load();}};
+  },[url]);
+  function clearBufferTimers(){for(const timer of bufferTimers.current)clearTimeout(timer);bufferTimers.current=[];}
+  function stopBuffering(){clearBufferTimers();setBuffering('');}
+  function waitingPlayback(element:HTMLVideoElement){
+    if(element.paused||element.ended||bufferTimers.current.length)return;
+    const waiting=()=>video.current===element&&!element.paused&&!element.ended;
+    // Keep brief seeks quiet and leave the native transport uncovered.
+    bufferTimers.current=[setTimeout(()=>{if(waiting())setBuffering('waiting');},700),setTimeout(()=>{if(waiting())setBuffering('stalled');},8000)];
+  }
+  function playVideo(element:HTMLVideoElement){
+    setNeedsPlay(false);
+    void element.play().catch(error=>{
+      if(video.current!==element||!element.isConnected||document.hidden||error?.name==='AbortError')return;
+      stopBuffering();if(element.error)failedPlayback();else setNeedsPlay(true);
+    });
+  }
+  function readyPlayback(element:HTMLVideoElement){
+    stopBuffering();
+    if(resume.current){resumePlayback(element);return;}
+    if(initialPlay.current){initialPlay.current=false;if(document.hidden)setNeedsPlay(true);else playVideo(element);}
+  }
+  function failedPlayback(){stopBuffering();setNeedsPlay(false);if(video.current&&!resume.current)resume.current=rememberPlayback(video.current);setPlayError('This clip could not play. Retry to get a fresh playback link.');}
+  function retryPlayback(){if(!resume.current)resume.current=video.current?rememberPlayback(video.current):{time:0,playing:!document.hidden,muted:false,volume:1,rate:1};resumeAttempts.current=0;setPlayError('');setRetry(value=>value+1);}
   function finishResume(element:HTMLVideoElement){
     const saved=resume.current;if(!saved||element.seeking)return;
     const target=Math.max(0,Math.min(saved.time,Math.max(0,element.duration-0.01)));
     if(Math.abs(element.currentTime-target)>0.08){if(resumeAttempts.current<3)resumePlayback(element);else setPlayError('The playback position could not be restored. Retry to reopen this section.');return;}
-    resume.current=null;if(saved.playing&&!document.hidden)void element.play().catch(()=>{});
+    resume.current=null;if(saved.playing&&!document.hidden)playVideo(element);
   }
   function resumePlayback(element:HTMLVideoElement){if(resume.current&&resumeAttempts.current<3&&restorePlayback(element,resume.current)){resumeAttempts.current++;if(!element.seeking)finishResume(element);}}
   async function fullscreen(){const target=video.current;if(!target)return;setFullscreenNotice('');try{await enterVideoFullscreen(target);}catch{setFullscreenNotice('Fullscreen is unavailable here. You can keep watching below or use the video’s own fullscreen control.');}}
   return <section className="watch">
     <button className="back" onClick={onBack}><ArrowLeft size={18}/>Back to clips</button>
     <div className="watch-grid"><div className="watch-main">
-      <div className="watch-player" ref={playerFrame}>{url?<video key={`${retry}:${url}`} ref={video} src={url} controls playsInline preload="metadata" autoPlay={retry===0} onLoadedMetadata={event=>resumePlayback(event.currentTarget)} onCanPlay={event=>resumePlayback(event.currentTarget)} onSeeked={event=>finishResume(event.currentTarget)} onError={failedPlayback} onDoubleClick={()=>void fullscreen()}/>:<div className="video-loading" role="status">Loading clip…</div>}{playError?<div className="playback-error"><p>{playError}</p><button onClick={retryPlayback}>Retry playback</button></div>:null}</div>
+      <div className="watch-player" ref={playerFrame}>{url?<video key={`${retry}:${url}`} ref={video} src={url} aria-label={`Video: ${clip.title}`} controls playsInline preload={retry===0?"metadata":"auto"} onLoadedMetadata={event=>readyPlayback(event.currentTarget)} onCanPlay={event=>readyPlayback(event.currentTarget)} onSeeked={event=>finishResume(event.currentTarget)} onWaiting={event=>waitingPlayback(event.currentTarget)} onSeeking={event=>waitingPlayback(event.currentTarget)} onPlay={()=>setNeedsPlay(false)} onPlaying={()=>{setNeedsPlay(false);stopBuffering();}} onPause={stopBuffering} onEnded={stopBuffering} onError={failedPlayback} onDoubleClick={()=>void fullscreen()}/>:<div className="video-loading" role="status">Loading clip…</div>}{needsPlay&&url&&!playError?<div className="playback-start"><button className="primary" onClick={()=>{if(video.current)playVideo(video.current);}}><Play size={18}/>Play video</button></div>:null}{playError?<div className="playback-error"><p>{playError}</p><button onClick={retryPlayback}>Retry playback</button></div>:null}</div>
+      {buffering&&!playError?<div className="playback-status" role="status"><span>{buffering==='stalled'?'The video is taking longer to load. Retry if it stays stuck.':'Buffering video...'}</span>{buffering==='stalled'?<button onClick={retryPlayback}>Retry playback</button>:null}</div>:null}
       {fullscreenNotice?<Notice onClose={()=>setFullscreenNotice('')}>{fullscreenNotice}</Notice>:null}
       <div className="watch-title-row"><div><h1>{clip.title}</h1><p className="author">@{clip.username||clip.displayName}</p></div><div className="watch-tools"><button ref={shareButton} className="icon-button" aria-label="Share clip" title="Share clip" disabled={sharing} onClick={()=>void share()}><Share2/></button><button className="icon-button" aria-label="Fullscreen video" onClick={()=>void fullscreen()}><Maximize/></button></div></div>
       <ClipActions clip={clip} onLike={onLike} onComments={()=>{commentInput.current?.scrollIntoView({block:'center'});commentInput.current?.focus();}} onMore={onMore} busy={busy||posting}/>

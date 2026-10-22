@@ -10,7 +10,8 @@ import {useAppNavigation,type AppPage} from './lib/navigation';
 
 export function App({api,remember=false,onRemember=()=>{},fixture=false}:{api:Api;remember?:boolean;onRemember?:(value:boolean)=>void;fixture?:boolean}) {
   const [account,setAccount]=useState(()=>({api,user:api.user,profile:api.profile}));
-  const [restoration,setRestoration]=useState(()=>({api,done:false}));
+  const [restoration,setRestoration]=useState(()=>({api,done:false,pending:true,error:'',attempt:0})),[restoreRetry,setRestoreRetry]=useState(0);
+  const restoreLock=useRef(false);
   const [profileLoad,setProfileLoad]=useState<{api:Api;userId:string|null;ready:boolean;error:string}>(()=>({api,userId:null,ready:false,error:''}));
   const [profileRetry,setProfileRetry]=useState(0);
   const [notice,setNotice]=useState(''),[feedVersion,setFeedVersion]=useState(0),[online,setOnline]=useState(navigator.onLine);
@@ -29,12 +30,16 @@ export function App({api,remember=false,onRemember=()=>{},fixture=false}:{api:Ap
   const {page,watchId}=navigation.route;
   // A replacement client never inherits the previous client's visible identity.
   const current=account.api===api?account:{api,user:api.user,profile:api.profile};
-  const restoring=restoration.api!==api||!restoration.done;
+  const restoring=restoration.api!==api||restoration.pending||restoration.attempt!==restoreRetry;
+  const restoreError=restoration.api===api?restoration.error:'';
   const userId=current.user?.id??null;
   const identity=useRef({api,userId});identity.current={api,userId};
   const profileReady=!!userId&&profileLoad.api===api&&profileLoad.userId===userId&&profileLoad.ready&&current.profile?.id===userId;
   const profileError=profileLoad.api===api&&profileLoad.userId===userId?profileLoad.error:'';
-  useEffect(()=>{updateEditing({dirty:false,busy:false});finishLeave(false);},[api,userId,updateEditing,finishLeave]);
+  useEffect(()=>{
+    updateEditing({dirty:false,busy:false});finishLeave(false);
+    if(userId)setRestoration(previous=>previous.api===api&&previous.error?{...previous,error:''}:previous);
+  },[api,userId,updateEditing,finishLeave]);
   useEffect(()=>()=>{decision.current?.resolve(false);decision.current=null;},[]);
 
   useEffect(()=>{
@@ -43,10 +48,15 @@ export function App({api,remember=false,onRemember=()=>{},fixture=false}:{api:Ap
     const snapshot=()=>{if(active)setAccount({api,user:api.user,profile:api.profile});};
     const unsubscribe=api.subscribe(snapshot);
     snapshot();setNotice('');
-    void api.restoreSession(abort.signal).catch(error=>{if(active&&!abort.signal.aborted)setNotice(messageFor(error));})
-      .finally(()=>{if(active&&!abort.signal.aborted){snapshot();setRestoration({api,done:true});}});
+    restoreLock.current=true;
+    setRestoration(previous=>({api,done:previous.done,pending:true,error:previous.api===api?previous.error:'',attempt:restoreRetry}));
+    void api.restoreSession(abort.signal).then(()=>{
+      if(active&&!abort.signal.aborted){snapshot();setRestoration({api,done:true,pending:false,error:'',attempt:restoreRetry});}
+    }).catch(error=>{
+      if(active&&!abort.signal.aborted){snapshot();setRestoration({api,done:true,pending:false,error:messageFor(error),attempt:restoreRetry});}
+    }).finally(()=>{if(active)restoreLock.current=false;});
     return()=>{active=false;abort.abort();unsubscribe();};
-  },[api]);
+  },[api,restoreRetry]);
 
   // Profile loading follows the verified account, including a new OTP sign-in.
   // Auth may unmount as soon as verification succeeds; it never owns this request.
@@ -75,19 +85,21 @@ export function App({api,remember=false,onRemember=()=>{},fixture=false}:{api:Ap
   },[profileEditing.dirty,profileEditing.busy]);
   function navigate(next:AppPage){if(!!current.user&&!profileReady)return;void navigation.navigate({page:next,watchId:null}).then(moved=>{if(moved){setNotice('');window.scrollTo({top:0});}});}
   function watch(id:string|null){if(id===null)navigation.backToMedia();else void navigation.navigate({page:'media',watchId:id});}
+  function retryRestore(){if(restoreLock.current||api.user)return;restoreLock.current=true;setRestoreRetry(value=>value+1);}
   async function signOut(){
     if(signingOut.current)return;
     signingOut.current=true;const owner=userId;
     try{
       if(!await confirmLeave()||identity.current.api!==api||identity.current.userId!==owner)return;
       await api.signOut();void navigation.navigate({page:'media',watchId:null},{replace:true,bypassGuard:true});setAccount({api,user:null,profile:null});
+      setRestoration(previous=>previous.api===api?{...previous,error:''}:previous);
     }catch(error){if(identity.current.api===api)setNotice(messageFor(error));}finally{signingOut.current=false;}
   }
   const complete=!!current.profile?.username;
   let content;
   if(restoring&&!restoration.done)content=<main className="loading" role="status">Opening Klipp…</main>;
   // Preserve an entered email while the Remember choice creates a new client.
-  else if(!current.user)content=<Auth api={api} remember={remember} onRemember={onRemember} initializing={restoring}/>;
+  else if(!current.user)content=<Auth api={api} remember={remember} onRemember={onRemember} initializing={restoring} restoreError={restoreError} onRetryRestore={retryRestore}/>;
   else if(restoring||!profileReady)content=profileError?
     <main className="empty"><h1>Your profile could not load</h1><p>{profileError}</p><div className="dialog-actions"><button className="primary" onClick={()=>setProfileRetry(value=>value+1)}>Retry</button><button onClick={()=>void signOut()}>Sign out</button></div></main>:
     <main className="loading" role="status">Loading your profile…</main>;

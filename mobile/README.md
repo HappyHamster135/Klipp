@@ -38,6 +38,8 @@ The production files are in `mobile/dist/`. Preserve the directory structure whe
 
 Open the HTTPS address in current Safari on iPhone or Chrome on Android. Create an account or sign in with the numeric email code; there is no additional mobile password. Returning from Mail recalculates the resend wait using elapsed time. **Remember me on this device** explicitly selects persistent local storage; otherwise the app uses browser session storage. Browser restoration behavior varies, so sign out when finished on a shared device.
 
+If a temporary connection problem prevents checking a saved sign-in, **Retry saved sign-in** checks it again without sending another email. You can also sign in below. An entered email stays in place during the check.
+
 On iPhone, use Safari's Share menu and **Add to Home Screen**, enabling **Open as Web App** if offered. On Android, use Chrome's **Install app** or **Add to Home screen** menu. This needs no Apple or Google developer account or app-store submission. [Apple instructions](https://support.apple.com/guide/iphone/bookmark-a-website-iph42ab2f3a7/ios), [Chrome instructions](https://support.google.com/chrome/answer/9658361?co=GENIE.Platform%3DAndroid).
 
 Media uses the browser's video decoder for the H.264/AAC clips published by Klipp on PC. The web app does not encode video, read your photo library or request access to camera/microphone devices. Keep an internet connection for private playback and interactions.
@@ -50,9 +52,11 @@ A failed feed load offers **Retry clips** rather than claiming the feed is empty
 
 **Share clip** opens the device's share sheet when available, copies the link otherwise, or offers a selectable link if clipboard access is unavailable. It shares a Klipp viewer link, not a temporary video URL or sign-in token. Recipients still need permission to use Media. Profile drafts survive failed saves, and changing Klipp screens with unsaved details asks before discarding them.
 
-Browser Back and Forward follow Media, clips and Profile. Returning from a clip keeps the selected feed tab. An old `#upload` bookmark returns to Media and explains: **Upload clips from Klipp on your PC.** Empty feeds use the same guidance without offering file selection.
+Browser Back and Forward follow Media, clips and Profile. Returning from a clip keeps the selected feed tab, scroll position and the control you opened it from. Older/Newer clips brings the requested page into view. If a direct clip link fails to open, **Retry clip** keeps that link available. An old `#upload` bookmark returns to Media and explains: **Upload clips from Klipp on your PC.** Empty feeds use the same guidance without offering file selection.
 
 If a playback link expires or a connection interrupts a clip, **Retry playback** keeps its position, paused/playing state and audio choices. Fullscreen uses the available browser video mode; inline playback remains usable when fullscreen is denied. Landscape opening/rotation brings the full player above the navigation bar. Phone browsers may suspend the app in the background; this is not background playback or an offline library.
+
+When a browser requires a tap before playing, **Play video** starts the same player. Brief waits stay quiet; longer buffering shows a status and a prolonged stall offers a manual retry. Switching away pauses playback, and returning leaves you in control of when it starts again. No other feed videos are prefetched.
 
 Publishing is intentional in the Windows app: choose **Upload to Media**, review a section and its audio, then confirm. The current free beta accepts up to 60 seconds / 16 MiB of video and a JPEG poster up to 256 KiB, with five reserved clips per account and forty globally. Incomplete uploads/deletions occupy a slot until cleanup succeeds. The web app can retry removal through **My uploads**; it does not upload a replacement. Originals on the PC remain unchanged.
 
