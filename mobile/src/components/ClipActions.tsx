@@ -1,0 +1,4 @@
+import {Heart,MessageCircle,MoreHorizontal} from 'lucide-react';
+import type {CommunityClip} from '../lib/models';
+
+export function ClipActions({clip,onLike,onComments,onMore,busy}:{clip:CommunityClip;onLike:()=>void;onComments:()=>void;onMore:()=>void;busy:boolean}){return <div className="clip-actions"><button className={clip.likedByMe?'liked':''} aria-pressed={clip.likedByMe} disabled={busy||clip.status!=='published'} onClick={onLike}><Heart size={20} fill={clip.likedByMe?'currentColor':'none'}/><span>{clip.likedByMe?'Liked':'Like'}{clip.likeCount?` · ${clip.likeCount}`:''}</span></button><button disabled={clip.status!=='published'} onClick={onComments}><MessageCircle size={20}/><span>Comments{clip.commentCount?` · ${clip.commentCount}`:''}</span></button><button className="icon-button more" aria-label={`Actions for ${clip.title}`} onClick={onMore}><MoreHorizontal/></button></div>;}

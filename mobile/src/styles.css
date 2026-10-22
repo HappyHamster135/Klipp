@@ -11,5 +11,8 @@ html{scroll-padding-bottom:calc(100px + env(safe-area-inset-bottom))}input,texta
 .watch-player{max-height:65dvh}.watch-player>video{max-height:none}
 @media(max-width:600px){.watch-player{max-height:60dvh}.watch-player>video{max-height:none}}
 .watch-main>.notice{margin:12px 0}
+.feed-error{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px;padding:18px;border:1px solid var(--border);border-radius:7px;background:var(--surface);margin-bottom:22px}.feed-error h2{font-size:16px;margin-bottom:4px}.feed-error p{color:var(--muted);max-width:52ch}.feed-error button{flex-shrink:0}.poster-fallback{position:absolute;left:10px;bottom:9px;max-width:calc(100% - 80px);padding:2px 6px;border-radius:4px;background:#101318d9;color:var(--muted);font-size:12px}
+.watch-tools{display:flex;align-items:center;gap:4px;flex-shrink:0}.comments-state{padding:16px;border:1px solid var(--border);border-radius:6px;background:var(--surface);margin:16px 0}.comments-state p{color:var(--muted);margin-bottom:12px}.comment-compose-actions{width:100%;display:flex;align-items:center;justify-content:space-between;gap:16px}
+@media(pointer:coarse){.watch-tools .icon-button,.comment .icon-button{width:44px;min-width:44px;height:44px;min-height:44px}.comments form button{min-height:44px}}
 
 .page-title .caption{margin-top:6px}

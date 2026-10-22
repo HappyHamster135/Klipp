@@ -52,6 +52,7 @@ const canvas=document.createElement('canvas');canvas.width=480;canvas.height=270
 const context=canvas.getContext('2d')!;context.fillStyle='#171d28';context.fillRect(0,0,480,270);context.fillStyle='#7198c7';context.fillRect(36,40,260,12);context.fillStyle='#e6e8eb';context.font='bold 30px sans-serif';context.fillText('Klipp local test',36,130);context.fillStyle='#a7adb5';context.font='18px sans-serif';context.fillText('Synthetic video · no personal media',36,170);
 const poster=await new Promise<Blob>(resolve=>canvas.toBlob(blob=>resolve(blob!),'image/jpeg',0.8));
 const api=new FixtureApi(URL.createObjectURL(poster),new URLSearchParams(location.search).get('empty')==='1');
-declare global{interface Window{__klippQA:{snapshot:()=>ReturnType<FixtureApi['snapshot']>}}}
-window.__klippQA={snapshot:()=>api.snapshot()};
+declare global{interface Window{__klippQA:{api:FixtureApi;snapshot:()=>ReturnType<FixtureApi['snapshot']>};__klippQASetup?:(api:FixtureApi)=>void}}
+window.__klippQA={api,snapshot:()=>api.snapshot()};
+window.__klippQASetup?.(api);
 createRoot(document.getElementById('root')!).render(<App api={api} fixture/>);

@@ -1,11 +1,11 @@
 import {describe,expect,it} from 'vitest';
-import {AppNavigation,parseRoute,routeHash,type AppRoute} from './navigation';
+import {AppNavigation,parseRoute,routeHash,type AppRoute,type LeaveRoute} from './navigation';
 
 const id='aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 const settle=()=>new Promise(resolve=>setTimeout(resolve,0));
 function setup(hash='#media'){
   const listeners=new Map<string,Set<()=>void>>();
-  const entries=[{state:null as unknown,hash}];let position=0,legacyNotices=0;
+  const entries=[{state:null as unknown,hash}];let position=0,legacyNotices=0,leave:LeaveRoute|undefined;
   const location={hash};
   const emit=()=>{for(const type of ['popstate','hashchange'])listeners.get(type)?.forEach(callback=>callback());};
   const host={location,history:{
@@ -15,8 +15,8 @@ function setup(hash='#media'){
     go(delta:number){const target=position+delta;if(target<0||target>=entries.length)return;queueMicrotask(()=>{position=target;location.hash=entries[position].hash;emit();});},
   },addEventListener(type:string,listener:()=>void){if(!listeners.has(type))listeners.set(type,new Set());listeners.get(type)!.add(listener);},removeEventListener(type:string,listener:()=>void){listeners.get(type)?.delete(listener);}};
   const routes:AppRoute[]=[];
-  const navigation=new AppNavigation(host,route=>routes.push(route),()=>{legacyNotices++;});
-  return{host,navigation,routes,entries,get legacyNotices(){return legacyNotices;},visitHash(hash:string){host.history.pushState(null,'',hash);emit();}};
+  const navigation=new AppNavigation(host,route=>routes.push(route),()=>{legacyNotices++;},next=>leave?.(next)??true);
+  return{host,navigation,routes,entries,get legacyNotices(){return legacyNotices;},set leave(value:LeaveRoute|undefined){leave=value;},visitHash(hash:string){host.history.pushState(null,'',hash);emit();}};
 }
 
 describe('viewer-only mobile navigation',()=>{
@@ -62,5 +62,33 @@ describe('viewer-only mobile navigation',()=>{
   it('normalizes an unknown initial fragment without showing upload guidance',()=>{
     const test=setup('#access_token=not-a-route');expect(test.host.location.hash).toBe('#media');
     expect(test.entries).toHaveLength(1);expect(test.legacyNotices).toBe(0);
+  });
+  it('keeps a saving profile at its exact history entry until the operation finishes',async()=>{
+    const test=setup();await test.navigation.navigate({page:'profile',watchId:null});test.leave=()=>false;
+    test.host.history.go(-1);await settle();
+    expect(test.host.location.hash).toBe('#profile');expect(test.entries).toHaveLength(2);
+    test.leave=undefined;test.host.history.go(-1);await settle();expect(test.routes.at(-1)?.page).toBe('media');
+  });
+  it('restores the Profile URL while a dirty Back decision is pending and supports keeping or discarding',async()=>{
+    const test=setup();await test.navigation.navigate({page:'profile',watchId:null});
+    let decide:(allow:boolean)=>void=()=>{};test.leave=()=>new Promise(resolve=>{decide=resolve;});
+    test.host.history.go(-1);await settle();expect(test.host.location.hash).toBe('#profile');
+    decide(false);await settle();expect(test.routes.at(-1)?.page).toBe('profile');expect(test.entries).toHaveLength(2);
+    test.host.history.go(-1);await settle();decide(true);await settle();
+    expect(test.host.location.hash).toBe('#media');expect(test.entries).toHaveLength(2);
+    test.leave=undefined;test.host.history.go(1);await settle();expect(test.routes.at(-1)?.page).toBe('profile');
+  });
+  it('coalesces navigation while the unsaved decision is pending and never creates a canceled entry',async()=>{
+    const test=setup();await test.navigation.navigate({page:'profile',watchId:null});
+    let decide:(allow:boolean)=>void=()=>{},asked=0;test.leave=()=>{asked++;return new Promise(resolve=>{decide=resolve;});};
+    const pending=test.navigation.navigate({page:'media',watchId:null});
+    expect(await test.navigation.navigate({page:'media',watchId:id})).toBe(false);expect(asked).toBe(1);
+    decide(false);expect(await pending).toBe(false);expect(test.entries).toHaveLength(2);expect(test.host.location.hash).toBe('#profile');
+    test.leave=undefined;expect(await test.navigation.navigate({page:'media',watchId:null})).toBe(true);
+  });
+  it('does not commit an awaited navigation after its controller has been disposed',async()=>{
+    const test=setup();let decide:(allow:boolean)=>void=()=>{};test.leave=()=>new Promise(resolve=>{decide=resolve;});
+    const pending=test.navigation.navigate({page:'profile',watchId:null});test.navigation.dispose();decide(true);
+    expect(await pending).toBe(false);expect(test.entries).toHaveLength(1);expect(test.host.location.hash).toBe('#media');
   });
 });

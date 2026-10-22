@@ -35,6 +35,8 @@ Publishing a clip makes its video, thumbnail, title, description, author profile
 
 Video and thumbnail buckets are private. Klipp requests short-lived playback links for the current signed-in account: five minutes for a video and two minutes for a thumbnail. Anyone given one of these links can use it until it expires. Blocking hides the other member's content and prevents new access requests; an already-issued link may remain usable until expiry. Signing out stops playback and removes local access to the session, but does not revoke every previously issued link.
 
+**Share clip** in the web viewer shares an app link containing the clip identifier through the device's share sheet, clipboard or a selectable text field. It does not include a session token or temporary Storage link. A chosen receiving app can handle that link under its own policy; recipients still need to sign in and have access to the clip through Media.
+
 The installed Windows app creates a share copy at up to 720p / 30 fps and mixes only the audio tracks selected before upload. A primary or mixed track may already contain voices and other sounds. The mobile web app plays the shared copy using the browser's video decoder; it does not encode or prepare local media.
 
 Windows temporary share files use `%TEMP%\Klipp\CommunityShare`; Klipp attempts to remove them on completion or cancellation. Preparation uses the PC's processing, memory and battery; originals remain unchanged. The server checks upload access, size, path, ownership and MIME metadata; it does not decode or transcode videos. Web playback and interactions still use device memory, processing and network data.

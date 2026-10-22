@@ -46,6 +46,10 @@ Media uses the browser's video decoder for the H.264/AAC clips published by Klip
 
 **Media** shows community clips; **My uploads** shows clips published from your Klipp PC account. Choose a clip to play it, use Like or Comments to interact, and use its actions menu to report or block another member. Owners can delete their own shared clips and comments. **Profile** contains account details, sign-out and reversible **Blocked users** management.
 
+A failed feed load offers **Retry clips** rather than claiming the feed is empty. A failed refresh keeps the current clips readable. Unavailable thumbnails do not prevent watching; refresh or returning online retries them. Keyboard users can switch collections with the arrow keys and Home/End.
+
+**Share clip** opens the device's share sheet when available, copies the link otherwise, or offers a selectable link if clipboard access is unavailable. It shares a Klipp viewer link, not a temporary video URL or sign-in token. Recipients still need permission to use Media. Profile drafts survive failed saves, and changing Klipp screens with unsaved details asks before discarding them.
+
 Browser Back and Forward follow Media, clips and Profile. Returning from a clip keeps the selected feed tab. An old `#upload` bookmark returns to Media and explains: **Upload clips from Klipp on your PC.** Empty feeds use the same guidance without offering file selection.
 
 If a playback link expires or a connection interrupts a clip, **Retry playback** keeps its position, paused/playing state and audio choices. Fullscreen uses the available browser video mode; inline playback remains usable when fullscreen is denied. Landscape opening/rotation brings the full player above the navigation bar. Phone browsers may suspend the app in the background; this is not background playback or an offline library.
