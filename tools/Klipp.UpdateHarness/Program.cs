@@ -299,8 +299,8 @@ foreach (var missingPreparedPackage in new[] { false, true })
     Assert(service.PrepareRestart() && client.Prepared?.Version == "1.0.9", "Canceled discovery discarded the verified restart handle.");
 }
 
-// Failed, missing, stale or mismatched verification must never replace the old package.
-foreach (var failure in new[] { "disk", "checksum", "stale", "missing", "wrong-version" })
+// Failed or stale verification retains the fallback only while the SDK still has that package.
+foreach (var failure in new[] { "disk", "checksum", "stale" })
 {
     var client = new FakeClient { Pending = FakeClient.Release("1.0.9"), Offered = FakeClient.Release("1.0.10") };
     client.Download = (_, progress, _) =>
@@ -308,8 +308,6 @@ foreach (var failure in new[] { "disk", "checksum", "stale", "missing", "wrong-v
         progress(100);
         if (failure == "disk") throw new IOException("disk full");
         if (failure == "checksum") throw new InvalidDataException("checksum mismatch");
-        if (failure == "missing") client.Pending = null;
-        if (failure == "wrong-version") client.Pending = FakeClient.Release("1.0.11");
         return Task.CompletedTask;
     };
     using var service = new AppUpdateService(client, State("pending-failure-" + failure));
@@ -319,6 +317,45 @@ foreach (var failure in new[] { "disk", "checksum", "stale", "missing", "wrong-v
         "A failed or unverified replacement lost the old ready package: " + failure);
     Assert(service.PrepareRestart() && client.Prepared?.Version == "1.0.9",
         "A failed or mismatched replacement changed the restart target: " + failure);
+}
+
+// The real SDK may remove the old package during failed/canceled replacement cleanup.
+foreach (var failure in new[] { "disk", "checksum", "missing", "wrong-version", "cancel" })
+{
+    var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+    var client = new FakeClient { Pending = FakeClient.Release("1.0.9"), Offered = FakeClient.Release("1.0.10") };
+    client.Download = async (_, progress, token) =>
+    {
+        client.Pending = failure == "wrong-version" ? FakeClient.Release("1.0.11") : null;
+        progress(100);
+        if (failure == "disk") throw new IOException("disk full after cleanup");
+        if (failure == "checksum") throw new InvalidDataException("checksum mismatch after cleanup");
+        if (failure == "cancel")
+        {
+            entered.TrySetResult();
+            await Task.Delay(Timeout.Infinite, token);
+        }
+    };
+    using var service = new AppUpdateService(client, State("pending-cleaned-" + failure));
+    await service.CheckAsync(false);
+    var transfer = service.CheckAsync(true, manual: true);
+    if (failure == "cancel")
+    {
+        await entered.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        service.CancelDownload();
+    }
+    await transfer;
+    Assert(service.Snapshot.Status == AppUpdateStatus.Available && service.Snapshot.AvailableVersion == "1.0.10" &&
+        service.Snapshot.Message.Contains("previous update is no longer prepared"),
+        "SDK cleanup left a stale ready card or omitted retry guidance: " + failure);
+    Assert(!service.PrepareRestart() && client.PrepareCalls == 0,
+        "SDK cleanup left a restart handle to a removed or mismatched package: " + failure);
+    client.Download = null;
+    await service.DownloadAsync();
+    Assert(service.Snapshot.Status == AppUpdateStatus.Ready && service.Snapshot.AvailableVersion == "1.0.10" && client.DownloadCalls == 2,
+        "SDK cleanup prevented an explicit replacement retry: " + failure);
+    Assert(service.PrepareRestart() && client.Prepared?.Version == "1.0.10",
+        "The retry did not prepare the newly verified update after SDK cleanup: " + failure);
 }
 
 // Pausing a replacement leaves the fallback ready; a manual retry can still install the newer one.

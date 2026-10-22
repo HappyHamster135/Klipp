@@ -272,21 +272,51 @@ public sealed class AppUpdateService : IDisposable
         {
             if (!_disposed)
             {
-                if (_ready is not null) PublishReady("The newer download was paused. You can retry it later.");
-                else Publish(AppUpdateStatus.Available, "Download paused. You can download the update again.", 0, release.Version);
+                var hadReady = _ready is not null;
+                if (RevalidateReady()) PublishReady("The newer download was paused. You can retry it later.");
+                else Publish(AppUpdateStatus.Available, hadReady
+                    ? "Download paused. The previous update is no longer prepared. Download this update again before restarting."
+                    : "Download paused. You can download the update again.", 0, release.Version);
             }
         }
         catch (Exception exception)
         {
             Debug.WriteLine($"[Klipp] Update download failed: {exception.GetType().Name}");
-            if (_ready is not null) PublishReady(DescribeError(exception, downloading: true));
-            else Publish(AppUpdateStatus.Available, DescribeError(exception, downloading: true), 0, release.Version);
+            if (_disposed) return;
+            var hadReady = _ready is not null;
+            var message = DescribeError(exception, downloading: true);
+            if (RevalidateReady()) PublishReady(message);
+            else Publish(AppUpdateStatus.Available, message + (hadReady
+                ? " The previous update is no longer prepared. Download this update again before restarting."
+                : string.Empty), 0, release.Version);
         }
         finally
         {
             lock (_sync)
                 if (ReferenceEquals(_downloadCancellation, download)) _downloadCancellation = null;
         }
+    }
+
+    private bool RevalidateReady()
+    {
+        if (_ready is null) return false;
+        try
+        {
+            // The SDK may clean the previous package even when a replacement
+            // download fails. Never keep a restart handle to a removed file.
+            var pending = _client.GetPendingRestart();
+            if (pending is not null && SameVersion(pending.Version, _ready.Version))
+            {
+                _ready = pending;
+                return true;
+            }
+        }
+        catch (Exception exception)
+        {
+            Debug.WriteLine($"[Klipp] Could not revalidate the pending update: {exception.GetType().Name}");
+        }
+        _ready = null;
+        return false;
     }
 
     private void PublishKnownUpdate()
