@@ -34,6 +34,7 @@ export class CommunityApi {
   private currentProfile: CommunityProfile | null = null;
   private disposed = false;
   private signOutPending = false;
+  private storageReadError: CommunityError | null = null;
   private unsubscribe: () => void;
 
   constructor(config: CommunityConfig, options: CommunityApiOptions = {}) {
@@ -43,7 +44,17 @@ export class CommunityApi {
     this.requestFetch = options.fetch ?? globalThis.fetch.bind(globalThis);
     this.uploadTransport = options.uploadTransport ?? ((...args) => browserUpload(this.requestFetch, ...args));
     const guardedStorage: StorageLike = {
-      getItem: key => this.storage.getItem(key),
+      getItem: async key => {
+        try { return await this.storage.getItem(key); }
+        catch (error) {
+          // INITIAL_SESSION also reads from a fire-and-forget SDK callback.
+          // Surface failures through our awaited operations, never as an
+          // unhandled browser rejection or as a pretend successful restore.
+          this.storageReadError = error instanceof CommunityError ? error
+            : new CommunityError('session_storage', 'This browser could not read your saved sign-in. Please reload and try again.');
+          return null;
+        }
+      },
       setItem: async (key, value) => {
         const context = this.authContext;
         if (this.disposed || (context ? context.generation !== this.generation
@@ -364,6 +375,7 @@ export class CommunityApi {
       this.assert(context); this.authContext = context;
       try {
         let { data, error } = await this.client.auth.getSession();
+        if (this.storageReadError) throw this.storageReadError;
         if (error) throw safeError(error);
         if (!data.session) throw new CommunityError('session_expired', 'Please sign in again to use Media.');
         if ((data.session.expires_at ?? 0) <= Date.now() / 1000 + minimumSeconds) {
@@ -410,7 +422,13 @@ export class CommunityApi {
     try {
       return await this.enqueue(async () => {
         this.assert(context); this.authContext = context;
-        try { const result = await operation(context); this.assert(context); return result; }
+        try {
+          await this.client.auth.initialize(); this.assert(context);
+          if (this.storageReadError) throw this.storageReadError;
+          const result = await operation(context);
+          this.assert(context); if (this.storageReadError) throw this.storageReadError;
+          return result;
+        }
         finally { this.authContext = null; }
       });
     } catch (error) {
@@ -540,7 +558,7 @@ function validateText(value: string, min: number, max: number, code: string, mes
   const result = value.trim(); if ([...result].length < min || [...result].length > max
     || (multiline ? /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/ : /[\u0000-\u001f\u007f]/).test(result)) throw new CommunityError(code, message); return result;
 }
-function isExpired(value: unknown): boolean { const row = value && typeof value === 'object' ? value as Record<string, unknown> : {}; return row.status === 401 || ['bad_jwt', 'session_not_found', 'refresh_token_not_found', 'refresh_token_already_used', 'user_not_found'].includes(String(row.code)); }
+function isExpired(value: unknown): boolean { const row = value && typeof value === 'object' ? value as Record<string, unknown> : {}; return row.status === 401 || ['bad_jwt', 'session_expired', 'session_not_found', 'refresh_token_not_found', 'refresh_token_already_used', 'user_not_found'].includes(String(row.code)); }
 function safeError(value: unknown, path = ''): CommunityError {
   if (value instanceof CommunityError) return value;
   const row = value && typeof value === 'object' ? value as Record<string, unknown> : {};

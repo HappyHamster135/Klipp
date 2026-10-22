@@ -23,7 +23,7 @@ function memoryStorage(): StorageLike & { values: Map<string, string> } {
   return { values, getItem: key => values.get(key) ?? null, setItem: (key, value) => { values.set(key, value); }, removeItem: key => { values.delete(key); } };
 }
 interface Captured { path: string; method: string; headers: Headers; body: unknown; signal: AbortSignal | null | undefined }
-function fixture() {
+function fixture(storageAdapter?: StorageLike) {
   const requests: Captured[] = [];
   const storage = memoryStorage();
   let reply: (request: Captured) => Response | Promise<Response> = request => {
@@ -38,7 +38,7 @@ function fixture() {
       body: typeof init?.body === 'string' ? JSON.parse(init.body) : init?.body, signal: init?.signal };
     requests.push(request); return reply(request);
   }) as typeof fetch;
-  const api = new CommunityApi(config, { storage, fetch: fetcher }); instances.push(api);
+  const api = new CommunityApi(config, { storage: storageAdapter ?? storage, fetch: fetcher }); instances.push(api);
   return { api, requests, storage, set reply(value: typeof reply) { reply = value; }, signIn: () => api.verifyEmailCode('player@example.com', '123456') };
 }
 function generatedUpload() { return { video: new Blob([new Uint8Array(1024)], { type: 'video/mp4' }),
@@ -64,6 +64,69 @@ describe('public configuration and browser sessions', () => {
     expect(tab.values.get('session')).toBe('tab-only'); expect(remembered.values.size).toBe(0);
     browserSessionStorage(true).setItem('session', 'remembered'); expect(remembered.values.get('session')).toBe('remembered');
   });
+  it('retains an ephemeral session when browser reads work but quota rejects writes', () => {
+    const tab = memoryStorage();
+    vi.stubGlobal('sessionStorage', { ...tab, setItem() { throw new DOMException('Quota exceeded', 'QuotaExceededError'); } });
+    const storage = browserSessionStorage();
+    storage.setItem('session', 'memory-only');
+    expect(storage.getItem('session')).toBe('memory-only');
+    expect(tab.values.size).toBe(0);
+    storage.removeItem('session');
+    expect(storage.getItem('session')).toBeNull();
+  });
+  it('keeps memory fallback authoritative if blocked browser storage becomes readable again', () => {
+    const tab = memoryStorage(); let blocked = true;
+    vi.stubGlobal('sessionStorage', { ...tab,
+      getItem(key: string) { if (blocked) throw new DOMException('Blocked', 'SecurityError'); return tab.getItem(key); },
+      setItem(key: string, value: string) { if (blocked) throw new DOMException('Blocked', 'SecurityError'); return tab.setItem(key, value); },
+    });
+    const storage = browserSessionStorage();
+    expect(storage.getItem('session')).toBeNull();
+    storage.setItem('session', 'memory-only'); blocked = false;
+    expect(storage.getItem('session')).toBe('memory-only');
+  });
+  it('does not silently report sign-out complete if a known saved session cannot be removed', () => {
+    const tab = memoryStorage(); tab.setItem('session', 'old-saved-session');
+    vi.stubGlobal('sessionStorage', { ...tab,
+      setItem() { throw new DOMException('Quota exceeded', 'QuotaExceededError'); },
+      removeItem() { throw new DOMException('Blocked', 'SecurityError'); },
+    });
+    const storage = browserSessionStorage();
+    expect(storage.getItem('session')).toBe('old-saved-session');
+    storage.setItem('session', 'refreshed-memory-session');
+    expect(() => storage.removeItem('session')).toThrow('could not remove your saved sign-in');
+  });
+  it('can clear a memory-only sign-in when all browser storage is blocked', () => {
+    vi.stubGlobal('sessionStorage', {
+      getItem() { throw new DOMException('Blocked', 'SecurityError'); },
+      setItem() { throw new DOMException('Blocked', 'SecurityError'); },
+      removeItem() { throw new DOMException('Blocked', 'SecurityError'); },
+    });
+    const storage = browserSessionStorage();
+    expect(storage.getItem('session')).toBeNull(); storage.setItem('session', 'memory-only');
+    expect(() => storage.removeItem('session')).not.toThrow(); expect(storage.getItem('session')).toBeNull();
+  });
+  it('explains inaccessible persistent storage instead of silently forgetting the Remember choice', () => {
+    vi.stubGlobal('localStorage', {
+      getItem() { throw new DOMException('Blocked', 'SecurityError'); },
+      setItem() { throw new DOMException('Blocked', 'SecurityError'); },
+      removeItem() { throw new DOMException('Blocked', 'SecurityError'); },
+    });
+    const storage = browserSessionStorage(true);
+    expect(() => storage.getItem('session')).toThrow('Turn off Remember');
+    expect(() => storage.setItem('session', 'not-saved')).toThrow('Turn off Remember');
+    expect(() => storage.removeItem('session')).toThrow('could not remove your saved sign-in');
+  });
+  it('surfaces blocked Remember storage through the SDK without sending an auth request', async () => {
+    vi.stubGlobal('localStorage', {
+      getItem() { throw new DOMException('Blocked', 'SecurityError'); },
+      setItem() { throw new DOMException('Blocked', 'SecurityError'); },
+      removeItem() { throw new DOMException('Blocked', 'SecurityError'); },
+    });
+    const f = fixture(browserSessionStorage(true));
+    await expect(f.api.restoreSession()).rejects.toMatchObject({ code: 'session_storage', message: expect.stringContaining('Turn off Remember') });
+    expect(f.requests).toHaveLength(0); expect(f.api.user).toBeNull();
+  });
   it('does not start a hosted request on construction and exposes no session tokens', async () => {
     const f = fixture(); await f.api.restoreSession();
     expect(f.requests).toHaveLength(0); expect(f.api.user).toBeNull(); expect('session' in f.api).toBe(false);
@@ -79,12 +142,59 @@ describe('public configuration and browser sessions', () => {
     expect(f.requests[1].path).toBe('/auth/v1/user'); expect(f.api.user).toEqual({ id: owner, email: 'player@example.com' });
     expect(JSON.stringify(f.api.user)).not.toContain('secret'); expect(f.storage.values.size).toBeGreaterThan(0);
   });
+  it('can verify, use and sign out of a memory-only phone session when browser writes fail', async () => {
+    const tab = memoryStorage();
+    vi.stubGlobal('sessionStorage', { ...tab, setItem() { throw new DOMException('Quota exceeded', 'QuotaExceededError'); } });
+    const f = fixture(browserSessionStorage()); await f.signIn();
+    expect(f.api.user?.id).toBe(owner); expect(tab.values.size).toBe(0);
+    f.reply = () => json([]); expect((await f.api.getFeed()).items).toEqual([]);
+    expect(f.requests.at(-1)?.headers.get('Authorization')).toBe('Bearer access-secret');
+    f.reply = () => json({}); await f.api.signOut();
+    expect(f.api.user).toBeNull(); expect(tab.values.size).toBe(0);
+  });
   it('restores only after server verification and does not share a desktop credential', async () => {
     const f = fixture(); await f.signIn(); f.api.dispose();
     const api = new CommunityApi(config, { storage: f.storage, fetch: async input => {
       expect(String(input)).toBe(`${config.projectUrl}/auth/v1/user`); return json(user);
     } }); instances.push(api);
     expect(api.user).toBeNull(); expect((await api.restoreSession())?.id).toBe(owner);
+  });
+  it('refreshes an expired saved phone session before verifying and exposing its user', async () => {
+    const f = fixture(); await f.signIn(); f.api.dispose();
+    const key = [...f.storage.values.keys()].find(key => key.endsWith('-auth'))!;
+    const saved = JSON.parse(f.storage.values.get(key)!); saved.expires_at = Math.floor(Date.now() / 1000) - 60;
+    f.storage.setItem(key, JSON.stringify(saved));
+    const paths: string[] = [];
+    const api = new CommunityApi(config, { storage: f.storage, fetch: async (input, init) => {
+      const url = new URL(String(input)); paths.push(url.pathname);
+      if (url.pathname === '/auth/v1/token') {
+        expect(url.searchParams.get('grant_type')).toBe('refresh_token');
+        expect(JSON.parse(String(init?.body))).toEqual({ refresh_token: 'refresh-secret' });
+        return json(session());
+      }
+      if (url.pathname === '/auth/v1/user') return json(user);
+      throw new Error('Unexpected fake auth request');
+    } }); instances.push(api);
+    expect(api.user).toBeNull(); expect((await api.restoreSession())?.id).toBe(owner);
+    expect(paths).toEqual(['/auth/v1/token', '/auth/v1/user']);
+  });
+  it('preserves a saved session through a temporary offline restore and can retry without another email', async () => {
+    const f = fixture(); await f.signIn(); f.api.dispose(); let offline = true;
+    const api = new CommunityApi(config, { storage: f.storage, fetch: async () => {
+      if (offline) throw new TypeError('Offline, including sensitive URL details'); return json(user);
+    } }); instances.push(api);
+    await expect(api.restoreSession()).rejects.toMatchObject({ code: 'offline' });
+    expect(api.user).toBeNull(); expect(f.storage.values.size).toBeGreaterThan(0);
+    offline = false; expect((await api.restoreSession())?.id).toBe(owner);
+  });
+  it('recognizes a server-expired session by its Auth error code even with HTTP 400', async () => {
+    const f = fixture(); await f.signIn(); f.api.dispose();
+    const api = new CommunityApi(config, { storage: f.storage, fetch: async () => {
+      const response = json({ code: 'session_expired', message: 'Private details' }, 400);
+      response.headers.set('x-supabase-api-version', '2024-01-01'); return response;
+    } }); instances.push(api);
+    expect(await api.restoreSession()).toBeNull();
+    expect(api.user).toBeNull(); expect(f.storage.values.size).toBe(0);
   });
   it('clears local identity and storage even when remote sign-out is offline', async () => {
     const f = fixture(); await f.signIn(); f.reply = () => { throw new TypeError('private secret host'); };

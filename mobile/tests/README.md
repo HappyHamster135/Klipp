@@ -7,6 +7,7 @@ Copy the synthetic test file before running the browser suite (from the reposito
 ```powershell
 New-Item -ItemType Directory -Force mobile/.qa | Out-Null
 Copy-Item artifacts/community-media-qa/generated-game-and-microphone.mp4 mobile/.qa/test-video.mp4
+Set-Content -LiteralPath mobile/.qa/unreadable.mp4 -Value 'Synthetic invalid MP4 for local recovery QA.'
 & "$env:LOCALAPPDATA/Klipp/bin/ffmpeg.exe" -hide_banner -loglevel error -y -i mobile/.qa/test-video.mp4 -map 0:v:0 -map 0:a:0 -t 3 -c:v libvpx-vp9 -deadline realtime -cpu-used 8 -threads 2 -b:v 400k -c:a libopus -b:a 64k mobile/.qa/test-video-opus.webm
 ```
 

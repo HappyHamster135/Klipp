@@ -46,6 +46,21 @@ To install on iPhone, open the site in Safari, use its Share menu, choose **Add 
 
 Installation is separate from clip encoding support. Preparing uploads requires a secure context, workers, and browser WebCodecs support for decoding the chosen video and encoding H.264. Capability checks report unsupported formats rather than sending the original large file to a server for conversion. Use a recent Safari/Chrome version and try an H.264 MP4 when a phone cannot read its original video. Exact codec support depends on the browser and device. [Mediabunny’s codec support](https://mediabunny.dev/guide/supported-formats-and-codecs).
 
+Browser Back and Forward follow the Media, clip, Upload and Profile screens. Returning from a clip keeps the selected feed tab; leaving an unfinished upload asks before discarding its section and details. Upload preparation and transfer keep their screen active until completion or cancellation. This does not prevent the phone from closing or suspending the app.
+
+If a playback link expires or the connection interrupts a clip, **Retry playback** keeps its position, paused/playing state and audio choices. Fullscreen uses the browser's available video mode, with inline playback still available when fullscreen is denied. Returning from Mail recalculates the resend wait using elapsed time. Trim fields support fractional seconds without submitting the form while a value is being edited.
+
+### Physical-phone check
+
+Run these checks separately on an iPhone and an Android phone; browser emulation does not establish a device result:
+
+1. Record the phone model, OS version and browser/version. Sign in, switch to Mail for the code, then return and verify the account.
+2. Choose a 5–10 second video you are happy to share with signed-in beta members. Trim a section, preview it, try **Include audio**, review the title and upload.
+3. Watch the shared clip with sound, seek, rotate the phone, enter/leave fullscreen, then use Back to return to the clips. Confirm the selected feed tab remains correct.
+4. Background and reopen the app. Check playback pauses appropriately and sign-in behavior matches the optional **Remember me on this device** choice. Sign out when finished on a shared device.
+
+Record pass/failure and the failing step for each device/browser. No email code, token, signed playback link or private recording is needed in a test report. The [QA ledger](design/IMPLEMENTATION.md) records the user-reported Z Flip/Chrome sign-in and viewing result; phone uploads, iPhone behavior and installation remain unverified.
+
 ## What happens to a selected video
 
 The user chooses an existing MP4, MOV, or WebM file, previews it, and sets the start and end of a section up to 60 seconds long. The original file is read locally and remains unchanged. The initial mobile audio control includes or excludes the source’s primary audio track; separate desktop microphone/game/Discord/music track selection is not part of this first mobile flow.

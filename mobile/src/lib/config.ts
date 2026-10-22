@@ -31,14 +31,26 @@ function isPublicKey(key: string): boolean {
 /** A tab session is the default. Durable browser storage is selected only by explicit opt-in. */
 export function browserSessionStorage(rememberDevice = false): StorageLike {
   const memory = new Map<string, string>();
+  const knownSaved = new Set<string>();
   let memoryOnly = false;
+  const browserStorage = () => rememberDevice ? globalThis.localStorage : globalThis.sessionStorage;
   return {
     getItem(key) {
-      try { return (rememberDevice ? globalThis.localStorage : globalThis.sessionStorage).getItem(key); }
-      catch { memoryOnly = true; return memory.get(key) ?? null; }
+      if (memoryOnly) return memory.get(key) ?? null;
+      try {
+        const value = browserStorage().getItem(key);
+        if (value !== null) knownSaved.add(key);
+        return value;
+      } catch {
+        if (rememberDevice) throw new CommunityError('session_storage', 'This browser could not read your saved sign-in. Turn off Remember this device and try again.');
+        memoryOnly = true; return memory.get(key) ?? null;
+      }
     },
     setItem(key, value) {
-      try { (rememberDevice ? globalThis.localStorage : globalThis.sessionStorage).setItem(key, value); memoryOnly = false; }
+      // Some phone browsers allow reads while quota or privacy policies reject
+      // writes. Once that happens, keep this tab's memory session authoritative.
+      if (memoryOnly) { memory.set(key, value); return; }
+      try { browserStorage().setItem(key, value); knownSaved.add(key); }
       catch {
         if (rememberDevice) throw new CommunityError('session_storage', 'This browser could not remember your sign-in. Turn off Remember this device and try again.');
         memoryOnly = true; memory.set(key, value);
@@ -46,9 +58,10 @@ export function browserSessionStorage(rememberDevice = false): StorageLike {
     },
     removeItem(key) {
       memory.delete(key);
-      try { (rememberDevice ? globalThis.localStorage : globalThis.sessionStorage).removeItem(key); }
+      try { browserStorage().removeItem(key); knownSaved.delete(key); }
       catch {
-        if (!memoryOnly) throw new CommunityError('session_storage', 'This browser could not remove your saved sign-in. Please try signing out again.');
+        if (rememberDevice || !memoryOnly || knownSaved.has(key))
+          throw new CommunityError('session_storage', 'This browser could not remove your saved sign-in. Please try signing out again.');
       }
     },
   };

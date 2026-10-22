@@ -12,7 +12,7 @@ self.onmessage = async ({data}: MessageEvent<{file:File;action:string;options:Sh
   try {
     if (data.file.size === 0 || data.file.size > 512 * 1024 * 1024) throw new Error('Choose a video smaller than 512 MB. You can select up to 60 seconds to share.');
     input = new Input({source:new BlobSource(data.file), formats:ALL_FORMATS});
-    const videoTrack = await input.getPrimaryVideoTrack();
+    const videoTrack = await input.getPrimaryVideoTrack().catch(()=>{throw new Error('This video could not be read. Choose an H.264 MP4, MOV or WebM file and try again.');});
     if (!videoTrack) throw new Error('This file has no readable video. Choose an MP4, MOV or WebM clip.');
     const [duration,width,height,audioTrack] = await Promise.all([input.computeDuration(),videoTrack.getDisplayWidth(),videoTrack.getDisplayHeight(),input.getPrimaryAudioTrack()]);
     if (!Number.isFinite(duration) || duration <= 0) throw new Error('The video duration could not be read.');
