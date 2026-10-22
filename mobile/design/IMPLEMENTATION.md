@@ -62,6 +62,12 @@ The new regressions are `feed-navigation.pw.ts` (12 cases), `playback-polish.pw.
 
 The final local bundle is `index-BB-jx94C.js` (508.56 kB / 146.31 kB gzip) with `index-BWu4FYOX.css`; the existing 500 kB Vite advisory remains. No dependencies or paid services were added. Thirteen retained license hashes match. Production scans found no upload RPC, preparation/encoding worker or QA hooks. Strict UTF-8 and whitespace checks passed for the changed mobile files. PC upload restrictions and backend configuration are unchanged.
 
+Deployment of this follow-up is **pending**, not yet verified live. Source commit `2c2b5be4c65b9dcfb4d9c6af23ff0f87037db201` was pushed and the existing manual Pages workflow was dispatched with `deploy=true` on `main`. At **2026-10-22 16:39:04 UTC**, [run 39814902354](https://github.com/HappyHamster135/Klipp/actions/runs/39814902354) and its build/deploy jobs were still queued with no runner assigned; the deployment approval list was empty. The run remains queued, with no cancellation, redispatch, hosting change or workaround.
+
+The [official GitHub component status](https://www.githubstatus.com/api/v2/components.json) reported Actions as `degraded_performance` and Pages as `operational`. The [unresolved-incident response](https://www.githubstatus.com/api/v2/incidents/unresolved.json), updated at 16:35:07 UTC, included Actions in its investigating incident. The degradation may explain the queue; it is not a run-specific diagnosis. Local passing checks do not establish that this new build has reached the public beta.
+
+The frozen local SHA-256 hashes are `4457411effe3c0464333e9c8970911d4cb33a5ffe8ee2cdaf0cb189cdc37c281` for `index-BB-jx94C.js` and `2d2f5908749d64d27b2ed0ab5c76fc6deb764f39a25de1bd2bb2a8eae9f32ee8` for `index-BWu4FYOX.css`. Scanning those exact files found no upload reservation/publication RPC, encoder/preparation worker or QA hooks; all thirteen license hashes match. The new commit's ten-file served-hash comparison and fresh signed-out phone smoke check have **not** run because deployment has not succeeded. Earlier published-site evidence above belongs to the prior source commit, not this follow-up.
+
 ## Distribution
 
 The [manual workflow](../../.github/workflows/mobile-pages.yml) builds a review ZIP unless Pages deployment is explicitly selected. It uses the existing free hosting/services and does not enable hosting, change DNS or modify Windows releases. Native wrappers and app-store distribution are separate decisions.
