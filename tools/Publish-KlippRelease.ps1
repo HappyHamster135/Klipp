@@ -158,6 +158,15 @@ $requiredFiles = @(
 foreach ($requiredFile in $requiredFiles) {
     if (!(Test-Path -LiteralPath (Join-Path $packageDirectory $requiredFile))) { throw "Release is missing $requiredFile." }
 }
+# Native DLLs are built separately; reject stale or concurrently replaced output
+# before requesting signatures or packaging a mixed-version release.
+foreach ($ownedBinary in @('Klipp.Desktop.exe', 'Klipp.Desktop.dll', 'Klipp.Core.dll', 'Klipp.Capture.dll',
+    'Klipp.Encoding.dll', 'Klipp.Storage.dll', 'Klipp.AudioEffects.dll', 'Klipp.GameHook.dll')) {
+    $binaryMetadata = [Diagnostics.FileVersionInfo]::GetVersionInfo((Join-Path $packageDirectory $ownedBinary))
+    if ($binaryMetadata.ProductName -ne 'Klipp' -or $binaryMetadata.ProductVersion -ne $Version) {
+        throw "Release metadata does not match Klipp $Version in $ownedBinary. Stop other builds and rebuild before signing."
+    }
+}
 $unexpected = @(Get-ChildItem -LiteralPath $packageDirectory -File -Recurse | Where-Object {
     $_.Name -match 'Harness|\.(pfx|p12|key|pem|mp4|wav|raw)$' -or
     $_.Name -in @('settings.json', 'playback-positions.json', 'crash.log', 'InstallKlippDevSigningCertificate.ps1')
