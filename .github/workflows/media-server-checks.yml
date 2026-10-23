@@ -37,11 +37,29 @@ jobs:
         uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
         with:
           dotnet-version: '10.0.301'
-      - name: Install distro media tools
+      - name: Ensure distro media tools are available
+        id: media-tools
+        timeout-minutes: 4
         run: |
-          sudo apt-get update
-          sudo apt-get install --yes --no-install-recommends ffmpeg
+          set -euo pipefail
+          if ! command -v ffmpeg >/dev/null 2>&1 || ! command -v ffprobe >/dev/null 2>&1; then
+            # Bound repository stalls without changing package or TLS verification.
+            apt_options=(
+              -o Acquire::ForceIPv4=true
+              -o Acquire::Retries=1
+              -o Acquire::http::Timeout=15
+              -o Acquire::https::Timeout=15
+              -o DPkg::Lock::Timeout=20
+            )
+            sudo timeout --kill-after=15s 90s apt-get "${apt_options[@]}" update
+            sudo timeout --kill-after=15s 120s apt-get "${apt_options[@]}" install --yes --no-install-recommends ffmpeg
+          fi
+          printf 'ffmpeg=%s\n' "$(command -v ffmpeg)" >> "$GITHUB_OUTPUT"
+          printf 'ffprobe=%s\n' "$(command -v ffprobe)" >> "$GITHUB_OUTPUT"
       - name: Run media authentication, upload, playback and storage checks
+        env:
+          FFPROBE_PATH: ${{ steps.media-tools.outputs.ffprobe }}
+          FFMPEG_PATH: ${{ steps.media-tools.outputs.ffmpeg }}
         run: >-
           dotnet run --project backend/Klipp.MediaServer.Tests/Klipp.MediaServer.Tests.csproj
-          --configuration Release -- /usr/bin/ffprobe /usr/bin/ffmpeg
+          --configuration Release -- "$FFPROBE_PATH" "$FFMPEG_PATH"
