@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.0.11 — 2026-10-23
+
+- Add optional accounts, profiles and a private Media feed with clips, likes, comments, reports and blocking. Recording and editing remain available without an account.
+- Share selected clips from the Windows Library, with audio review and a prepared copy that preserves the original. Uploads remain PC-only.
+- Add Storage & usage with upload capacity warnings, private help requests, moderator review and account deletion that safely retries interrupted cleanup.
+- Host new clip files on the private HTTPS media server, with bounded uploads, smooth range playback and verified encrypted backups.
+- Include the public community configuration in installer and automatic-update packages. Keep automatic updates enabled and signing disabled.
+
 ## 1.0.10 — 2026-10-22
 
 - See what's new in the update popup before restarting.

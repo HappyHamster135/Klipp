@@ -1,0 +1,67 @@
+<UserControl
+    x:Class="Klipp.Desktop.Controls.CommunityUploadReview"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    Loaded="OnReviewLoaded" Unloaded="OnReviewUnloaded">
+    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+        <StackPanel Spacing="18">
+            <TextBlock Text="Choose exactly what to share. Only this section and the audio you select will be uploaded." Style="{StaticResource KlippBodyTextSecondary}" TextWrapping="Wrap" />
+            <Grid x:Name="ReviewGrid" ColumnSpacing="24" RowSpacing="20" SizeChanged="OnReviewSizeChanged">
+                <Grid.ColumnDefinitions><ColumnDefinition x:Name="PreviewColumn" Width="*" /><ColumnDefinition x:Name="DetailsColumn" Width="320" /></Grid.ColumnDefinitions>
+                <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
+                <StackPanel x:Name="PreviewPanel" Spacing="12">
+                    <StackPanel Spacing="5">
+                        <TextBlock x:Name="FileNameText" FontWeight="SemiBold" FontSize="14" TextTrimming="CharacterEllipsis" />
+                        <TextBlock x:Name="SourceSummaryText" Style="{StaticResource KlippCaption}" TextWrapping="Wrap" />
+                    </StackPanel>
+                    <Border Background="{StaticResource KlippBackgroundBrush}" BorderBrush="{StaticResource KlippBorderSubtleBrush}" BorderThickness="1" CornerRadius="6">
+                        <Grid x:Name="PreviewFrame" Height="290">
+                            <FontIcon x:Name="PreviewPlaceholder" Glyph="&#xE714;" FontSize="32" Foreground="{StaticResource KlippTextMutedBrush}" />
+                            <MediaPlayerElement x:Name="VideoPreview" AutoPlay="False" AreTransportControlsEnabled="False" Stretch="Uniform" IsHitTestVisible="False" />
+                        </Grid>
+                    </Border>
+                    <Grid ColumnSpacing="8">
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                        <Button x:Name="PlayPreviewButton" Content="Play section" Click="OnPlayPreviewClicked" Height="32" IsEnabled="False" AutomationProperties.Name="Play the selected section" />
+                        <Button x:Name="ReplayPreviewButton" Grid.Column="1" Content="Replay" Click="OnReplayPreviewClicked" Height="32" IsEnabled="False" AutomationProperties.Name="Replay the selected section from the beginning" />
+                        <TextBlock x:Name="PreviewStateText" Grid.Column="2" Text="Loading preview…" Style="{StaticResource KlippCaption}" TextWrapping="Wrap" VerticalAlignment="Center" HorizontalAlignment="Right" Margin="8,0,0,0" />
+                    </Grid>
+                    <Border Background="{StaticResource KlippSurfaceBrush}" BorderBrush="{StaticResource KlippBorderSubtleBrush}" BorderThickness="1" CornerRadius="6" Padding="14">
+                        <StackPanel Spacing="10">
+                            <Grid ColumnSpacing="8"><Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                <TextBlock Text="Section to upload" FontWeight="SemiBold" FontSize="13" />
+                                <TextBlock x:Name="SectionSummaryText" Grid.Column="1" Style="{StaticResource KlippCaption}" />
+                            </Grid>
+                            <Slider x:Name="SectionStartSlider" Header="Section starts at" Minimum="0" StepFrequency="0.1" ValueChanged="OnSectionSliderChanged" AutomationProperties.Name="Move the start of the section within the source video" />
+                            <Grid ColumnSpacing="12"><Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                                <NumberBox x:Name="StartInput" Header="Start · seconds" Minimum="0" SmallChange="0.1" LargeChange="10" SpinButtonPlacementMode="Inline" ValueChanged="OnSectionInputChanged" AutomationProperties.Name="Section start in seconds" />
+                                <NumberBox x:Name="LengthInput" Grid.Column="1" Header="Length · seconds" Minimum="0.1" Maximum="60" SmallChange="0.1" LargeChange="10" SpinButtonPlacementMode="Inline" ValueChanged="OnSectionInputChanged" AutomationProperties.Name="Section length in seconds, up to sixty seconds" />
+                            </Grid>
+                            <TextBlock Text="Drag the start marker or enter precise times. The preview plays only this section." Style="{StaticResource KlippCaption}" TextWrapping="Wrap" />
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+                <StackPanel x:Name="DetailsPanel" Grid.Column="1" Spacing="14">
+                    <TextBox x:Name="TitleInput" Header="Title" MaxLength="120" TextChanged="OnTitleChanged" AutomationProperties.Name="Shared clip title" />
+                    <TextBox x:Name="DescriptionInput" Header="Description (optional)" MaxLength="500" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="80" MaxHeight="130" AutomationProperties.Name="Shared clip description" />
+                    <StackPanel Spacing="6">
+                        <TextBlock Text="Audio in the upload" FontWeight="SemiBold" FontSize="13" />
+                        <StackPanel x:Name="AudioChoicesPanel" Spacing="0" />
+                        <TextBlock x:Name="AudioSummaryText" Style="{StaticResource KlippCaption}" TextWrapping="Wrap" />
+                    </StackPanel>
+                    <ComboBox x:Name="PreviewAudioChoice" Header="Listen to a selected track" HorizontalAlignment="Stretch" SelectionChanged="OnPreviewAudioChanged" AutomationProperties.Name="Audio track to listen to in the preview" />
+                    <TextBlock x:Name="PreviewAudioHelpText" Style="{StaticResource KlippCaption}" TextWrapping="Wrap" />
+                    <Border Background="{StaticResource KlippSurfaceBrush}" BorderBrush="{StaticResource KlippBorderSubtleBrush}" BorderThickness="1" CornerRadius="6" Padding="12">
+                        <StackPanel Spacing="6">
+                            <TextBlock Text="Your share copy" FontWeight="SemiBold" FontSize="13" />
+                            <TextBlock Text="Up to 720p · MP4 · 60 seconds" Style="{StaticResource KlippBodyTextSecondary}" TextWrapping="Wrap" />
+                            <TextBlock Text="Prepared on this device · up to 16 MB" Style="{StaticResource KlippCaption}" TextWrapping="Wrap" />
+                            <TextBlock Text="Your original recording stays unchanged on this device. Signed-in Klipp members can watch the shared copy." Style="{StaticResource KlippCaption}" TextWrapping="Wrap" />
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </Grid>
+            <TextBlock x:Name="ValidationText" Style="{StaticResource KlippCaption}" TextWrapping="Wrap" AutomationProperties.LiveSetting="Polite" />
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

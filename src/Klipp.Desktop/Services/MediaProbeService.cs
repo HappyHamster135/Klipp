@@ -58,6 +58,8 @@ public sealed class MediaProbeService
             using var process = Process.Start(psi);
             if (process is null) return null;
 
+            using var cancellation = cancellationToken.Register(() => FFmpegProgressReader.Terminate(process));
+
             try { process.PriorityClass = ProcessPriorityClass.BelowNormal; } catch { }
 
             var output = await process.StandardOutput.ReadToEndAsync(cancellationToken).ConfigureAwait(false);
@@ -108,6 +110,8 @@ public sealed class MediaProbeService
             using var process = Process.Start(psi);
             if (process is null)
                 return null;
+
+            using var cancellation = cancellationToken.Register(() => FFmpegProgressReader.Terminate(process));
 
             try { process.PriorityClass = ProcessPriorityClass.BelowNormal; } catch { }
             var outputTask = process.StandardOutput.ReadToEndAsync(cancellationToken);

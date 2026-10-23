@@ -1,11 +1,13 @@
 export interface CommunityConfig { projectUrl: string; publishableKey: string; mediaApiUrl?: string; operationsEnabled?: boolean }
 export interface CommunityUser { id: string; email: string }
+export interface CommunityOperationsCapabilities { version: 1; enabled: boolean; operator: boolean; accountDeletion: boolean }
 export interface CommunityProfile { id: string; username: string | null; displayName: string; bio: string }
 export interface CommunityClip {
   id: string; ownerId: string; username: string; displayName: string; title: string; description: string;
   durationSeconds: number; byteSize: number; createdAt: string; likeCount: number; commentCount: number;
   likedByMe: boolean; status: 'uploading' | 'published' | 'deleting';
   storageProvider?: 'supabase' | 'home';
+  moderationHidden?: boolean;
 }
 export interface CommunityComment {
   id: string; clipId: string; ownerId: string; username: string; displayName: string; body: string; createdAt: string;
@@ -29,7 +31,7 @@ export interface ProviderUsageMetric {
 export type ProviderUsageKey = 'cachedEgress' | 'uncachedEgress' | 'monthlyActiveUsers' | 'emailDaily' | 'emailMonthly';
 export interface CommunityUsage {
   me: { slotsUsed: number; slotsLimit: number; published: number; uploading: number; deleting: number; storedBytes: number };
-  beta: { slotsUsed: number; slotsLimit: number; reservedBytes: number; storageBytes: number; storageLimitBytes: number; unknownStorageObjects: number };
+  beta: { slotsUsed: number; slotsLimit: number; reservedBytes: number; storageBytes: number; storageLimitBytes: number; unknownStorageObjects: number; homeBytes?: number; legacyBytes?: number };
   limits: { maxVideoBytes: number; maxDurationSeconds: number; warningPercent: number };
   operator: boolean; checkedAt: string;
   operations: null | {

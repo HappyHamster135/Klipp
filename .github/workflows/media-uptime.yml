@@ -1,0 +1,42 @@
+name: Media HTTPS availability
+
+on:
+  schedule:
+    # Offset from the busy start of the hour. Best effort, not an uptime SLA.
+    - cron: '7,22,37,52 * * * *'
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'tools/hosting-monitor/**'
+      - '.github/workflows/media-uptime.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'tools/hosting-monitor/**'
+      - '.github/workflows/media-uptime.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: media-uptime-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    # Never consume private-repository minutes or probe from somebody else's fork.
+    if: github.repository == 'HappyHamster135/Klipp' && github.event.repository.private == false
+    runs-on: ubuntu-24.04
+    timeout-minutes: 4
+    env:
+      PYTHONDONTWRITEBYTECODE: '1'
+    steps:
+      - name: Check out without persisting credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Check monitor failure and privacy boundaries
+        run: python3 -m unittest discover --start-directory tools/hosting-monitor --pattern 'test_*.py' --verbose
+      - name: Check public HTTPS, readiness and anonymous media denial
+        if: github.event_name != 'pull_request'
+        run: python3 tools/hosting-monitor/check_media.py --attempts 3

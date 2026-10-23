@@ -17,9 +17,13 @@ public sealed class BackupGate(MediaOptions options, TimeProvider time) : IBacku
             using var json = JsonDocument.Parse(file, new JsonDocumentOptions { MaxDepth = 4 });
             var successful = json.RootElement.GetProperty("successful_at").GetDateTimeOffset();
             var verified = json.RootElement.GetProperty("verified_restore_at").GetDateTimeOffset();
+            var databaseSuccessful = json.RootElement.GetProperty("database_successful_at").GetDateTimeOffset();
+            var databaseVerified = json.RootElement.GetProperty("database_verified_restore_at").GetDateTimeOffset();
             var now = time.GetUtcNow();
             if (successful > now.AddMinutes(5) || successful < now.AddHours(-48)
-                || verified > now.AddMinutes(5))
+                || databaseSuccessful > now.AddMinutes(5) || databaseSuccessful < now.AddHours(-48)
+                || verified > now.AddMinutes(5) || verified < now.AddDays(-8)
+                || databaseVerified > now.AddMinutes(5) || databaseVerified < now.AddDays(-8))
                 throw new MediaException(503, "backup_required", "Uploads are paused until the latest backup has been verified.");
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException or KeyNotFoundException or FormatException or InvalidOperationException)

@@ -9,6 +9,9 @@ mobile/.env*.local
 mobile/playwright-report/
 mobile/test-results/
 mobile/.qa/
+backend/supabase/.temp/
+__pycache__/
+*.pyc
 *.tsbuildinfo
 [Bb]in/
 [Oo]bj/

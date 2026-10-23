@@ -75,6 +75,7 @@
     <Content Include="Resources\WebPlayer\player.html">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
+    <Content Include="..\..\backend\community.json" Link="community.json" Condition="Exists('..\..\backend\community.json')" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
   <ItemGroup Condition="'$(Platform)' == 'x64' or '$(Platform)' == 'ARM64'">
     <AudioEffectsSource Include="..\Klipp.AudioEffects\AudioEffects.cpp;..\Klipp.AudioEffects\AudioEffects.def;..\Klipp.AudioEffects\build.ps1;..\Klipp.NativeVersion.ps1;..\Klipp.VersionInfo.rc;..\Directory.Build.props" />

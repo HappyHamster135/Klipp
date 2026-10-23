@@ -30,7 +30,7 @@ public static class MediaEndpoints
     }
 
     private static async Task<IResult> UploadAsync(Guid id, string asset, HttpContext context, ICommunityGateway gateway,
-        PrivateMediaStore store, IMediaValidator validator, IBackupGate backup)
+        PrivateMediaStore store, IMediaValidator validator, IBackupGate backup, TimeProvider time)
     {
         EnsureDesktop(context);
         backup.EnsureUploadsAllowed();
@@ -42,9 +42,10 @@ public static class MediaEndpoints
             throw new MediaException(411, "length_required", "The upload must include its file size.");
         using var timeout = Deadline(context);
         var identity = Identity(context);
-        await using var clipLock = await store.AcquireClipAsync(id, timeout.Token);
+        await using var clipLock = await store.AcquireClipAsync(identity.UserId, id, timeout.Token);
         var clip = await RequireOwnerAsync(gateway, identity, id, timeout.Token);
         if (clip.Status != "uploading") throw new MediaException(409, "upload_closed", "This clip can no longer be uploaded.");
+        RequireCurrentUpload(clip, time);
         if (asset == "video" && context.Request.ContentLength != clip.VideoBytes)
             throw new MediaException(400, "invalid_size", "The uploaded file does not match its reservation.");
         await store.StoreUploadAsync(identity.UserId, id, asset, context.Request.Body, context.Request.ContentLength.Value, validator, timeout.Token);
@@ -52,17 +53,18 @@ public static class MediaEndpoints
     }
 
     private static async Task<IResult> PublishAsync(Guid id, HttpContext context, ICommunityGateway gateway,
-        PrivateMediaStore store, IMediaValidator validator, IBackupGate backup)
+        PrivateMediaStore store, IMediaValidator validator, IBackupGate backup, TimeProvider time)
     {
         EnsureDesktop(context);
         backup.EnsureUploadsAllowed();
         using var timeout = Deadline(context);
         var identity = Identity(context);
-        await using var clipLock = await store.AcquireClipAsync(id, timeout.Token);
+        await using var clipLock = await store.AcquireClipAsync(identity.UserId, id, timeout.Token);
         await using var backupLock = await store.AcquireBackupReadLockAsync(timeout.Token);
         var clip = await RequireOwnerAsync(gateway, identity, id, timeout.Token);
         if (clip.Status == "published") return Results.Json(clip.Json);
         if (clip.Status != "uploading") throw MediaException.Unavailable();
+        RequireCurrentUpload(clip, time);
         store.Guard.Verify();
         var videoPath = store.AssetPath(clip.OwnerId, id, "video");
         var posterPath = store.AssetPath(clip.OwnerId, id, "poster");
@@ -91,7 +93,7 @@ public static class MediaEndpoints
         PrivateMediaStore store, MediaSigner signer, TimeProvider time)
     {
         var clip = await gateway.GetClipAsync(Identity(context), id, context.RequestAborted);
-        if (clip.Id != id || clip.Status != "published") throw MediaException.Unavailable();
+        if (clip.Id != id || clip.Status != "published" || clip.ModerationHidden) throw MediaException.Unavailable();
         // Confirm both local files exist before handing a player a signed capability.
         using (store.OpenAsset(clip.OwnerId, id, "video")) { }
         using (store.OpenAsset(clip.OwnerId, id, "poster")) { }
@@ -104,7 +106,7 @@ public static class MediaEndpoints
     {
         using var timeout = Deadline(context);
         var identity = Identity(context);
-        await using var clipLock = await store.AcquireClipAsync(id, timeout.Token);
+        await using var clipLock = await store.AcquireClipAsync(identity.UserId, id, timeout.Token);
         // Check the provider before marking anything for removal. The home API
         // must never change the lifecycle of a legacy Supabase Storage clip.
         try { await RequireOwnerAsync(gateway, identity, id, timeout.Token); }
@@ -122,12 +124,24 @@ public static class MediaEndpoints
         return Results.Json(new { id, deleted = true });
     }
 
-    private static IResult Asset(Guid owner, Guid id, string asset, HttpContext context, PrivateMediaStore store, MediaSigner signer)
+    private static async Task<IResult> Asset(Guid owner, Guid id, string asset, HttpContext context, PrivateMediaStore store, MediaSigner signer,
+        PlaybackGovernor playback, ICommunityGateway gateway)
     {
         if (context.Request.Query.Count != 2 || context.Request.Query["expires"].Count != 1 || context.Request.Query["signature"].Count != 1
             || !signer.Verify(owner, id, asset, context.Request.Query["expires"].ToString(), context.Request.Query["signature"].ToString()))
             throw new MediaException(403, "invalid_link", "This playback link has expired. Open the clip again.");
-        return Results.File(store.OpenAsset(owner, id, asset), asset == "video" ? "video/mp4" : "image/jpeg", enableRangeProcessing: true);
+        var stream = playback.Open(() => store.OpenAsset(owner, id, asset),
+            context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            asset == "video" && !HttpMethods.IsHead(context.Request.Method), context.RequestAborted, context.Abort);
+        try
+        {
+            // Reserve the bounded stream lease before the database request, so
+            // repeated valid links cannot create unlimited access checks. No
+            // file bytes are sent before current moderation/deletion is checked.
+            if (!await gateway.IsAssetAllowedAsync(id, owner, context.RequestAborted)) throw MediaException.Unavailable();
+            return Results.File(stream, asset == "video" ? "video/mp4" : "image/jpeg", enableRangeProcessing: true);
+        }
+        catch { await stream.DisposeAsync(); throw; }
     }
 
     private static async Task<GatewayClip> RequireOwnerAsync(ICommunityGateway gateway, MediaIdentity identity, Guid id, CancellationToken token)
@@ -144,6 +158,11 @@ public static class MediaEndpoints
     }
 
     private static MediaIdentity Identity(HttpContext context) => (MediaIdentity)context.Items["media.identity"]!;
+    private static void RequireCurrentUpload(GatewayClip clip, TimeProvider time)
+    {
+        if (clip.UploadExpiresAt is null || clip.UploadExpiresAt <= time.GetUtcNow())
+            throw new MediaException(410, "upload_expired", "This unfinished upload has expired. Start a new upload.");
+    }
     private static CancellationTokenSource Deadline(HttpContext context)
     {
         var timeout = CancellationTokenSource.CreateLinkedTokenSource(context.RequestAborted);

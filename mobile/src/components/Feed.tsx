@@ -2,7 +2,7 @@ import {useEffect,useRef,useState,type KeyboardEvent} from 'react';
 import {ArrowLeft,Play,RefreshCw,Trash2,Flag,UserRoundX} from 'lucide-react';
 import type {Api} from '../lib/service';
 import {messageFor,timeLabel} from '../lib/service';
-import type {CommunityClip,CommunityCursor} from '../lib/models';
+import {CommunityError,type CommunityClip,type CommunityCursor} from '../lib/models';
 import {Dialog,Empty,Notice} from './Primitives';
 import {Watch} from './Watch';
 import {ClipActions} from './ClipActions';
@@ -13,6 +13,7 @@ function Poster({api,clip,generation}:{api:Api;clip:CommunityClip;generation:str
   useEffect(()=>{
     const abort=new AbortController();let requested=false,visible=false,failed=false,pending=false,url='';
     setPreview({url:'',failed:false});
+    if(clip.moderationHidden)return()=>abort.abort();
     const load=async()=>{
       if(pending||abort.signal.aborted)return;
       pending=true;requested=true;failed=false;
@@ -31,10 +32,10 @@ function Poster({api,clip,generation}:{api:Api;clip:CommunityClip;generation:str
     if(ref.current)observer.observe(ref.current);
     window.addEventListener('online',online);
     return()=>{abort.abort();observer.disconnect();window.removeEventListener('online',online);};
-  },[api,clip.id,generation]);
+  },[api,clip.id,clip.moderationHidden,generation]);
   return <div ref={ref} className="poster">
     {preview.url?<img src={preview.url} alt="" loading="lazy" onError={event=>failure.current(event.currentTarget.getAttribute('src')??'')}/>:null}
-    <span className="play-circle"><Play fill="currentColor" size={24}/></span>
+    {clip.moderationHidden?<span className="poster-fallback">Hidden from Media</span>:<span className="play-circle"><Play fill="currentColor" size={24}/></span>}
     {preview.failed?<span className="poster-fallback">Preview unavailable</span>:null}
     <span className="duration">{timeLabel(clip.durationSeconds)}</span>
   </div>;
@@ -71,7 +72,7 @@ export function Feed({api,version,watchId,onWatchChange}:{api:Api;version:number
     if(selected?.id===watchId)return;
     const abort=new AbortController();
     setWatchLoad({api,id:watchId,error:''});
-    void api.getClip(watchId,abort.signal).then(clip=>{if(!abort.signal.aborted)setSelected(clip);})
+    void api.getClip(watchId,abort.signal).then(clip=>{if(clip.moderationHidden)throw new CommunityError('clip_unavailable','This clip is hidden from Media.');if(!abort.signal.aborted)setSelected(clip);})
       .catch(error=>{if(!abort.signal.aborted)setWatchLoad({api,id:watchId,error:messageFor(error)});});
     return()=>abort.abort();
   },[api,watchId,watchRetry]);
@@ -136,7 +137,7 @@ export function Feed({api,version,watchId,onWatchChange}:{api:Api;version:number
     }catch(error){if(current(scope))setNotice(messageFor(error));}
     finally{if(current(scope)){actionLock.current=false;setBusy(false);}}
   }
-  function select(clip:CommunityClip){if(clip.status!=='published')return;if(!watchId){browseScroll.current=window.scrollY;browseOpener.current=clickedControl.current;}setSelected(clip);onWatchChange(clip.id);window.scrollTo({top:0});}
+  function select(clip:CommunityClip){if(clip.status!=='published'||clip.moderationHidden)return;if(!watchId){browseScroll.current=window.scrollY;browseOpener.current=clickedControl.current;}setSelected(clip);onWatchChange(clip.id);window.scrollTo({top:0});}
   function switchTab(value:boolean){if(mine===value)return;setMine(value);setHistory([null]);setPage(0);}
   function openActions(clip:CommunityClip){setActionError('');setReason('');setAction({clip,type:'menu'});}
   function closeActions(){if(!dialogRequest.current){setAction(null);setReason('');setActionError('');}}
@@ -186,8 +187,9 @@ export function Feed({api,version,watchId,onWatchChange}:{api:Api;version:number
         {error?<div className="feed-error" role="alert"><div><h2>{loaded?'Could not refresh clips':'Could not load clips'}</h2><p>{error}{loaded&&items.length?' Your current clips are still shown.':''}</p></div><button onClick={()=>setRefresh(value=>value+1)}>Retry clips</button></div>:null}
         {!loading&&loaded&&!error&&!items.length?<Empty title={mine?'No uploads yet':'No clips shared yet'}><p>Upload clips from Klipp on your PC.</p></Empty>:null}
         <div className="feed-grid">{items.map(clip=><article className={watching?.id===clip.id?'clip-card selected':'clip-card'} key={clip.id} onClickCapture={event=>{const target=(event.target as Element).closest('button');if(target)clickedControl.current=target;}}>
-          <button className="poster-button" aria-label={`Watch ${clip.title}`} disabled={clip.status!=='published'} onClick={()=>select(clip)}><Poster api={api} clip={clip} generation={`${version}:${refresh}`}/></button>
-          <div className="clip-meta"><button className="clip-title" onClick={()=>select(clip)} disabled={clip.status!=='published'}>{clip.title}</button><p className="author">@{clip.username||clip.displayName}<time dateTime={clip.createdAt}>{new Date(clip.createdAt).toLocaleDateString(undefined,{month:'short',day:'numeric'})}</time></p>
+          <button className="poster-button" aria-label={`Watch ${clip.title}`} disabled={clip.status!=='published'||clip.moderationHidden} onClick={()=>select(clip)}><Poster api={api} clip={clip} generation={`${version}:${refresh}`}/></button>
+          <div className="clip-meta"><button className="clip-title" onClick={()=>select(clip)} disabled={clip.status!=='published'||clip.moderationHidden}>{clip.title}</button><p className="author">@{clip.username||clip.displayName}<time dateTime={clip.createdAt}>{new Date(clip.createdAt).toLocaleDateString(undefined,{month:'short',day:'numeric'})}</time></p>
+            {clip.moderationHidden?<p className="caption">Hidden by moderation. You can still delete your shared clip.</p>:null}
             {clip.status!=='published'?<p className="caption">{clip.status==='deleting'?'Deletion incomplete. Use Delete again to finish cleanup.':'Upload incomplete. Delete it to free this slot.'}</p>:null}
             <ClipActions clip={clip} onLike={()=>void like(clip)} onComments={()=>select(clip)} onMore={()=>openActions(clip)} busy={busy}/>
           </div>

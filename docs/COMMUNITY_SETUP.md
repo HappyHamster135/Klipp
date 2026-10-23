@@ -1,170 +1,103 @@
 # Optional accounts and Media
 
-The Windows Media workspace supports optional accounts, profiles and sharing clips with other members. Recording, editing, exporting and the local Library remain available without an account, an internet connection or a configured backend.
+Klipp’s Windows recorder, editor, export and local Library work without an account or an internet connection. Online Media requires a verified account. The mobile web app supports sign-in, watching, seeking and interactions on iPhone and Android; uploads stay in the installed Windows app.
 
-The online client supports email verification codes, saved sessions, profiles, a paged community feed, private clip storage, likes, comments, reports and reversible user blocking. Media requires a verified permanent account; a username is required to share and interact. Uploading is always an explicit action. Mobile clients, follows and a moderator interface are not included yet.
+## Service design — 23 October 2026
 
-## Deployment status — 22 October 2026
+The beta keeps **Supabase Free** for Auth, profiles, clip metadata, interactions and operations records. **Resend Free** delivers email codes. Newly shared videos/posters are stored on the operator’s own HTTPS media server at `https://media.shlipp.com`; two older beta clips remain in private Supabase Storage. GitHub Pages serves the mobile app, and GitHub releases serve Windows installers/update packages. No paid storage, video processing or tunnel service is enabled.
 
-The existing Supabase **Free** project **Shilpp** (`hxbblnuyfijoppjoglce`) is being used for this deployment. The accounts/profiles, Media and follow-up RPC-only policy migrations have been applied. The local publisher configuration at `backend/community.json` contains its public project URL and publishable key. The private `community-videos` and `community-posters` buckets have the size and MIME restrictions described below. The follow-up's six explicit deny policies also cleared the advisor's informational findings about Media tables having RLS enabled without policies.
+The home host passed trusted HTTPS, authenticated desktop uploads and full video/poster hash checks, HTTP/1.1 and HTTP/2 seeking, interaction/deletion and browser-upload rejection. iPhone and Android viewing were tested. These checks use generated temporary media rather than personal recordings. Public installer versions and the current deployment checkpoint belong in release notes; a local test installer is not a published release.
 
-The sending domain `accounts.shlipp.com` is verified in Resend. Receiving is disabled; this domain is being used to send login emails, not to host an inbox. The Resend account remains on **Free**, with paid overages disabled.
+Usage, private help, moderation and self-service account deletion are capability-gated additions. Deploy and verify the SQL, media API and deletion function before enabling them or shipping an enabled client. The exact sequence and restricted privileges are in [Online operations deployment](../backend/supabase/OPERATIONS.md). This guide does not imply an unverified feature flag is enabled.
 
-The approved **Sending access** API key is restricted to `accounts.shlipp.com`. Custom SMTP is enabled in Supabase using sender **Klipp** / `login@accounts.shlipp.com`, host `smtp.resend.com`, port `465` and username `resend`. These settings were confirmed after reloading the provider form; its saved password remains hidden. The key value is not stored in this repository or the desktop client.
+## Free-tier limits and costs
 
-Both **Confirm Sign Up** and **Magic Link / OTP** templates use the code-only Klipp HTML. Live emails were delivered with the subjects **Your Klipp confirmation code** and **Your Klipp sign-in code**. Their code-only bodies were verified without exposing the codes in chat, screenshots or logs.
+| Resource | Current plan/design |
+| --- | --- |
+| Accounts | Supabase Free: 50,000 monthly active users |
+| Database | Supabase Free: 500 MB; profiles, comments, reports and Auth also occupy space |
+| Legacy cloud files | Supabase Free: 1 GB Storage; new clip bytes use the home server |
+| Supabase delivery | Finite 5 GB uncached and 5 GB cached egress allowances; home video traffic does not remove Auth/API/legacy usage |
+| Login/owner-alert emails | Resend Free: 3,000/month, at most 100/day, shared by configured sending activity |
+| Upload beta | 40 reserved clips globally, 5 per account; video at most 60 seconds / 16 MiB, JPEG poster at most 256 KiB |
+| Clip reservation budget | Each slot reserves 16.25 MiB, at most 650 MiB total; this is an application budget, not measured SSD free space |
+| External checks | Standard GitHub Actions runners in this public repository; no paid runner, artifact or extra provider |
 
-The live account check used the actual desktop account service and Windows DPAPI session store: the pending signup was confirmed with its real code, the member profile was loaded and saved with the owner's chosen username, sign-out removed the saved credential, a fresh sign-in returned the same account, and a new service instance restored the protected session. Codes were transferred through a same-user-only named pipe and were never command-line arguments or plaintext files. No recipient address, code or token is recorded here.
+Provider allowances can change. Check [Supabase pricing](https://supabase.com/pricing), [Resend pricing](https://resend.com/pricing) and [GitHub Actions billing](https://docs.github.com/en/billing/concepts/product-billing/github-actions) before increasing the beta. Free Supabase projects may pause after inactivity. Keep paid upgrades, add-ons and overages disabled. A large Auth allowance does not mean unlimited login email, database space or video viewing. Home electricity, hardware, backups and internet service still have real costs.
 
-The Media-enabled local installer **1.0.11-local.2** was built and installed on this PC with signing disabled. Its owned binary versions, application/installer/update-package icons, asset checksums and public client configuration were verified; automatic updates remain enabled. It has not been published as a GitHub release. SMTP credentials belong only in provider settings, not in the desktop configuration or installer.
+The usage dashboard reports actual reservations and known logical media bytes. The operator can see database size, reports/requests and provider allowance observations. Unconnected or stale provider counters say **Not measured recently**, rather than showing a fabricated zero. Capacity warnings appear before application limits; the operator must still review provider dashboards before inviting more users. Partial files and unknown server files are not represented as measured SSD usage.
 
-The live Media harness uploaded a generated test clip through the actual account service, found it in the feed, downloaded its private video and poster through short-lived URLs, checked anonymous feed denial, and verified like/unlike and comment creation/removal. The installed build restored the saved account and passed feed/playback checks. Local preparation checks covered selected audio, output limits, cancellation and keeping the generated source unchanged. The test upload, both physical files and its metadata/interactions were removed afterward; original recording preferences were restored byte-for-byte. These checks used generated media, not a personal recording. See [the Media harness](../tools/Klipp.CommunityMediaHarness/README.md).
+## Public client configuration
 
-## Free-tier plan
+The Windows publisher configuration contains only public values:
 
-Use one Supabase **Free** project for Auth, profiles, Media metadata and private file storage. The published free allowance currently includes 50,000 monthly active users, a 500 MB database and 1 GB of file storage; inactive free projects can pause after a week. Storage requests, cached delivery and uncached egress also have finite allowances. These are service limits, not a promise of unlimited free operation. See [Supabase pricing](https://supabase.com/pricing).
-
-Email delivery needs separate attention: Supabase's default SMTP service sends only to organization team addresses and currently allows two messages per hour. In addition, new Free projects using the default SMTP service cannot customize Auth email templates from 3 June 2026. Klipp's code-only sign-in needs a template containing `{{ .Token }}`, so configure custom SMTP **before** editing its templates or testing the code flow, including internal tests on a new Free project. Existing projects that retained older templates are an exception; do not assume that exception applies to a new deployment. See [the Free template change](https://supabase.com/changelog/46599-changes-to-email-template-customisation-on-free-tier) and [Supabase SMTP limitations](https://supabase.com/docs/guides/auth/auth-smtp).
-
-For a beta with real users, keep the custom SMTP provider within its free allowance. Resend advertises a free plan with 3,000 messages per month and a 100-message daily limit and requires a domain you own with DNS verification; buying a domain is a separate cost if you do not have one. Do not enable paid overages for a free-only beta. The deployment above uses the already-owned sending domain listed in its status. See [Resend pricing](https://resend.com/pricing) and [verified sender domains](https://resend.com/docs/dashboard/domains/introduction).
-
-If no domain is available, Brevo documents temporary sender-address rewriting for unauthenticated domains, including verified Gmail senders, to its shared `brevosend.com` domain. Its Free plan has a 300-email daily allowance. This may support a small no-domain beta, subject to sender verification, transactional-platform activation and an actual delivery test; it is not a permanent branded-domain guarantee. Excess transactional messages can queue, so keep usage below the quota rather than allowing old login codes to arrive late. See [Brevo sender rewriting](https://help.brevo.com/hc/en-us/articles/16045394674066-Troubleshooting-Domain-authentication) and [Free plan limits](https://help.brevo.com/hc/en-us/articles/208580669-FAQs-What-are-the-limits-of-the-Free-plan).
-
-Accounts alone do not require video storage, SMS login or a paid email provider. Media uses the project's existing free Storage allowance; no paid video/transcoding service is enabled.
-
-The device creates a compressed share copy, JPEG poster and selected audio mix. The beta permits at most **60 seconds / 16 MiB of video**, **256 KiB per poster**, **5 reserved clips per account** and **40 reserved clips globally**. Each reservation counts as a full 16.25 MiB slot, including failed uploads and clips awaiting deletion, so clients cannot evade capacity limits by claiming a smaller size. This bounds reserved media to 650 MiB. It does not cap total viewing traffic: repeated plays and thumbnail loads still consume egress. Monitor usage and keep the beta small; move to another storage design or change limits deliberately before increasing capacity.
-
-Video encoding and probing happen locally, at up to 720p / 30 fps with H.264 and optional AAC audio. The server checks account access, reservation limits and the stored objects' owner, path, size and MIME metadata before publishing. It does not decode videos, verify their actual duration from the uploaded bytes, transcode them or create adaptive streaming renditions.
-
-## Configure a Supabase project
-
-1. Use the existing intended project if it is already on **Free**; do not create a duplicate project for the deployment above. For a fresh deployment, create a project on the **Free** plan, choose the intended hosting region and keep paid add-ons disabled. Record the project URL and the **publishable** API key from the project's API settings.
-2. Inspect the existing schema and migration history. Apply `backend/supabase/migrations/202610220001_accounts_profiles.sql` once if it has not already been applied. The migration creates profiles for existing accounts too. For the deployment above this step is complete. Alternatively, use the Supabase CLI migration workflow against the intended project after reviewing the migration.
-3. In Authentication, enable the Email provider, allow new sign-ups for this beta and keep email confirmation enabled. Keep anonymous sign-ins disabled: online Media requires a permanent account. Klipp uses one-time email codes; it does not ask users to create a password or handle an email magic-link callback.
-4. Set up the free email provider, verify its sender/domain, then enable and save **custom SMTP** in Supabase using the settings below. On new Free projects this must be completed before Auth email templates can be customized. Stay on Free and leave overages disabled.
-5. In Authentication email templates, configure **Magic link or OTP** to display `{{ .Token }}`. Configure **Confirm sign up** to display it as well so both new and returning users receive a code. A minimal body is:
-
-   ```html
-   <h2>Your Klipp sign-in code</h2>
-   <p>Enter this code in Klipp:</p>
-   <p><strong>{{ .Token }}</strong></p>
-   <p>If you did not request this code, you can ignore this email.</p>
-   ```
-
-   The complete Klipp-styled body is saved at `backend/supabase/templates/email-code.html`. Paste that file into both templates. Use **Your Klipp sign-in code** for the Magic Link subject and **Your Klipp confirmation code** for the Confirm Sign Up subject. The template has no external images, tracking links or redirect links. Keep the `{{ .Token }}` placeholder unchanged.
-
-6. Keep Auth's server-side request and verification rate limits enabled and below the email provider's free quota. If CAPTCHA is enabled at the provider, a compatible client flow must be added before enabling that setting for this desktop beta.
-7. For a new deployment, copy `backend/community.example.json` to `backend/community.json` and replace both placeholders with the project's public values. The local configuration for the deployment above has already been set:
-
-   ```json
-   {
-     "projectUrl": "https://YOUR_PROJECT_REF.supabase.co",
-     "publishableKey": "sb_publishable_YOUR_PUBLIC_KEY"
-   }
-   ```
-
-8. Build or publish the desktop app. When present, `backend/community.json` is copied to `community.json` beside the executable. This is publisher configuration; end users should receive it with the app and should never need their own Supabase account or API key. Existing installs will need a newly packaged build to receive configuration changes. The local configuration file is ignored by Git.
-9. Before inviting users, complete the signup, profile, sign-out and sign-in checks below with an address outside the Supabase organization team. Check actual code delivery and session restoration; the built-in SMTP's team-only testing is not a substitute for this custom-SMTP test.
-
-Only a root HTTPS project URL and a public publishable key belong in this file. Legacy `anon` JWT keys are also supported. **Never** include a secret key, `service_role` key, database password, SMTP credentials or JWT signing secret in the desktop app, repository or installer. All client authorization depends on the user's verified session and database policies, not on keeping the public key secret. An absent, placeholder or invalid file leaves online features unavailable without affecting local capture/editing.
-
-Official references: [passwordless email and OTP templates](https://supabase.com/docs/guides/auth/auth-email-passwordless), [email template variables](https://supabase.com/docs/guides/auth/auth-email-templates), [Auth user/profile tables](https://supabase.com/docs/guides/auth/managing-user-data).
-
-## Free login email settings
-
-Use **Supabase Free** and the email provider's **Free** plan. Leave transactional overages, automatic top-ups, paid add-ons and paid upgrades disabled. If onboarding requires buying a plan, stop at that screen; a paid plan is outside this setup. The free email allowance limits login volume, even though the Auth allowance is much larger.
-
-For a domainless beta, create or sign in to Brevo, stay on Free, and add a sender named **Klipp** using an email address you control. Complete the provider's sender verification yourself. In its SMTP settings, obtain the **SMTP Login** and an **SMTP key**. Do not use the account password or an API key as the SMTP password.
-
-In Supabase **Authentication → Email → SMTP settings**, enable custom SMTP and fill these fields:
-
-| Field | Brevo Free | Resend Free, with an owned verified domain |
-| --- | --- | --- |
-| Sender name | `Klipp` | `Klipp` |
-| Sender email | The email address verified in Brevo | An address on the verified sending domain |
-| Host | `smtp-relay.brevo.com` | `smtp.resend.com` |
-| Port | `587` | `465` |
-| Username | Copy **SMTP Login** from Brevo | `resend` |
-| Password | The Brevo **SMTP key** | A Resend sending API key |
-
-Enter SMTP secrets directly into Supabase's protected provider settings. Do not put them in `community.json`, Git, screenshots, chat or the desktop installer. If a key must be created or copied, the account owner should handle it privately.
-
-Keep email confirmation enabled. Klipp accepts email codes, not a password or email-link redirect. Use a six-digit code, a 60-second resend interval and an expiry appropriate for delivery time; Supabase's default is one hour. Custom SMTP initially has a 30-email/hour Supabase limit. For a small beta, use conservative server limits and monitor the provider's daily quota. The hourly limit is not a guarantee that the daily free quota cannot be reached.
-
-Verify the integration before inviting users: request a **Create account** code from Klipp to an address outside the Supabase organization team, check arrival time and spam placement, enter it, save a username/profile, sign out, then request a fresh **Sign in** code for that same address. Do not create an administrative test account or disable confirmation to make the test pass. Verify session restoration after restarting Klipp too. A provider test email alone does not prove account creation, OTP verification and profile access work.
-
-Official settings: [Brevo SMTP and activation](https://help.brevo.com/hc/en-us/articles/115000188150-Troubleshooting-Issues-with-Brevo-SMTP), [Resend with Supabase](https://resend.com/docs/send-with-supabase-smtp), [Supabase SMTP limits](https://supabase.com/docs/guides/auth/auth-smtp).
-
-## Database access contract
-
-`public.profiles` contains only `id`, `username`, `display_name`, `bio`, `created_at` and `updated_at`. Email addresses and authentication information remain in Supabase Auth.
-
-- A private signup trigger creates a profile with `display_name = 'Player'`, no username and an empty biography. It ignores client-supplied signup metadata. Existing Auth accounts are backfilled by the migration.
-- A username is optional until the member sets up their profile. Handles must be unique, lowercase ASCII, 3–24 characters, start with a letter, and contain only letters, numbers and underscores. Display names are trimmed, nonempty and up to 40 characters; biographies are up to 160 characters.
-- Anonymous API access has no profile privileges. Signed-in members can read profiles. Row-level security restricts updates to the member's own profile, and column grants restrict changes to `username`, `display_name` and `bio`.
-- Desktop requests use an explicit profile field list and the current account's ID. Updates are `PATCH` requests, not inserts or upserts. Identity and timestamps are managed by the server.
-- After owned Media files and clip reservations have been removed, administrative Auth account deletion removes the profile through its foreign key. There is no client account-deletion endpoint or in-app deletion UI yet. Before a public beta, publish a private operator contact for deletion requests. Keep administrative credentials off the client.
-
-See [Supabase RLS](https://supabase.com/docs/guides/database/postgres/row-level-security). Trigger functions use a fixed empty search path and live in an unexposed schema; clients cannot call them as RPCs.
-
-## Enable Media storage and access
-
-For a fresh deployment, first apply the accounts/profiles migration above. Create these buckets through the Supabase Storage dashboard or Storage API, keeping **Public bucket off**:
-
-| Bucket | Maximum object size | Allowed MIME types |
-| --- | --- | --- |
-| `community-videos` | `16777216` bytes (16 MiB) | `video/mp4` |
-| `community-posters` | `262144` bytes (256 KiB) | `image/jpeg` |
-
-Apply `backend/supabase/migrations/20261022114947_community_media.sql` once against the intended project. It requires both private buckets with exactly these limits before allowing upload reservations. Do not create or remove Storage objects by writing to `storage.objects`; use the Storage API so physical files and metadata remain consistent.
-
-Then apply `backend/supabase/migrations/20261022120248_community_rpc_only_policies.sql`. Its six restrictive deny policies cover the five public Media tables and the private comment-rate event table. Direct anonymous/member access remains denied even if a later change accidentally adds a table grant and a permissive policy. Checked private RPC implementations and protected operator access retain their intended privileges.
-
-Apply `backend/supabase/migrations/20261022152239_community_desktop_uploads.sql` next. Web/mobile Media is for watching and interacting; upload from the installed Klipp Windows app. Reservation and publication reject browser requests, and a separate restrictive Storage INSERT policy prevents an old browser tab from continuing a reserved upload. Existing clips, viewing, comments, likes, profiles and owner cleanup stay available.
-
-The upload check reads the server-provided HTTP header context and rejects any Origin (including `null`) or Fetch Metadata headers. The Windows HTTP client sends none of those headers. Missing header context is denied. This blocks ordinary browser upload requests; it is not device attestation and cannot prove that a custom HTTP client is the official app. A client-supplied app name, User-Agent or secret embedded in a distributed executable would not provide that proof. Account verification, owner checks and upload quotas remain the authorization boundary.
-
-- Direct anonymous or member reads/writes of the Media tables are denied. Public RPC wrappers call private implementations that check the current verified, non-anonymous, non-banned Auth account. A user's JWT metadata cannot grant ownership or moderation privileges.
-- Server-side reservation locking enforces the five-account / forty-global limits. Uploads use fixed owner/clip paths, reject replacement and retain capacity until physical file cleanup succeeds.
-- Publishing requires both the reserved video and poster. Public feeds hide unfinished/deleting clips, blocked members in either direction, and authors with incomplete profiles. Owners can still find their own unfinished clips in **My uploads**.
-- Feed pages show twelve clips with **Newer clips / Older clips** navigation. Comments load thirty at a time with **Load older comments**. Both use timestamp/ID cursors rather than downloading all rows. There is no automatic video playback; posters load for visible cards and videos stream when selected.
-- Likes set an explicit on/off state. Members can post comments and delete their own comments. The server caps comments at 100 per clip and limits comment frequency. Reports are stored for the operator; they do not automatically remove a clip. **Block this user** hides their content, and **Blocked users → Unblock** reverses a block.
-- Playback and poster links are signed on demand using the current user's access and Storage policies. They expire after five minutes and two minutes respectively. Possession of an already-issued link permits access until its expiry, including after a block or local sign-out.
-- **Delete shared clip** hides an owned clip first, removes both files through Storage, then releases its reservation and associated likes/comments/reports. If cleanup fails, its hidden reservation remains in **My uploads** so deletion can be retried. Deleting a shared clip does not delete its original local recording.
-
-There is no in-app moderation console or account-deletion action yet. The operator must review reports and handle moderation/deletion requests with protected administrative tools. Remove an account's physical Media files and clip reservations before deleting its Auth account; the clip foreign key intentionally prevents account deletion from leaving untracked files behind. Publish the operator's private contact method and retention details before a public beta.
-
-To share from the installed Windows app, use **Upload clip** in Media or **Upload to Media** on a Library clip. Review the title, description, section and audio selection before confirming. Game audio is selected by default when a separate game track is available; microphone, Discord and music tracks are included only when selected. A single existing mixed track may already contain multiple sources. The original is unchanged. A temporary share copy is prepared under `%TEMP%\Klipp\CommunityShare`; Klipp attempts to remove it on completion or cancellation. Uploads show progress and can be canceled. No capture or editor project is uploaded automatically.
-
-## Local development and SQL checks
-
-The CLI's local Supabase stack runs for free. On Windows it requires a compatible container runtime; it is not included in Klipp. See [local development setup](https://supabase.com/docs/guides/local-development).
-
-For a new disposable local setup, from the repository root:
-
-```powershell
-supabase init --workdir backend
-supabase start --workdir backend
-supabase db reset --workdir backend
+```json
+{
+  "projectUrl": "https://YOUR_PROJECT.supabase.co",
+  "publishableKey": "sb_publishable_YOUR_PUBLIC_KEY",
+  "mediaApiUrl": "https://media.shlipp.com"
+}
 ```
 
-`db reset` resets that local development database and applies the migrations. Use the local database connection shown by `supabase status --workdir backend`, then run the checks with `psql`:
+Use the configuration scripts under `tools/` to validate and package it. Never put SMTP passwords, database backup credentials, gateway/signing secrets or a Supabase secret/service-role key in this file or either app. The home server has a separate root-protected configuration; its independent gateway proof is not a client secret.
 
-```powershell
-psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -v ON_ERROR_STOP=1 -f backend/supabase/tests/accounts_profiles.sql
-psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -v ON_ERROR_STOP=1 -f backend/supabase/tests/community_media.sql
-```
+Mobile builds use the equivalent public build configuration. See the mobile project’s instructions for its current build and publication flags; do not embed administrative credentials. A missing backend keeps local capture/editing usable and shows online features as unavailable.
 
-The account SQL file creates fixtures inside a transaction and rolls them back. It checks signup defaults, anonymous access denial, member reads, own-profile updates, cross-account update denial, protected identity/timestamps, username/content constraints, duplicate handles, missing identity and profile deletion cascade. The Media SQL file checks quotas, ownership, private-function grants, blocked/incomplete profiles, tuple pagination, interaction limits and cleanup policies, including denial after deliberately adding broad grants/permissive policies to its disposable fixtures. Its Storage rows are synthetic local fixtures, not physical uploaded files. Use a disposable local database for these tests, never the public service.
+## Account email setup
 
-The desktop configuration intentionally requires HTTPS. For a full local Auth/UI integration run, put the local API behind a trusted local HTTPS endpoint, or use a separate hosted Free test project. Do not weaken the published client's HTTPS requirement to make local development easier.
+The configured sending domain is `accounts.shlipp.com`, verified with Resend. Receiving is disabled; no support mailbox is hosted there. Supabase custom SMTP uses:
 
-The 24 account/profile assertions and 85 Media assertions passed on PostgreSQL 18.6 through temporary PGlite harnesses with minimal Supabase Auth, role and Storage fixtures. These SQL checks did not use a hosted service or real user credentials. All four migrations are applied to the existing hosted Free project listed above. The desktop upload restriction was verified there without creating or changing clips; the two existing clips and four stored objects remained unchanged. Guard checks rejected browser reservation/publication, allowed the native header shape through to account verification, and retained all existing RLS/grants. Security advisors reported no new findings. Live account and generated-media checks are described in the deployment status. See [the account harness](../tools/Klipp.CommunityHarness/README.md) and [the Media harness](../tools/Klipp.CommunityMediaHarness/README.md); ordinary harness runs remain local.
+| Field | Value |
+| --- | --- |
+| Sender name | `Klipp` |
+| Sender email | `login@accounts.shlipp.com` |
+| SMTP host | `smtp.resend.com` |
+| Port | `465` |
+| Username | `resend` |
+| Password | Restricted **Sending access** key for the verified domain, entered privately in Supabase |
 
-`backend/supabase/tests/community_media_deployment_check.sql` is a separate read-only production check. It reports schema/policy metadata and aggregate reserved capacity without returning accounts, emails, object paths or media. Expected values after all migrations are: five public tables with RLS, thirteen public invoker RPCs, zero anonymous RPC grants, zero direct client table grants, nine Storage policies (including the browser upload guard), two guarded upload RPCs, six restrictive RPC-only deny policies and two correctly configured private buckets. Reserved slots must stay at or below forty. This metadata check complements the local fixture tests and live generated-media check; it does not decode or inspect uploaded videos.
+Both signup and sign-in templates contain `{{ .Token }}` and use code-only Klipp messages. The verified subjects are **Your Klipp confirmation code** and **Your Klipp sign-in code**. Keep email confirmation enabled. A template/provider test email alone does not prove account creation: request a code to a real test address, enter it privately, save a profile, sign out, sign in again and verify session restoration.
 
-## Data and session handling
+Supabase’s default SMTP is unsuitable for general public signup. Use custom SMTP before setting code-only templates, keep conservative resend/rate limits and monitor both provider allowances. Enter keys directly into protected provider settings; never place them in Git, command arguments, screenshots, chat or installers. Operational owner email uses a separate restricted credential on the server; it is not a support inbox or a client capability. See [Supabase SMTP](https://supabase.com/docs/guides/auth/auth-smtp) and [Resend integration](https://resend.com/docs/send-with-supabase-smtp).
 
-Online requests occur on Media/account actions, not during local recording startup. Saved sessions are protected for the current Windows user using DPAPI and stored under `%LOCALAPPDATA%\Klipp\Community`, separated by a hash of the configured project URL. They are not stored in ordinary app settings. A restored session is checked with the Auth service before it is used; refresh, profile and Media requests stay separate from capture/editor work. Media uploads stream from disk in bounded buffers; they are not loaded entirely into RAM. Navigation/sign-out stops online playback, and sign-out fences stale requests.
+## Database and file access
 
-Signing out clears the local session even when the network is unavailable. It leaves recordings and editor projects alone. It does not delete the online account. Auth/profile failures must stay within Media and must never block recording, editing or export. See [the privacy policy](PRIVACY.md) for the user-facing data description.
+Apply the reviewed migration chain in filename order to the intended project. An earlier local operations placeholder was empty and was never applied; the public chain contains the later reviewed operations migration described in its [deployment contract](../backend/supabase/OPERATIONS.md). Do not reset a hosted database to apply source changes.
+
+Profiles expose only account ID, username, display name, biography and timestamps. Signup ignores client-supplied profile/privilege metadata and starts with an incomplete profile. Usernames are unique lowercase ASCII, 3–24 characters, beginning with a letter; display names are at most 40 characters and biographies 160. Verified incomplete accounts can use account help/usage/deletion when those capabilities are enabled, while sharing/interactions require profile completion.
+
+Media tables deny direct client access. Checked public RPCs call private implementations that validate the current verified, non-anonymous, non-banned Auth account, ownership and blocking. Operator status comes from a private allowlist, never an email string or JWT/user metadata. Row-level security, restricted grants and fixed search paths remain in place.
+
+New uploads use the home provider. Direct new uploads to the legacy Supabase buckets are closed. Existing `community-videos` and `community-posters` buckets remain private, retaining their size/MIME restrictions for historical content and cleanup. Use the supported Storage API to remove physical objects; never manipulate `storage.objects` directly to pretend files were removed.
+
+The desktop-only guard rejects browser Origin/Fetch Metadata headers in reservation, upload and publication. It blocks normal browser/mobile upload requests. It is **not device attestation**: a custom HTTP client can emulate the native header shape. Account verification, ownership, real media validation and quotas are the security boundary; no shared secret is hidden in the distributed app.
+
+The Windows app prepares an explicit selected section at up to 720p / 30 fps, H.264 and optional AAC, with reviewed audio selection. Originals and editor projects remain local. The API independently checks size, duration, container/codec and poster validity with FFprobe before publication. It never transcodes on the home server. Upload and download bodies are streamed through bounded buffers.
+
+Reservation locks enforce five slots per account and forty globally. Unfinished uploads expire after 30 minutes. Cleanup removes files before releasing capacity, including owner deletions queued if the app closes. Failed cleanup stays hidden and retryable; there are bounded pending-work limits. Playback can continue while a backup briefly pauses media mutations.
+
+## Watching and interaction
+
+Feed/comment pages use timestamp/ID cursors. Posters load for visible cards; videos play when selected rather than auto-playing the entire feed. Members can like/unlike, comment, remove their own comments, report clips, block and unblock users. Reports do not automatically remove content.
+
+Videos and thumbnails use private short-lived links: five minutes and two minutes. The home API rechecks publication/moderation/deletion state on each new GET/HEAD. Downloaded bytes and open streams cannot be recalled. A previously issued legacy Storage link can remain usable until expiry. App sharing sends a clip identifier link, not an access token or playback capability.
+
+When operations are enabled, **Storage & usage** shows reservations and capacity warnings. **Help & requests** provides private support/deletion requests and operator replies. An allowlisted operator can review reports, hide/keep clips and reply; actions are audited. Account deletion requires a live session and exact username confirmation (or `DELETE` if incomplete), durable pending intent, confirmed physical file removal and finally server-side Auth hard deletion. Failed cleanup is retried; it must not falsely report the account deleted. No administrative key goes to either app or the home API. See the [deletion function contract](../backend/supabase/functions/community-delete-account/README.md).
+
+## Sessions, privacy and recovery
+
+Windows sessions use per-user DPAPI storage separated by project. Mobile defaults to session-only browser storage; **Remember me on this device** explicitly opts into persistent storage. Navigation/sign-out cancel stale online work and playback. Auth/Media errors must not prevent local recording, editing or export. The [privacy policy](PRIVACY.md) describes retention, browser storage, support records and deletion limits.
+
+The home host has daily encrypted backups to a separate physical SSD and weekly isolated restore checks. They include video/poster/manifests, legacy clip copies, exact API artifacts/configuration and full account/community database exports, including Auth/private records. Read-only database credentials use verified TLS and remain root-only. Restore checks recover data in temporary isolated memory storage with job swap disabled; no persistent public PostgreSQL listener is installed.
+
+Uploads fail closed if required media/database backups exceed 48 hours or isolated restore proofs exceed eight days. Local operations alerts warn earlier about backups, capacity, certificate renewal and proxy updates. A separate external HTTPS checker can detect loss of the whole host after the [monitor workflow](../tools/hosting-monitor/README.md) is published and configured. It uses no accounts or paid provider; GitHub schedules and notification preferences have limitations documented there.
+
+The separate SSD does not protect against whole-server loss, theft, fire or root compromise. An offline export helper is prepared, but no off-site copy is claimed until an explicitly selected third disk passes encrypted copy and full read verification. No disk is selected or formatted automatically. Keep the recovery password off the server and offline disk. Deleted data can remain in retained encrypted backups; restore must reconcile deletion intent and revoke restored historical sessions before reopening service.
+
+Custom proxy updates require review and verified installation; the operating-system package is not silently substituted. Public clients use normal HTTPS certificate validation. Never disable certificate checks, open database/administration ports or weaken network separation to work around a playback problem. Private machine-specific installation and recovery runbooks are kept separately from the public source.
+
+## Development and verification
+
+Use a disposable local Supabase/PostgreSQL environment for fixture tests. Inspect the installed CLI’s help before initialization/reset commands, and never run a reset against the public project. Apply the full migration chain before rollback-based SQL suites. Source includes separate read-only deployment checks, account/media harnesses and operations/deletion tests; run the tests relevant to a change rather than relying on an earlier assertion count.
+
+The [media API README](../backend/Klipp.MediaServer/README.md) documents validation, auth and streaming. The [account harness](../tools/Klipp.CommunityHarness/README.md) and [media harness](../tools/Klipp.CommunityMediaHarness/README.md) document local checks and deliberately opt-in live generated-media drills. Do not use an existing member’s account for a deletion test; use a disposable account with no personal content. Keep all email codes/tokens private and remove generated test clips afterward.

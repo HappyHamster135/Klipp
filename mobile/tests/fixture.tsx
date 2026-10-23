@@ -2,7 +2,8 @@
 import {createRoot} from 'react-dom/client';
 import {App} from '../src/App';
 import type {Api} from '../src/lib/service';
-import type {CommunityBlockedUser,CommunityClip,CommunityComment,CommunityCursor,CommunityProfile,CommunityUser,CommunityUsage,CommunitySupportRequest,CommunityReport,SupportCategory,CommunityPage} from '../src/lib/models';
+import {CommunityError} from '../src/lib/models';
+import type {CommunityBlockedUser,CommunityClip,CommunityComment,CommunityCursor,CommunityProfile,CommunityUser,CommunityUsage,CommunitySupportRequest,CommunityReport,SupportCategory,CommunityPage,CommunityOperationsCapabilities} from '../src/lib/models';
 import '../src/styles.css';
 
 const me='11111111-1111-4111-8111-111111111111';
@@ -22,6 +23,9 @@ class FixtureApi implements Api {
   blocked=new Set<string>();
   reports:{id:string;reason:string}[]=[];
   playbackRequests:string[]=[];
+  capabilities:CommunityOperationsCapabilities={version:1,enabled:true,operator:false,accountDeletion:true};
+  pendingDeletionOnce=false;
+  accountDeletionCalls=0;
   private listeners=new Set<()=>void>();
   constructor(private defaultPoster:string,empty=false){if(empty)this.clips=[];}
   private check(signal?:AbortSignal){signal?.throwIfAborted();if(!this.user)throw new Error('Sign in to use Media.');}
@@ -45,6 +49,7 @@ class FixtureApi implements Api {
   async deleteClip(id:string,signal?:AbortSignal){const clip=await this.getClip(id,signal);if(clip.ownerId!==me)throw new Error('Only your own clip can be removed.');this.clips=this.clips.filter(item=>item.id!==id);this.comments=this.comments.filter(item=>item.clipId!==id);}
   async getPlaybackUrl(id:string,signal?:AbortSignal){await this.getClip(id,signal);this.playbackRequests.push(id);return videoUrl;}
   async getPosterUrl(id:string,signal?:AbortSignal){await this.getClip(id,signal);return this.defaultPoster;}
+  async getOperationsCapabilities(signal?:AbortSignal):Promise<CommunityOperationsCapabilities>{this.check(signal);return structuredClone(this.capabilities);}
   async getUsage(signal?:AbortSignal):Promise<CommunityUsage>{this.check(signal);const mine=this.clips.filter(clip=>clip.ownerId===me);return{me:{slotsUsed:mine.length,slotsLimit:5,published:mine.length,uploading:0,deleting:0,storedBytes:mine.reduce((sum,clip)=>sum+clip.byteSize,0)},beta:{slotsUsed:this.clips.length,slotsLimit:40,reservedBytes:0,storageBytes:this.clips.reduce((sum,clip)=>sum+clip.byteSize,0),storageLimitBytes:1024**3,unknownStorageObjects:0},limits:{maxVideoBytes:16*1024**2,maxDurationSeconds:60,warningPercent:80},operator:false,checkedAt:new Date().toISOString(),operations:null};}
   private support:CommunitySupportRequest[]=[];
   async getSupportRequests(signal?:AbortSignal){this.check(signal);return structuredClone(this.support);}
@@ -53,7 +58,7 @@ class FixtureApi implements Api {
   async reviewClip(_id:string,_action:'hide'|'keep',_note:string,signal?:AbortSignal):Promise<void>{this.check(signal);throw new Error('Only Klipp moderators can open this section.');}
   async getOperatorSupport(_cursor:CommunityCursor|null=null,signal?:AbortSignal):Promise<CommunityPage<CommunitySupportRequest>>{this.check(signal);throw new Error('Only Klipp moderators can open this section.');}
   async replySupport(_id:string,_reply:string,_status:'open'|'resolved',signal?:AbortSignal):Promise<CommunitySupportRequest>{this.check(signal);throw new Error('Only Klipp moderators can open this section.');}
-  async deleteAccount(confirmation:string,signal?:AbortSignal){this.check(signal);if(confirmation!==this.profile?.username)throw new Error('Type your username to confirm.');this.clips=this.clips.filter(clip=>clip.ownerId!==me);this.comments=this.comments.filter(comment=>comment.ownerId!==me);await this.signOut(signal);}
+  async deleteAccount(confirmation:string,signal?:AbortSignal){this.check(signal);if(confirmation!==(this.profile?.username??'DELETE'))throw new Error('Type your username to confirm.');this.accountDeletionCalls++;if(this.pendingDeletionOnce){this.pendingDeletionOnce=false;throw new CommunityError('deletion_pending','Account cleanup is in progress. Please retry account deletion to finish.');}this.clips=this.clips.filter(clip=>clip.ownerId!==me);this.comments=this.comments.filter(comment=>comment.ownerId!==me);await this.signOut(signal);}
   snapshot(){return structuredClone({clips:this.clips,comments:this.comments,blocked:[...this.blocked],reports:this.reports,profile:this.profile,playbackRequests:this.playbackRequests});}
 }
 

@@ -428,8 +428,28 @@
                    Fill="{StaticResource KlippBorderSubtleBrush}" />
 
         <Grid Grid.Row="1">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+            <Border x:Name="WorkspaceNavigation" Grid.Row="0" BorderBrush="{StaticResource KlippBorderSubtleBrush}" BorderThickness="0,0,0,1" Padding="24,8">
+                <Grid ColumnSpacing="16">
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                    <StackPanel Orientation="Horizontal" Spacing="4">
+                        <Button x:Name="LibraryNavigationButton" Click="OnLibraryNavigationClicked" Height="32" MinWidth="100" Padding="12,4" Background="{StaticResource KlippSurfaceElevatedBrush}" AutomationProperties.Name="Local clip library">
+                            <StackPanel Orientation="Horizontal" Spacing="8"><FontIcon Glyph="&#xE8B7;" FontSize="14" /><TextBlock Text="Library" VerticalAlignment="Center" /></StackPanel>
+                        </Button>
+                        <Button x:Name="MediaNavigationButton" Click="OnMediaNavigationClicked" Height="32" MinWidth="100" Padding="12,4" Background="Transparent" BorderBrush="Transparent" AutomationProperties.Name="Online media">
+                            <StackPanel Orientation="Horizontal" Spacing="8"><FontIcon Glyph="&#xE714;" FontSize="14" /><TextBlock Text="Media" VerticalAlignment="Center" /></StackPanel>
+                        </Button>
+                    </StackPanel>
+                    <Button x:Name="CommunityAccountButton" Grid.Column="1" Click="OnCommunityAccountClicked" Height="32" Padding="10,4" Background="Transparent" BorderBrush="Transparent" ToolTipService.ToolTip="Optional account for online media" AutomationProperties.Name="Online account">
+                        <StackPanel Orientation="Horizontal" Spacing="8"><FontIcon Glyph="&#xE77B;" FontSize="14" /><TextBlock x:Name="CommunityAccountLabel" Text="Sign in" MaxWidth="160" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" /></StackPanel>
+                    </Button>
+                </Grid>
+            </Border>
 
-            <Grid x:Name="LibraryView" Padding="24,20,24,24">
+            <Grid x:Name="LibraryView" Grid.Row="1" Padding="24,20,24,24">
                 <Grid.RenderTransform>
                     <TranslateTransform x:Name="LibraryViewTransform" Y="0" />
                 </Grid.RenderTransform>
@@ -607,6 +627,7 @@
                                                    ThumbnailPath="{x:Bind ThumbnailPath, Mode=OneWay}"
                                                    OpenFolderRequested="OnClipCardOpenFolderRequested"
                                                    EditRequested="OnClipCardEditRequested"
+                                                   UploadRequested="OnClipCardUploadRequested"
                                                    FavoriteRequested="OnClipCardFavoriteRequested"
                                                    OrganizeRequested="OnClipCardOrganizeRequested"
                                                    RenameRequested="OnClipCardRenameRequested"
@@ -622,7 +643,9 @@
                 </ScrollViewer>
             </Grid>
 
-            <Grid x:Name="PlayerHost"
+            <Grid x:Name="MediaHost" Grid.Row="1" Visibility="Collapsed" IsHitTestVisible="False" />
+
+            <Grid x:Name="PlayerHost" Grid.Row="1"
                   Opacity="0"
                   Visibility="Collapsed">
                 <Grid.RenderTransform>
@@ -630,7 +653,7 @@
                 </Grid.RenderTransform>
             </Grid>
 
-            <Grid x:Name="EditorHost"
+            <Grid x:Name="EditorHost" Grid.Row="1"
                   Opacity="0"
                   Visibility="Collapsed">
                 <Grid.RenderTransform>

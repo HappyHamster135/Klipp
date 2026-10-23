@@ -28,14 +28,22 @@ Environment variables use .NET's `Media__` prefix:
 | `Media__BackupStatusPath` | Root-managed `/var/lib/klipp-backup/status.json` |
 | `Media__MinimumFreeBytes` | 1 GiB reserve; at least 256 MiB |
 | `Media__AllowedOrigins__0` | Exact mobile web origin; default `https://happyhamster135.github.io` |
+| `Media__MaximumVideoStreams` | Eight active video responses globally |
+| `Media__MaximumVideoStreamsPerClient` | Four active video responses per client IP |
+| `Media__MaximumPlaybackStreams` | 64 active file responses, including posters and HEAD |
+| `Media__MaximumPlaybackStreamsPerClient` | 16 active file responses per client IP |
+| `Media__PlaybackBytesPerSecond` | Shared 20 MiB/s budget for videos and thumbnails |
+| `Media__PlaybackBurstBytes` | Shared 4 MiB startup burst, including range requests |
+| `Media__PlaybackStreamTimeoutSeconds` | 180-second response lifetime; configurable from 30 to 180 |
 
 Keep configuration root-owned and readable only by the service group. Public clients
 receive only `mediaApiUrl`, the media origin; they never receive either private secret.
 The signing and gateway secrets must be different.
 
-The backup receipt must contain UTC `successful_at` (at most 48 hours old) and a
-non-null UTC `verified_restore_at` from an actual restore drill. Missing, stale or
-malformed receipts pause new uploads/publication. Playback and owner cleanup remain
+The backup receipt must contain UTC `successful_at` and `database_successful_at`
+(at most 48 hours old), plus `verified_restore_at` and `database_verified_restore_at`
+from an actual media/database restore drill (at most eight days old). Missing, stale
+or malformed receipts pause new uploads/publication. Playback and owner cleanup remain
 available. The service cannot write this root-owned receipt or read the encrypted
 backup repository. Database home upload activation is a separate, initially disabled
 switch.
@@ -48,7 +56,9 @@ trust user-editable JWT metadata or a client-supplied owner ID.
 
 - Reserve in Supabase with `community_begin_home_upload` (same arguments as the legacy
   reservation RPC). Both providers share the existing five-per-member / forty-total
-  reservation limits. Unfinished and deleting reservations still count.
+  reservation limits. New legacy cloud uploads are retired. Unfinished and deleting
+  reservations still count. Pending reservations expire after thirty minutes, with
+  separate pending and creation-rate limits enforced by the database.
 - `PUT /v1/clips/{id}/video`: raw `video/mp4`, exact `Content-Length`, at most 16 MiB.
 - `PUT /v1/clips/{id}/poster`: raw `image/jpeg`, exact `Content-Length`, at most 256 KiB.
 - `POST /v1/clips/{id}/publish`: validates both immutable files, computes SHA256,
@@ -60,7 +70,9 @@ trust user-editable JWT metadata or a client-supplied owner ID.
   `community_home_finish_delete`; returns `{id, deleted: true}`. Retries are safe.
 - Signed `GET` / `HEAD /v1/assets/{owner}/{id}/{video|poster}`: private, short-lived
   capabilities with normal byte-range seeking. Video links last five minutes,
-  thumbnails two minutes. Deletion prevents subsequent file opens immediately.
+  thumbnails two minutes. Each new asset request checks the scoped
+  `community_home_asset_allowed` RPC; hidden clips and pending account deletions
+  cannot open a previously issued link. An unavailable access check fails closed.
 
 Uploads and publication reject `Origin` and browser Fetch Metadata headers, and
 ordinary browser CORS does not allow PUT. Phones retain watching, likes, comments
@@ -71,7 +83,24 @@ format validation, quotas and bounds still apply to every upload.
 Already-issued playback URLs are bearer capabilities, as with Supabase Storage's
 signed URLs. A block/sign-out prevents obtaining new links; an existing video URL
 can remain usable for up to five minutes. Tokens are not access tokens and cannot
-call account or database APIs. Do not log their query strings at the reverse proxy.
+call account or database APIs. Moderation and deletion revoke new home requests;
+already downloaded bytes and open streams cannot be recalled. Do not log query
+strings at the reverse proxy.
+
+Mutation work has two slots per account and four globally. Duplicate edits acquire
+the clip lock before a global work slot; each wait is bounded and cancellation
+returns every permit. Playback preserves normal seeking and HEAD responses while
+sharing one byte budget across all URLs and ranges. All file responses have global
+and per-IP stream caps, with tighter limits for videos. A three-minute absolute response deadline, request cancellation
+or service shutdown closes the stream and frees its slot, including idle readers.
+
+A non-overlapping background sweep runs every five minutes. It claims up to ten
+expired uploads using `community_home_claim_expired_uploads`, removes their files
+under the normal clip/backup locks, then calls `community_home_finish_expired_upload`.
+Both maintenance RPCs accept only the scoped gateway proof and publishable key; they
+do not need a user session or privileged Supabase key. Failed cleanup retains the
+database tombstone and quota for a later retry. The SQL hardening migration and new
+backup receipt fields must be installed before deploying this version.
 
 ## Disk and backup contract
 

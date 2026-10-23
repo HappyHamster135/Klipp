@@ -3,7 +3,7 @@ import { browserSessionStorage, createConfig } from './config';
 import {
   cancelled, CommunityError, mediaLimits, unavailable, type CommunityBlockedUser, type CommunityClip,
   type CommunityComment, type CommunityConfig, type CommunityCursor, type CommunityPage, type CommunityProfile,
-  type CommunityUser, type StorageLike,
+  type CommunityUser, type StorageLike, type CommunityOperationsCapabilities,
   type CommunityUsage, type CommunitySupportRequest, type CommunityReport, type SupportCategory, type ProviderUsageMetric,
 } from './models';
 
@@ -190,7 +190,7 @@ export class CommunityApi {
     return this.identity(async context => {
       const rows = array(await this.rpc('community_feed', { p_limit: 13, p_before: cursor?.createdAt ?? null,
         p_before_id: cursor?.id ?? null, p_mine: mine }, context), 13).map(row => parseClip(row, context.userId!));
-      if (rows.some(row => mine ? row.ownerId !== context.userId : row.status !== 'published')) throw unavailable();
+      if (rows.some(row => mine ? row.ownerId !== context.userId : row.status !== 'published'||row.moderationHidden)) throw unavailable();
       return page(rows, mediaLimits.feedPageSize, cursor);
     }, signal);
   }
@@ -257,6 +257,14 @@ export class CommunityApi {
   getPlaybackUrl(id: string, signal?: AbortSignal): Promise<string> { return this.assetUrl(id, false, signal); }
   getPosterUrl(id: string, signal?: AbortSignal): Promise<string> { return this.assetUrl(id, true, signal); }
 
+  getOperationsCapabilities(signal?: AbortSignal): Promise<CommunityOperationsCapabilities> {
+    return this.identity(async context => {
+      const row = object(await this.rpc('community_operations_capabilities', {}, context));
+      if (row.version !== 1) return {version:1,enabled:false,operator:false,accountDeletion:false};
+      if (typeof row.enabled !== 'boolean'||typeof row.operator !== 'boolean'||typeof row.account_deletion !== 'boolean') throw unavailable();
+      return {version:1,enabled:row.enabled,operator:row.enabled&&row.operator,accountDeletion:row.enabled&&row.account_deletion};
+    }, signal);
+  }
   getUsage(signal?: AbortSignal): Promise<CommunityUsage> {
     return this.identity(async context => parseUsage(await this.rpc('community_usage', {}, context)), signal);
   }
@@ -266,7 +274,10 @@ export class CommunityApi {
   submitSupport(category: SupportCategory, body: string, signal?: AbortSignal): Promise<CommunitySupportRequest> {
     if (!['help', 'privacy', 'deletion'].includes(category)) throw new CommunityError('invalid_request', 'Choose a request category.');
     body = validateText(body, 10, 2000, 'invalid_request', 'Write a message of 10–2,000 characters.', true);
-    return this.identity(async context => parseSupport(await this.rpc('community_submit_support', { p_category: category, p_body: body }, context)), signal);
+    return this.identity(async context => {
+      const saved=parseSupport(await this.rpc('community_submit_support', { p_category: category, p_body: body }, context));
+      if(saved.category!==category||saved.body!==body||saved.status!=='open')throw unavailable();return saved;
+    }, signal);
   }
   getOperatorReports(cursor: CommunityCursor | null = null, signal?: AbortSignal): Promise<CommunityPage<CommunityReport>> {
     validateCursor(cursor);
@@ -277,7 +288,7 @@ export class CommunityApi {
   reviewClip(id: string, action: 'hide' | 'keep', note: string, signal?: AbortSignal): Promise<void> {
     id = uuid(id);
     if (!['hide', 'keep'].includes(action)) throw new CommunityError('invalid_review', 'Choose a review action.');
-    note = validateText(note, 0, 500, 'invalid_review', 'Keep the review note to 500 characters.', true);
+    note = validateText(note, 1, 1000, 'invalid_review', 'Write a review note of 1–1,000 characters.', true);
     return this.identity(async context => {
       const row = object(await this.rpc('community_operator_review', { p_clip_id: id, p_action: action, p_note: note }, context));
       if (row.reviewed !== true || row.hidden !== (action === 'hide')) throw unavailable();
@@ -295,7 +306,7 @@ export class CommunityApi {
     reply = validateText(reply, 1, 2000, 'invalid_reply', 'Write a reply of 1–2,000 characters.', true);
     return this.identity(async context => {
       const request = parseSupport(await this.rpc('community_operator_reply', { p_request_id: id, p_reply: reply, p_status: status }, context), true);
-      if (request.id !== id || request.status !== status) throw unavailable();
+      if (request.id !== id || request.status !== status || request.reply !== reply) throw unavailable();
       return request;
     }, signal);
   }
@@ -303,6 +314,10 @@ export class CommunityApi {
     const expected = this.currentProfile?.username ?? 'DELETE';
     if (confirmation !== expected) throw new CommunityError('confirmation_required', 'Type your username exactly to confirm account deletion.');
     await this.identity(async context => {
+      const rows=array(await this.json(`rest/v1/profiles?select=id,username,display_name,bio&id=eq.${context.userId}&limit=1`,'GET',undefined,context),1);
+      if(rows.length!==1)throw unavailable();
+      const fresh=parseProfile(rows[0],context.userId!);this.assert(context);this.currentProfile=fresh;this.emit();
+      if(confirmation!==(fresh.username??'DELETE'))throw new CommunityError('confirmation_required','Your username changed. Type your current username exactly to confirm account deletion.');
       requireTrue(await this.json('functions/v1/community-delete-account', 'POST', { confirmation }, context), 'deleted');
     }, signal);
     // Only the acknowledged deletion clears identity. A cleanup failure remains retryable.
@@ -320,7 +335,7 @@ export class CommunityApi {
     id = uuid(id);
     return this.identity(async context => {
       const clip = await this.getClipCore(id, context);
-      if (clip.status !== 'published') throw new CommunityError('clip_unavailable', 'This clip is not available to play.');
+      if (clip.status !== 'published'||clip.moderationHidden) throw new CommunityError('clip_unavailable', 'This clip is not available to play.');
       if (clip.storageProvider === 'home') {
         const row = object(await this.homeJson(`v1/clips/${id}/playback`, 'POST', {}, context));
         return this.homeAssetUrl(row, clip, poster);
@@ -555,6 +570,7 @@ function uuid(value: unknown): string {
   if (typeof value !== 'string' || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value) || /^0{8}-0{4}-0{4}-0{4}-0{12}$/.test(value)) throw unavailable(); return value.toLowerCase();
 }
 function integer(value: unknown, max = Number.MAX_SAFE_INTEGER): number { if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < 0 || value > max) throw unavailable(); return value; }
+function booleanValue(value: unknown):boolean {if(typeof value!=='boolean')throw unavailable();return value;}
 function time(value: unknown): string { const result = text(value, 64); if (!/^\d{4}-\d\d-\d\dT/.test(result) || !Number.isFinite(Date.parse(result)) || Date.parse(result) < 0) throw unavailable(); return result; }
 function validateCursor(cursor: CommunityCursor | null): void { if (cursor) { uuid(cursor.id); time(cursor.createdAt); } }
 function parseUser(value: unknown): CommunityUser { const row = object(value); return { id: uuid(row.id), email: emailAddress(text(row.email, 254)) }; }
@@ -571,7 +587,8 @@ function parseClip(value: unknown, viewer: string): CommunityClip {
   return { id, ownerId, username: row.username === null ? '' : text(row.username, 24), displayName: text(row.display_name, 40),
     title: text(row.title, 120), description: text(row.description, 500, true), durationSeconds: row.duration_seconds,
     byteSize, createdAt: time(row.created_at), likeCount: integer(row.like_count), commentCount: integer(row.comment_count),
-    likedByMe: row.liked_by_me, status: row.status as CommunityClip['status'], storageProvider: storageProvider(row) };
+    likedByMe: row.liked_by_me, status: row.status as CommunityClip['status'], storageProvider: storageProvider(row),
+    moderationHidden: row.moderation_hidden===undefined?false:booleanValue(row.moderation_hidden) };
 }
 function storageProvider(row: Record<string, unknown>): 'supabase' | 'home' {
   const provider = row.storage_provider ?? 'supabase';
@@ -595,7 +612,7 @@ function parseReport(value: unknown): CommunityReport {
   return { id: uuid(row.id), clipId: uuid(row.clip_id), reporterId: uuid(row.reporter_id), reason: text(row.reason, 500),
     status: row.status as CommunityReport['status'], createdAt: time(row.created_at), title: text(row.title, 120),
     ownerUsername: row.owner_username === null ? '' : text(row.owner_username, 24, true), reporterUsername: row.reporter_username === null ? '' : text(row.reporter_username, 24, true),
-    hidden: row.hidden, reviewNote: row.review_note === null ? '' : text(row.review_note, 500, true), reviewedAt: row.reviewed_at === null ? null : time(row.reviewed_at) };
+    hidden: row.hidden, reviewNote: row.review_note === null ? '' : text(row.review_note, 1000, true), reviewedAt: row.reviewed_at === null ? null : time(row.reviewed_at) };
 }
 function metric(value: unknown): ProviderUsageMetric {
   const row = object(value); const limit = integer(row.limit); if (!limit) throw unavailable();
@@ -615,6 +632,8 @@ function parseUsage(value: unknown): CommunityUsage {
     operator: row.operator, checkedAt: time(row.checked_at), operations: null };
   if (!result.me.slotsLimit || !result.beta.slotsLimit || !result.beta.storageLimitBytes || !result.limits.warningPercent || !result.limits.maxVideoBytes || !result.limits.maxDurationSeconds
     || result.me.slotsUsed !== result.me.published + result.me.uploading + result.me.deleting) throw unavailable();
+  if(beta.home_bytes!==undefined)result.beta.homeBytes=integer(beta.home_bytes);
+  if(beta.legacy_bytes!==undefined)result.beta.legacyBytes=integer(beta.legacy_bytes);
   if (row.operations !== null) {
     const operations = object(row.operations), provider = object(operations.provider_usage);
     result.operations = { registeredUsers: integer(operations.registered_users), databaseBytes: integer(operations.database_bytes), databaseLimitBytes: integer(operations.database_limit_bytes),
@@ -671,8 +690,14 @@ function safeError(value: unknown, path = ''): CommunityError {
     KM009: [path.endsWith('community_block_user') ? 'block_limit' : path.endsWith('community_report_clip') ? 'report_limit' : 'comment_limit', 'This beta feature has reached its limit.'],
     KM010: ['cleanup_pending', 'The clip is hidden. Retry deleting it from My uploads to finish cleanup.'], KM011: ['access_denied', 'Your account cannot change this clip or comment.'],
     KM015: ['upload_not_ready', 'The clip has not finished uploading. Please try again.'], KM016: ['hosting_unavailable', 'Clip hosting is getting ready. Please try again shortly.'],
+    KM017: ['upload_expired', 'This unfinished upload expired. Start a new upload from Klipp on your PC.'],
+    KM018: ['legacy_upload_retired', 'Update Klipp on your PC to upload clips to the new server.'],
+    KM019: ['uploads_busy', 'Uploads or clip cleanup are still in progress. Please try again shortly.'],
     uploads_paused: ['hosting_unavailable', 'Uploads are temporarily paused while clip storage is being prepared. Please try again later.'],
-    backup_required: ['hosting_unavailable', 'Uploads are temporarily paused while clip storage is being prepared. Please try again later.'],
+    backup_required: ['hosting_unavailable', 'Uploads are temporarily paused until the server backup and recovery checks pass. Please try again later.'],
+    upload_expired: ['upload_expired', 'This unfinished upload expired. Start a new upload from Klipp on your PC.'],
+    server_busy: ['rate_limited', 'Clip hosting is busy. Wait a moment and try again.'],
+    playback_busy: ['rate_limited', 'Clip hosting is busy. Wait a moment and try again.'],
     upload_capacity: ['upload_limit', 'The available upload slots are in use. Remove a shared clip and try again.'],
     profile_required: ['profile_required', 'Choose a username in your profile before sharing clips.'],
     upload_incomplete: ['upload_not_ready', 'The upload did not finish. Please upload the clip again.'],

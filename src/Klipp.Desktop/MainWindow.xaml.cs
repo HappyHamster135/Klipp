@@ -2480,6 +2480,7 @@ public sealed partial class MainWindow : Window
 
     private void OnMainWindowClosed(object sender, WindowEventArgs args)
     {
+        DisposeCommunity();
         DisposeUpdates();
         DisposeTrayIcon();
         _inlineWindowClosing = true;
@@ -2853,6 +2854,8 @@ public sealed partial class MainWindow : Window
     private void ShowPlayer(string filePath, TimeSpan? startPosition = null, bool autoPlay = true,
         bool? isMuted = null, double? volume = null)
     {
+        LeaveMedia();
+        UpdateWorkspaceNavigation(media: false, visible: false);
         ClipCard.StopActivePreview();
         HideSideMenu();
         TopBar.Visibility = Visibility.Collapsed;
@@ -2884,6 +2887,8 @@ public sealed partial class MainWindow : Window
             }
 
             HideSideMenu();
+            LeaveMedia();
+            UpdateWorkspaceNavigation(media: false, visible: false);
             TopBar.Visibility = Visibility.Collapsed;
             StopPlayerIfCreated();
             SetViewVisibility(PlayerHost, false);
@@ -2901,6 +2906,7 @@ public sealed partial class MainWindow : Window
             StopEditorIfCreated();
             SetViewVisibility(EditorHost, false);
             SetViewVisibility(LibraryView, true);
+            UpdateWorkspaceNavigation(media: false);
             TopBar.Visibility = Visibility.Visible;
             throw;
         }
@@ -2908,6 +2914,8 @@ public sealed partial class MainWindow : Window
 
     private void ShowLibrary()
     {
+        LeaveMedia();
+        UpdateWorkspaceNavigation(media: false);
         HideSideMenu();
         SetPlayerFullscreen(false);
         TopBar.Visibility = Visibility.Visible;

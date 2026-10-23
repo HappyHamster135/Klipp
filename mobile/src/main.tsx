@@ -12,5 +12,5 @@ function Root({config}:{config:CommunityConfig}){
   return <App api={api} remember={remember} operationsEnabled={config.operationsEnabled===true} onRemember={value=>{try{localStorage.setItem('klipp.remember-device.v1',value?'yes':'no');}catch{}setRemember(value);}}/>;
 }
 const root=createRoot(document.getElementById('root')!);
-try{const config=createConfig(import.meta.env.VITE_SUPABASE_URL,import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,import.meta.env.VITE_MEDIA_API_URL);root.render(<Root config={config}/>);}catch{root.render(<main className="empty"><h1>Media is getting ready</h1><p>The mobile app needs its public community configuration before sign-in is available.</p></main>);}
+try{const config=createConfig({projectUrl:import.meta.env.VITE_SUPABASE_URL,publishableKey:import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,mediaApiUrl:import.meta.env.VITE_MEDIA_API_URL,operationsEnabled:true});root.render(<Root config={config}/>);}catch{root.render(<main className="empty"><h1>Media is getting ready</h1><p>The mobile app needs its public community configuration before sign-in is available.</p></main>);}
 if(import.meta.env.PROD && 'serviceWorker' in navigator)window.addEventListener('load',()=>{void navigator.serviceWorker.register(`${import.meta.env.BASE_URL}sw.js`).catch(()=>{});});

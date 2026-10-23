@@ -67,18 +67,31 @@ try
     Check(!LinuxStorageGuard.MatchesMount([mount.Replace(options.ExpectedMountSource, "/dev/wrong")], "/srv/klipp/media", options.ExpectedMountSource), "wrong volume rejected");
     var backup = new BackupGate(options, now);
     Reject(backup.EnsureUploadsAllowed, "backup_required", "missing backup receipt blocks uploads");
-    File.WriteAllText(options.BackupStatusPath, JsonSerializer.Serialize(new { successful_at = now.Now, verified_restore_at = now.Now }));
+    void WriteBackup(DateTimeOffset successful, DateTimeOffset? verified, DateTimeOffset? databaseSuccessful, DateTimeOffset? databaseVerified) =>
+        File.WriteAllText(options.BackupStatusPath, JsonSerializer.Serialize(new { successful_at = successful, verified_restore_at = verified,
+            database_successful_at = databaseSuccessful, database_verified_restore_at = databaseVerified }));
+    WriteBackup(now.Now, now.Now, now.Now, now.Now);
     backup.EnsureUploadsAllowed();
     Check(true, "verified fresh backup enables uploads");
     now.Now = now.Now.AddHours(49);
     Reject(backup.EnsureUploadsAllowed, "backup_required", "stale backup blocks uploads");
     now.Now = DateTimeOffset.UtcNow;
-    File.WriteAllText(options.BackupStatusPath, JsonSerializer.Serialize(new { successful_at = now.Now, verified_restore_at = (DateTimeOffset?)null }));
+    WriteBackup(now.Now, null, now.Now, now.Now);
     Reject(backup.EnsureUploadsAllowed, "backup_required", "backup without actual restore drill blocks uploads");
+    WriteBackup(now.Now, now.Now.AddDays(-9), now.Now, now.Now);
+    Reject(backup.EnsureUploadsAllowed, "backup_required", "restore verification older than eight days blocks uploads");
+    WriteBackup(now.Now, now.Now, null, now.Now);
+    Reject(backup.EnsureUploadsAllowed, "backup_required", "missing database backup proof blocks uploads");
+    WriteBackup(now.Now, now.Now, now.Now.AddHours(-49), now.Now);
+    Reject(backup.EnsureUploadsAllowed, "backup_required", "stale database backup blocks uploads");
+    WriteBackup(now.Now, now.Now, now.Now, now.Now.AddDays(-9));
+    Reject(backup.EnsureUploadsAllowed, "backup_required", "stale database restore verification blocks uploads");
     options.UploadsEnabled = false;
     Reject(backup.EnsureUploadsAllowed, "uploads_paused", "default activation switch blocks uploads");
     options.UploadsEnabled = true;
-    File.WriteAllText(options.BackupStatusPath, JsonSerializer.Serialize(new { successful_at = now.Now, verified_restore_at = now.Now }));
+    WriteBackup(now.Now, now.Now, now.Now, now.Now);
+
+    await HardeningChecks.RunAsync(options, Check);
 
     var video = Path.Combine(directory, "fixture.mp4");
     var poster = Path.Combine(directory, "fixture.jpg");
@@ -105,6 +118,7 @@ try
         builder.Services.Replace(ServiceDescriptor.Singleton(options));
         builder.Services.Replace(ServiceDescriptor.Singleton<TimeProvider>(now));
         builder.Services.Replace(ServiceDescriptor.Singleton<ICommunityGateway>(gateway));
+        builder.Services.Replace(ServiceDescriptor.Singleton<IExpiryGateway>(new EmptyExpiryGateway()));
         builder.Services.Replace(ServiceDescriptor.Singleton<IStorageGuard>(guard));
     });
     await app.StartAsync();
@@ -143,6 +157,9 @@ try
     options.UploadsEnabled = false;
     await Status(Send(HttpMethod.Put, clipPath + "/video", videoBytes), HttpStatusCode.ServiceUnavailable, "paused uploads do not write files");
     options.UploadsEnabled = true;
+    gateway.UploadExpiresAt = now.Now.AddMinutes(-1);
+    await Status(Send(HttpMethod.Put, clipPath + "/video", videoBytes), HttpStatusCode.Gone, "expired reservation rejects upload before storing bytes");
+    gateway.UploadExpiresAt = now.Now.AddMinutes(30);
     await Status(Send(HttpMethod.Put, clipPath + "/video", videoBytes), HttpStatusCode.OK, "bounded streamed video uploads");
     await Status(Send(HttpMethod.Put, clipPath + "/poster", posterBytes, "image/jpeg"), HttpStatusCode.OK, "bounded thumbnail uploads");
     await Status(Send(HttpMethod.Put, clipPath + "/video", videoBytes), HttpStatusCode.Conflict, "uploaded assets cannot be overwritten");
@@ -179,6 +196,16 @@ try
     }
     await Status(Send(HttpMethod.Get, assetPath + "&signature=bad", token: null), HttpStatusCode.Forbidden, "duplicate signed query argument rejected");
     await Status(Send(HttpMethod.Get, assetPath.Replace(owner.ToString("D"), other.ToString("D")), token: null), HttpStatusCode.Forbidden, "HTTP asset owner tampering rejected");
+    gateway.ModerationHidden = true;
+    await Status(Send(HttpMethod.Post, clipPath + "/playback"), HttpStatusCode.NotFound, "hidden clip owner cannot mint playback capabilities");
+    await Status(Send(HttpMethod.Get, assetPath, token: null), HttpStatusCode.NotFound, "moderation revokes an already-issued home playback link");
+    await Status(Send(HttpMethod.Head, assetPath, token: null), HttpStatusCode.NotFound, "moderation also prevents HEAD metadata access");
+    gateway.ModerationHidden = false;
+    gateway.AccessCheckUnavailable = true;
+    await Status(Send(HttpMethod.Get, assetPath, token: null), HttpStatusCode.ServiceUnavailable, "visibility lookup outage fails closed");
+    gateway.AccessCheckUnavailable = false;
+    using (var recovered = await Send(HttpMethod.Head, assetPath, token: null))
+        Check(recovered.StatusCode == HttpStatusCode.OK, "denied access checks release their bounded playback leases");
     now.Now = now.Now.AddMinutes(6);
     await Status(Send(HttpMethod.Get, assetPath, token: null), HttpStatusCode.Forbidden, "expired HTTP playback capability rejected");
     now.Now = DateTimeOffset.UtcNow;
@@ -228,11 +255,15 @@ sealed class FixtureGateway(Guid owner, Guid other, Guid id, long bytes) : IComm
     private string _status = "uploading";
     private bool _deleted;
     public bool DenyPlayback { get; set; }
+    public bool ModerationHidden { get; set; }
+    public bool AccessCheckUnavailable { get; set; }
+    public int AccessChecks { get; private set; }
+    public DateTimeOffset UploadExpiresAt { get; set; } = DateTimeOffset.UtcNow.AddMinutes(30);
     public int PublishCalls { get; private set; }
     public MediaEvidence? Evidence { get; private set; }
     private JsonElement Clip() => JsonSerializer.SerializeToElement(new { id, owner_id = owner, status = _status,
-        storage_provider = "home", byte_size = bytes, duration_seconds = 1.0, title = "Fixture", description = "",
-        username = "fixture", display_name = "Fixture", created_at = DateTimeOffset.UtcNow,
+        storage_provider = "home", byte_size = bytes, duration_seconds = 1.0, upload_expires_at = UploadExpiresAt, title = "Fixture", description = "",
+        username = "fixture", display_name = "Fixture", created_at = DateTimeOffset.UtcNow, moderation_hidden = ModerationHidden,
         video_path = $"{owner:D}/{id:D}/video.mp4", poster_path = $"{owner:D}/{id:D}/poster.jpg",
         like_count = 0, comment_count = 0, liked_by_me = false });
     public Task<MediaIdentity> AuthenticateAsync(string token, CancellationToken cancellation) => token switch
@@ -245,6 +276,13 @@ sealed class FixtureGateway(Guid owner, Guid other, Guid id, long bytes) : IComm
     {
         if (requested != id || _deleted || DenyPlayback && identity.UserId != owner) throw MediaException.Unavailable();
         return Task.FromResult(GatewayClip.Parse(Clip()));
+    }
+    public Task<bool> IsAssetAllowedAsync(Guid requested, Guid requestedOwner, CancellationToken cancellation)
+    {
+        AccessChecks++;
+        if (AccessCheckUnavailable) throw MediaException.StorageUnavailable();
+        return Task.FromResult(requested == id && requestedOwner == owner && !_deleted && _status == "published"
+            && !ModerationHidden && !DenyPlayback);
     }
     public Task<JsonElement> PublishAsync(MediaIdentity identity, Guid requested, MediaEvidence evidence, CancellationToken cancellation)
     {

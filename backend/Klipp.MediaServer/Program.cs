@@ -41,9 +41,13 @@ public static class MediaServerApplication
         builder.Services.AddSingleton<IBackupGate, BackupGate>();
         builder.Services.AddSingleton<PrivateMediaStore>();
         builder.Services.AddSingleton<MediaSigner>();
+        builder.Services.AddSingleton<PlaybackGovernor>();
         builder.Services.AddSingleton<IMediaValidator, FfprobeMediaValidator>();
         builder.Services.AddHttpClient<ICommunityGateway, SupabaseCommunityGateway>(client => client.Timeout = TimeSpan.FromSeconds(15))
             .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler { AllowAutoRedirect = false, PooledConnectionLifetime = TimeSpan.FromMinutes(5) });
+        builder.Services.AddHttpClient<IExpiryGateway, SupabaseCommunityGateway>(client => client.Timeout = TimeSpan.FromSeconds(15))
+            .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler { AllowAutoRedirect = false, PooledConnectionLifetime = TimeSpan.FromMinutes(5) });
+        builder.Services.AddHostedService<ExpiryJanitor>();
         builder.Services.AddCors(cors => cors.AddDefaultPolicy(policy => policy.WithOrigins(options.AllowedOrigins)
             .WithMethods("GET", "HEAD", "POST", "DELETE").WithHeaders("Authorization", "Content-Type", "Range")
             .WithExposedHeaders("Accept-Ranges", "Content-Range", "Content-Length")));

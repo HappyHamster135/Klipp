@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Klipp.Core\Klipp.Core.csproj" />
+    <Compile Include="..\..\src\Klipp.Desktop\Services\CommunityConfigurationService.cs" Link="CommunityConfigurationService.cs" />
+    <Compile Include="..\..\src\Klipp.Desktop\Services\CommunitySessionStore.cs" Link="CommunitySessionStore.cs" />
+  </ItemGroup>
+</Project>

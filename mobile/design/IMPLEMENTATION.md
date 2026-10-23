@@ -71,3 +71,18 @@ The frozen local SHA-256 hashes are `4457411effe3c0464333e9c8970911d4cb33a5ffe8e
 ## Distribution
 
 The [manual workflow](../../.github/workflows/mobile-pages.yml) builds a review ZIP unless Pages deployment is explicitly selected. It uses the existing free hosting/services and does not enable hosting, change DNS or modify Windows releases. Native wrappers and app-store distribution are separate decisions.
+
+## Account operations on 2026-10-23
+
+Usage, private help, operator moderation and self-service account deletion are implemented behind both the reviewed mobile build switch and identity-scoped live version-1 capabilities. Operator access comes from the private database allowlist. New operations screens load lazily; mobile remains watch/interact only with no upload picker or transport.
+
+| Before | After | Why |
+| --- | --- | --- |
+| Account tools were hidden prototypes | Usage and Help are enabled only after the deployed service confirms support | Prevent incomplete deployment or stale roles exposing actions |
+| Capacity had no usable explanation | Clip slots, tracked logical bytes, database capacity and current/unknown provider observations have separate labels and warnings | Avoid treating billing usage as free disk space or missing measurements as zero |
+| Reports had one shared draft | Each report/request retains its own note/reply, with explicit hide confirmation and navigation guards | Prevent sending a decision to the wrong item or losing work |
+| Account removal required operator intervention | Typed current-handle confirmation, durable cleanup intent and physical file removal precede Auth deletion | Retry interruption without falsely reporting deletion or leaving hosted files behind |
+
+Validation: 94 mobile unit tests, 154 browser cases (77 Android Chromium and 77 iPhone WebKit), 918 Core tests, 130 actual Linux media-server checks, 63 rollback SQL checks and 54 mocked deletion-function checks passed. The rendered Chrome fixture also passed usage navigation, unsent-request protection, submission and deletion-dialog cancellation with no console errors. Phone emulation does not establish a new physical-device account-deletion result. Existing iPhone and Z Flip viewer results belong to the earlier viewer flows.
+
+The reviewed SQL migration and JWT-protected deletion function are deployed. A valid-session malformed-request probe verified the actual Edge runtime safely rejects non-confirming input. No real account was deleted. API activation is staged behind the local administrator step; public feature activation, current Windows release and hosted monitor checks must be recorded separately after successful rollout. An off-site drive and actual reboot test remain operator/hardware steps, not completed checks.

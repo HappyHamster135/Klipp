@@ -15,6 +15,13 @@ public sealed class MediaOptions
     public string FfprobePath { get; set; } = "/usr/bin/ffprobe";
     public string[] AllowedOrigins { get; set; } = ["https://happyhamster135.github.io"];
     public long MinimumFreeBytes { get; set; } = 1024L * 1024 * 1024;
+    public int MaximumVideoStreams { get; set; } = 8;
+    public int MaximumVideoStreamsPerClient { get; set; } = 4;
+    public int MaximumPlaybackStreams { get; set; } = 64;
+    public int MaximumPlaybackStreamsPerClient { get; set; } = 16;
+    public int PlaybackBytesPerSecond { get; set; } = 20 * 1024 * 1024;
+    public int PlaybackBurstBytes { get; set; } = 4 * 1024 * 1024;
+    public int PlaybackStreamTimeoutSeconds { get; set; } = 180;
     public const long MaximumVideoBytes = 16 * 1024 * 1024;
     public const long MaximumPosterBytes = 256 * 1024;
     public const double MaximumDurationSeconds = 60;
@@ -36,6 +43,14 @@ public sealed class MediaOptions
             throw new InvalidOperationException("The private data directory must be inside the required media mount.");
         if (!Path.IsPathFullyQualified(FfprobePath) || MinimumFreeBytes < 256L * 1024 * 1024)
             throw new InvalidOperationException("Configure the installed ffprobe path and a free-space reserve of at least 256 MiB.");
+        if (MaximumVideoStreams is < 1 or > 128 || MaximumVideoStreamsPerClient < 1
+            || MaximumVideoStreamsPerClient > MaximumVideoStreams || PlaybackBytesPerSecond is < 1048576 or > 268435456
+            || MaximumPlaybackStreams is < 1 or > 256 || MaximumPlaybackStreamsPerClient < 1
+            || MaximumPlaybackStreamsPerClient > MaximumPlaybackStreams || MaximumVideoStreams > MaximumPlaybackStreams
+            || MaximumVideoStreamsPerClient > MaximumPlaybackStreamsPerClient
+            || PlaybackBurstBytes is < 65536 or > 16777216 || PlaybackBurstBytes > PlaybackBytesPerSecond
+            || PlaybackStreamTimeoutSeconds is < 30 or > 180)
+            throw new InvalidOperationException("Configure bounded playback streams and an aggregate byte budget.");
         foreach (var origin in AllowedOrigins) ValidateOrigin(origin);
     }
 

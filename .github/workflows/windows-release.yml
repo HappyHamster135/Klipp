@@ -70,6 +70,16 @@ jobs:
       - name: Check version-specific release notes
         run: powershell -NoProfile -File tools/Test-KlippReleaseNotes.ps1
         shell: pwsh
+      - name: Check public publisher configuration and update payload validation
+        run: powershell -NoProfile -ExecutionPolicy Bypass -File tools/Test-KlippCommunityConfigurationChecks.ps1
+        shell: pwsh
+      - name: Prepare public community configuration
+        shell: pwsh
+        env:
+          KLIPP_SUPABASE_URL: ${{ vars.KLIPP_SUPABASE_URL }}
+          KLIPP_SUPABASE_PUBLISHABLE_KEY: ${{ vars.KLIPP_SUPABASE_PUBLISHABLE_KEY }}
+          KLIPP_MEDIA_API_URL: ${{ vars.KLIPP_MEDIA_API_URL }}
+        run: powershell -NoProfile -ExecutionPolicy Bypass -File tools/New-KlippCommunityConfiguration.ps1 -OutputPath backend/community.json -RequireOnlineConfiguration
       - name: Check Windows shortcut icon repair
         run: dotnet run --project tools/Klipp.ShortcutHarness/Klipp.ShortcutHarness.csproj -c Release
         shell: pwsh
@@ -88,6 +98,15 @@ jobs:
           SIGNPATH_POLICY: release-signing
           SIGNPATH_API_TOKEN: ${{ inputs.sign && secrets.SIGNPATH_API_TOKEN || '' }}
           SIGNPATH_GITHUB_TOKEN: ${{ inputs.sign && github.token || '' }}
+      - name: Verify public configuration survives in the update payload
+        shell: pwsh
+        env:
+          KLIPP_ARTIFACT_DIRECTORY: ${{ steps.build.outputs.artifact-directory }}
+          KLIPP_CANDIDATE_VERSION: ${{ inputs.version }}
+        run: |
+          $package = Join-Path $env:KLIPP_ARTIFACT_DIRECTORY ("HappyHamster135.Klipp-" + $env:KLIPP_CANDIDATE_VERSION + "-full.nupkg")
+          powershell -NoProfile -ExecutionPolicy Bypass -File tools/Test-KlippCommunityConfiguration.ps1 -ExpectedConfigurationPath backend/community.json -FullPackagePath $package
+          if ($LASTEXITCODE -ne 0) { throw 'Public publisher configuration did not pass update payload verification.' }
       - name: Upload candidate for maintainer review
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:

@@ -32,6 +32,7 @@ public sealed partial class ClipCard : UserControl
     public event EventHandler<ClipCardClickEventArgs>? OrganizeRequested;
     public event EventHandler<ClipCardClickEventArgs>? RenameRequested;
     public event EventHandler<ClipCardClickEventArgs>? DeleteRequested;
+    public event EventHandler<ClipCardClickEventArgs>? UploadRequested;
 
     /// <summary>
     /// Filsökväg som identifierar vilket klipp kortet representerar.
@@ -344,6 +345,11 @@ public sealed partial class ClipCard : UserControl
     private void OnDeleteClicked(object sender, RoutedEventArgs e)
     {
         DeleteRequested?.Invoke(this, new ClipCardClickEventArgs(ClipFilePath));
+    }
+
+    private void OnUploadClicked(object sender, RoutedEventArgs e)
+    {
+        UploadRequested?.Invoke(this, new ClipCardClickEventArgs(ClipFilePath));
     }
 
     private bool IsActionSource(object originalSource)

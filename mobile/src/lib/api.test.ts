@@ -47,6 +47,59 @@ function cleanupReply(request: Captured): Response {
   return json([]);
 }
 
+describe('verified account tools and destructive confirmations',()=>{
+  const profile=(username:string|null='player',id=owner)=>[{id,username,display_name:'Player',bio:''}];
+  async function account(){const f=fixture();await f.signIn();f.reply=()=>json(profile());await f.api.getProfile();return f;}
+  it('fetches live capabilities using only the current public key and user bearer',async()=>{
+    const f=await account();f.reply=()=>json({version:1,enabled:true,operator:true,account_deletion:true});
+    expect(await f.api.getOperationsCapabilities()).toEqual({version:1,enabled:true,operator:true,accountDeletion:true});
+    const request=f.requests.at(-1)!;expect(request.path).toBe('/rest/v1/rpc/community_operations_capabilities');
+    expect(request.headers.get('Authorization')).toBe('Bearer access-secret');expect(request.headers.get('apikey')).toBe(config.publishableKey);
+  });
+  it('does not enable unsupported capability versions or use user claims as fallback',async()=>{
+    const f=await account();f.reply=()=>json({version:2,enabled:true,operator:true,account_deletion:true});
+    expect(await f.api.getOperationsCapabilities()).toMatchObject({enabled:false,operator:false,accountDeletion:false});
+    f.reply=()=>json({version:1,enabled:true,operator:'true',account_deletion:true});
+    await expect(f.api.getOperationsCapabilities()).rejects.toMatchObject({code:'unavailable'});
+  });
+  it('rejects a late capability response after sign-out',async()=>{
+    const f=await account();let resolve!:(value:Response)=>void;let started!:()=>void;const beginning=new Promise<void>(done=>{started=done;});
+    f.reply=request=>request.path.endsWith('community_operations_capabilities')?new Promise<Response>(done=>{resolve=done;started();}):json({});
+    const pending=f.api.getOperationsCapabilities();await beginning;const signout=f.api.signOut();resolve(json({version:1,enabled:true,operator:true,account_deletion:true}));
+    await expect(pending).rejects.toMatchObject({name:'AbortError'});await signout;expect(f.api.user).toBeNull();
+  });
+  it('rechecks the current self profile and stops deletion if the username changed',async()=>{
+    const f=await account();f.reply=request=>{expect(request.path).toContain('/rest/v1/profiles?');return json(profile('new_name'));};
+    await expect(f.api.deleteAccount('player')).rejects.toMatchObject({code:'confirmation_required'});
+    expect(f.api.profile?.username).toBe('new_name');expect(f.api.user?.id).toBe(owner);expect(f.requests.some(request=>request.path.includes('community-delete-account'))).toBe(false);
+  });
+  it('keeps pending cleanup signed in and retryable',async()=>{
+    const f=await account();f.reply=request=>request.path.startsWith('/rest/v1/profiles')?json(profile()):json({code:'KO004'},409);
+    await expect(f.api.deleteAccount('player')).rejects.toMatchObject({code:'deletion_pending'});
+    expect(f.api.user?.id).toBe(owner);expect(f.storage.values.size).toBeGreaterThan(0);
+  });
+  it('never clears credentials on an unacknowledged deletion',async()=>{
+    const f=await account();f.reply=request=>request.path.startsWith('/rest/v1/profiles')?json(profile()):json({deleted:false});
+    await expect(f.api.deleteAccount('player')).rejects.toMatchObject({code:'unavailable'});expect(f.api.user?.id).toBe(owner);
+  });
+  it('only clears the identity and saved session after the server acknowledges deletion',async()=>{
+    const f=await account();f.reply=request=>request.path.startsWith('/rest/v1/profiles')?json(profile()):json({deleted:true});
+    await f.api.deleteAccount('player');expect(f.api.user).toBeNull();expect(f.storage.values.size).toBe(0);
+  });
+  it('permits verified incomplete profiles to confirm account deletion using DELETE',async()=>{
+    const f=await account();f.reply=()=>json(profile(null));await f.api.getProfile();f.reply=request=>request.path.startsWith('/rest/v1/profiles')?json(profile(null)):json({deleted:true});
+    await f.api.deleteAccount('DELETE');expect(f.api.user).toBeNull();
+  });
+  it.each([false,true])('does not request a capability for hidden video or poster (%s)',async poster=>{
+    const f=await account();f.reply=request=>{expect(request.path).toContain('community_get_clip');return json(clip({moderation_hidden:true}));};
+    await expect(poster?f.api.getPosterUrl(clipId):f.api.getPlaybackUrl(clipId)).rejects.toMatchObject({code:'clip_unavailable'});
+  });
+  it('requires a meaningful review note and preserves 1000-character server notes',async()=>{
+    const f=await account();expect(()=>f.api.reviewClip(clipId,'hide','')).toThrow('Write a review note');
+    f.reply=()=>json({reviewed:true,hidden:true});await f.api.reviewClip(clipId,'hide','a'.repeat(1000));
+  });
+});
+
 describe('public configuration and browser sessions', () => {
   it('rejects privileged keys and non-root/insecure URLs', () => {
     for (const key of ['sb_secret_private', 'eyJpdiI.eyJyb2xlIjoic2VydmljZV9yb2xlIn0.signature', 'YOUR_KEY'])
@@ -420,9 +473,12 @@ describe('home-hosted media alongside existing clips', () => {
     await expect(f.api.getPlaybackUrl(clipId)).rejects.toMatchObject({code:'offline'});
     expect(f.requests.some(request=>request.path.startsWith('/storage/'))).toBe(false);
   });
-  it.each(['uploads_paused','backup_required'])('explains paused hosting without displaying private server details: %s',async code=>{
+  it.each([
+    ['uploads_paused','Uploads are temporarily paused while clip storage is being prepared. Please try again later.'],
+    ['backup_required','Uploads are temporarily paused until the server backup and recovery checks pass. Please try again later.'],
+  ])('explains paused hosting without displaying private server details: %s',async(code,message)=>{
     const f=fixture(undefined,homeConfig);await f.signIn();f.reply=request=>request.path.endsWith('community_get_clip')?json(clip({storage_provider:'home'})):json({code,message:'private provider detail'},503);
-    await expect(f.api.getPlaybackUrl(clipId)).rejects.toMatchObject({code:'hosting_unavailable',message:'Uploads are temporarily paused while clip storage is being prepared. Please try again later.'});
+    await expect(f.api.getPlaybackUrl(clipId)).rejects.toMatchObject({code:'hosting_unavailable',message});
   });
   it('rejects a malformed signed link as an unavailable clip',async()=>{
     const f=fixture(undefined,homeConfig);await f.signIn();f.reply=request=>request.path.endsWith('community_get_clip')?json(clip({storage_provider:'home'})):json(homeLinks({video_url:'not a URL'}));

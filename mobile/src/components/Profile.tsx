@@ -11,7 +11,7 @@ const normalized=(draft:Draft):Draft=>({username:draft.username.trim().toLowerCa
 const matches=(left:Draft,right:Draft)=>left.username===right.username&&left.displayName===right.displayName&&left.bio===right.bio;
 const limited=(value:string,length:number)=>[...value].slice(0,length).join('');
 
-export function Profile({api,onSaved,onSignOut,onEditingChange,onUsage,onHelp}:{api:Api;onSaved:()=>void;onSignOut:()=>void;onEditingChange?:(state:ProfileEditingState)=>void;onUsage?:()=>void;onHelp?:()=>void}) {
+export function Profile({api,onSaved,onSignOut,onEditingChange,onUsage,onHelp,toolsError,onRetryTools}:{api:Api;onSaved:()=>void;onSignOut:()=>void;onEditingChange?:(state:ProfileEditingState)=>void;onUsage?:()=>void;onHelp?:()=>void;toolsError?:string;onRetryTools?:()=>void}) {
   const[draft,setDraft]=useState<Draft>(()=>({username:api.profile?.username??'',displayName:api.profile?.displayName??'',bio:api.profile?.bio??''}));
   const[busy,setBusy]=useState<'save'|'blocked'|'unblock'|null>(null),[notice,setNotice]=useState(''),[blocked,setBlocked]=useState<CommunityBlockedUser[]|null>(null);
   const draftRef=useRef(draft),baseline=useRef(normalized(draft)),requestBusy=useRef(false),operation=useRef<'save'|'blocked'|'unblock'|null>(null),lifetime=useRef<Scope|null>(null);
@@ -58,6 +58,7 @@ export function Profile({api,onSaved,onSignOut,onEditingChange,onUsage,onHelp}:{
     <h1>Your profile</h1>
     {!api.profile?.username?<p>Choose a username to join the conversation.</p>:null}
     {notice?<Notice onClose={()=>setNotice('')}>{notice}</Notice>:null}
+    {toolsError?<Notice>Account tools could not be checked. {toolsError} <button disabled={!!busy} onClick={onRetryTools}>Retry account tools</button></Notice>:null}
     <form onSubmit={save}>
       <div><label>Username<input value={draft.username} disabled={busy==='save'} onChange={event=>edit('username',event.target.value.toLowerCase())} pattern="[a-z][a-z0-9_]{2,23}" minLength={3} maxLength={24} required autoCapitalize="none" autoCorrect="off" spellCheck={false} autoComplete="username" aria-describedby="profile-username-help" title="Start with a letter. Use 3–24 lowercase letters, numbers or underscores."/></label><small id="profile-username-help">Start with a letter. Use 3–24 lowercase letters, numbers or underscores.</small></div>
       <div><label>Display name<input value={draft.displayName} disabled={busy==='save'} onChange={event=>edit('displayName',limited(event.target.value,40))} maxLength={80} required autoComplete="nickname" aria-describedby="profile-name-help"/></label><small id="profile-name-help">Shown beside your clips and comments. {[...draft.displayName].length}/40 characters</small></div>

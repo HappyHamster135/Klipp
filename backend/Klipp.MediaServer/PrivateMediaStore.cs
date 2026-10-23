@@ -7,6 +7,8 @@ public sealed partial class PrivateMediaStore(MediaOptions options, IStorageGuar
 {
     private readonly SemaphoreSlim[] _clipLocks = Enumerable.Range(0, 64).Select(_ => new SemaphoreSlim(1, 1)).ToArray();
     private readonly SemaphoreSlim _mutations = new(4, 4);
+    private readonly Dictionary<Guid, AccountSlots> _accounts = [];
+    private readonly object _accountGate = new();
 
     public IStorageGuard Guard => guard;
     public string AssetPath(Guid owner, Guid clip, string asset)
@@ -18,15 +20,45 @@ public sealed partial class PrivateMediaStore(MediaOptions options, IStorageGuar
         return path;
     }
 
-    public async Task<IAsyncDisposable> AcquireClipAsync(Guid clip, CancellationToken token)
+    public async Task<IAsyncDisposable> AcquireClipAsync(Guid owner, Guid clip, CancellationToken token)
     {
+        if (owner == Guid.Empty || clip == Guid.Empty) throw MediaException.Unavailable();
+        AccountSlots account;
+        lock (_accountGate)
+        {
+            if (!_accounts.TryGetValue(owner, out account!)) _accounts.Add(owner, account = new AccountSlots());
+            account.References++;
+        }
         var clipLock = _clipLocks[(uint)clip.GetHashCode() % _clipLocks.Length];
-        if (!await _mutations.WaitAsync(TimeSpan.FromSeconds(10), token))
-            throw new MediaException(429, "server_busy", "Clip storage is busy. Try again shortly.");
-        try { await clipLock.WaitAsync(token); }
-        catch { _mutations.Release(); throw; }
-        return new AsyncRelease(() => { clipLock.Release(); _mutations.Release(); });
+        var hasAccount = false;
+        var hasClip = false;
+        var hasGlobal = false;
+        void Release()
+        {
+            if (hasGlobal) _mutations.Release();
+            if (hasClip) clipLock.Release();
+            if (hasAccount) account.Slots.Release();
+            lock (_accountGate)
+            {
+                if (--account.References == 0) { _accounts.Remove(owner); account.Slots.Dispose(); }
+            }
+        }
+        try
+        {
+            hasAccount = await account.Slots.WaitAsync(TimeSpan.FromSeconds(2), token);
+            if (!hasAccount) throw Busy();
+            // Duplicate edits wait here without reserving the global work budget.
+            hasClip = await clipLock.WaitAsync(TimeSpan.FromSeconds(10), token);
+            if (!hasClip) throw Busy();
+            hasGlobal = await _mutations.WaitAsync(TimeSpan.FromSeconds(10), token);
+            if (!hasGlobal) throw Busy();
+            return new AsyncRelease(Release);
+        }
+        catch { Release(); throw; }
     }
+
+    private static MediaException Busy() => new(429, "server_busy", "Clip storage is busy. Try again shortly.");
+    private sealed class AccountSlots { public readonly SemaphoreSlim Slots = new(2, 2); public int References; }
 
     public async Task<IAsyncDisposable> AcquireBackupReadLockAsync(CancellationToken token)
     {
