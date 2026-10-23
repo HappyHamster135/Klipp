@@ -1,4 +1,4 @@
-import {useCallback,useEffect,useRef,useState} from 'react';
+import {lazy,Suspense,useCallback,useEffect,useRef,useState} from 'react';
 import {Clapperboard,UserRound} from 'lucide-react';
 import type {Api} from './lib/service';
 import {messageFor} from './lib/service';
@@ -8,7 +8,11 @@ import {Feed} from './components/Feed';
 import {Dialog,Notice} from './components/Primitives';
 import {useAppNavigation,type AppPage} from './lib/navigation';
 
-export function App({api,remember=false,onRemember=()=>{},fixture=false}:{api:Api;remember?:boolean;onRemember?:(value:boolean)=>void;fixture?:boolean}) {
+const UsageDashboard=lazy(()=>import('./components/Usage').then(module=>({default:module.UsageDashboard})));
+const Operations=lazy(()=>import('./components/Operations').then(module=>({default:module.Operations})));
+const Support=lazy(()=>import('./components/Support').then(module=>({default:module.Support})));
+
+export function App({api,remember=false,onRemember=()=>{},fixture=false,operationsEnabled=false}:{api:Api;remember?:boolean;onRemember?:(value:boolean)=>void;fixture?:boolean;operationsEnabled?:boolean}) {
   const [account,setAccount]=useState(()=>({api,user:api.user,profile:api.profile}));
   const [restoration,setRestoration]=useState(()=>({api,done:false,pending:true,error:'',attempt:0})),[restoreRetry,setRestoreRetry]=useState(0);
   const restoreLock=useRef(false);
@@ -16,6 +20,8 @@ export function App({api,remember=false,onRemember=()=>{},fixture=false}:{api:Ap
   const [profileRetry,setProfileRetry]=useState(0);
   const [notice,setNotice]=useState(''),[feedVersion,setFeedVersion]=useState(0),[online,setOnline]=useState(navigator.onLine);
   const [profileEditing,setProfileEditing]=useState<ProfileEditingState>({dirty:false,busy:false}),[leaveProfile,setLeaveProfile]=useState(false);
+  const [leaveKind,setLeaveKind]=useState<'profile'|'message'>('profile');
+  const editingPage=useRef<'profile'|'message'>('profile');
   const editing=useRef(profileEditing),decision=useRef<{promise:Promise<boolean>;resolve:(allow:boolean)=>void}|null>(null),signingOut=useRef(false);
   const updateEditing=useCallback((state:ProfileEditingState)=>{editing.current=state;setProfileEditing(previous=>previous.dirty===state.dirty&&previous.busy===state.busy?previous:state);},[]);
   const finishLeave=useCallback((allow:boolean)=>{const pending=decision.current;decision.current=null;if(pending){setLeaveProfile(false);pending.resolve(allow);}},[]);
@@ -23,11 +29,12 @@ export function App({api,remember=false,onRemember=()=>{},fixture=false}:{api:Ap
     if(editing.current.busy)return false;
     if(!editing.current.dirty)return true;
     if(decision.current)return decision.current.promise;
-    let resolve:(allow:boolean)=>void=()=>{};
+    setLeaveKind(editingPage.current);let resolve:(allow:boolean)=>void=()=>{};
     const promise=new Promise<boolean>(done=>{resolve=done;});decision.current={promise,resolve};setLeaveProfile(true);return promise;
   },[]);
   const navigation=useAppNavigation(confirmLeave);
   const {page,watchId}=navigation.route;
+  editingPage.current=page==='help'?'message':'profile';
   // A replacement client never inherits the previous client's visible identity.
   const current=account.api===api?account:{api,user:api.user,profile:api.profile};
   const restoring=restoration.api!==api||restoration.pending||restoration.attempt!==restoreRetry;
@@ -76,6 +83,9 @@ export function App({api,remember=false,onRemember=()=>{},fixture=false}:{api:Ap
   useEffect(()=>{
     if(profileReady&&!current.profile?.username&&page!=='profile')void navigation.navigate({page:'profile',watchId:null},{replace:true,bypassGuard:true});
   },[profileReady,current.profile?.username,page,navigation.navigate]);
+  useEffect(()=>{
+    if(!operationsEnabled&&page!=='media'&&page!=='profile')void navigation.navigate({page:'profile',watchId:null},{replace:true,bypassGuard:true});
+  },[operationsEnabled,page,navigation.navigate]);
 
   useEffect(()=>{const update=()=>setOnline(navigator.onLine);window.addEventListener('online',update);window.addEventListener('offline',update);return()=>{window.removeEventListener('online',update);window.removeEventListener('offline',update);};},[]);
   useEffect(()=>{
@@ -103,7 +113,10 @@ export function App({api,remember=false,onRemember=()=>{},fixture=false}:{api:Ap
   else if(restoring||!profileReady)content=profileError?
     <main className="empty"><h1>Your profile could not load</h1><p>{profileError}</p><div className="dialog-actions"><button className="primary" onClick={()=>setProfileRetry(value=>value+1)}>Retry</button><button onClick={()=>void signOut()}>Sign out</button></div></main>:
     <main className="loading" role="status">Loading your profile…</main>;
-  else if(page==='profile'||!complete)content=<Profile key={userId} api={api} onSaved={()=>{setAccount({api,user:api.user,profile:api.profile});setFeedVersion(value=>value+1);}} onSignOut={()=>void signOut()} onEditingChange={updateEditing}/>;
+  else if(page==='profile'||!complete||!operationsEnabled&&page!=='media')content=<Profile key={userId} api={api} onSaved={()=>{setAccount({api,user:api.user,profile:api.profile});setFeedVersion(value=>value+1);}} onSignOut={()=>void signOut()} onEditingChange={updateEditing} onUsage={operationsEnabled?()=>navigate('usage'):undefined} onHelp={operationsEnabled?()=>navigate('help'):undefined}/>;
+  else if(operationsEnabled&&page==='usage')content=<UsageDashboard api={api} onBack={()=>navigate('profile')} onManage={()=>navigate('manage')} onManageClips={()=>navigate('media')}/>;
+  else if(operationsEnabled&&page==='manage')content=<Operations api={api} onBack={()=>navigate('usage')} onOpenClip={id=>watch(id)}/>;
+  else if(operationsEnabled&&page==='help')content=<Support api={api} onBack={()=>navigate('profile')} onDeleted={()=>{setAccount({api,user:api.user,profile:api.profile});setNotice('Your Klipp account and shared content have been deleted. Your original recordings stay on your devices.');void navigation.navigate({page:'media',watchId:null},{replace:true,bypassGuard:true});}} onEditingChange={updateEditing}/>;
   else content=<Feed api={api} version={feedVersion} watchId={watchId} onWatchChange={watch}/>;
-  return <div className="app-shell"><header className="app-header"><a className="brand" href="#media" onClick={event=>{event.preventDefault();navigate('media');}}><img src="./icons/klipp.svg" width="29" height="29" alt=""/>Klipp</a>{current.user?<button className="avatar" disabled={!profileReady||profileEditing.busy} onClick={()=>navigate('profile')} aria-label="Your profile">{(current.profile?.displayName||'K')[0].toUpperCase()}</button>:null}</header>{fixture?<div className="fixture-banner">Local test data · no online changes</div>:null}{!online?<Notice>You’re offline. Connect to the internet to use Media.</Notice>:null}{navigation.uploadNotice?<Notice onClose={navigation.dismissUploadNotice}>Upload clips from Klipp on your PC.</Notice>:null}{notice?<Notice onClose={()=>setNotice('')}>{notice}</Notice>:null}{content}{current.user?<nav className="bottom-nav" aria-label="Main navigation"><button aria-current={page==='media'?'page':undefined} disabled={!profileReady||profileEditing.busy} onClick={()=>navigate('media')}><Clapperboard/>Media</button><button aria-current={page==='profile'?'page':undefined} disabled={!profileReady||profileEditing.busy} onClick={()=>navigate('profile')}><UserRound/>Profile</button></nav>:null}<footer className="app-footer">Klipp · <a href="https://github.com/HappyHamster135/Klipp/blob/main/docs/PRIVACY.md" target="_blank" rel="noopener noreferrer">Privacy</a></footer>{leaveProfile?<Dialog title="Discard profile changes?" onClose={()=>finishLeave(false)}><p>Your changes haven’t been saved. Discard them to continue.</p><div className="dialog-actions"><button onClick={()=>finishLeave(false)}>Keep editing</button><button className="danger" onClick={()=>finishLeave(true)}>Discard changes</button></div></Dialog>:null}</div>;
+  return <div className="app-shell"><header className="app-header"><a className="brand" href="#media" onClick={event=>{event.preventDefault();navigate('media');}}><img src="./icons/klipp.svg" width="29" height="29" alt=""/>Klipp</a>{current.user?<button className="avatar" disabled={!profileReady||profileEditing.busy} onClick={()=>navigate('profile')} aria-label="Your profile">{(current.profile?.displayName||'K')[0].toUpperCase()}</button>:null}</header>{fixture?<div className="fixture-banner">Local test data · no online changes</div>:null}{!online?<Notice>You’re offline. Connect to the internet to use Media.</Notice>:null}{navigation.uploadNotice?<Notice onClose={navigation.dismissUploadNotice}>Upload clips from Klipp on your PC.</Notice>:null}{notice?<Notice onClose={()=>setNotice('')}>{notice}</Notice>:null}<Suspense fallback={<main className="loading" role="status">Opening account tools…</main>}>{content}</Suspense>{current.user?<nav className="bottom-nav" aria-label="Main navigation"><button aria-current={page==='media'?'page':undefined} disabled={!profileReady||profileEditing.busy} onClick={()=>navigate('media')}><Clapperboard/>Media</button><button aria-current={page!=='media'?'page':undefined} disabled={!profileReady||profileEditing.busy} onClick={()=>navigate('profile')}><UserRound/>Profile</button></nav>:null}<footer className="app-footer">Klipp · <a href="https://github.com/HappyHamster135/Klipp/blob/main/docs/PRIVACY.md" target="_blank" rel="noopener noreferrer">Privacy</a></footer>{leaveProfile?<Dialog title={leaveKind==='profile'?'Discard profile changes?':'Discard your message?'} onClose={()=>finishLeave(false)}><p>Your changes haven’t been saved. Discard them to continue.</p><div className="dialog-actions"><button onClick={()=>finishLeave(false)}>Keep editing</button><button className="danger" onClick={()=>finishLeave(true)}>Discard changes</button></div></Dialog>:null}</div>;
 }

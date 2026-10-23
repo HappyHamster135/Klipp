@@ -11,7 +11,7 @@ const normalized=(draft:Draft):Draft=>({username:draft.username.trim().toLowerCa
 const matches=(left:Draft,right:Draft)=>left.username===right.username&&left.displayName===right.displayName&&left.bio===right.bio;
 const limited=(value:string,length:number)=>[...value].slice(0,length).join('');
 
-export function Profile({api,onSaved,onSignOut,onEditingChange}:{api:Api;onSaved:()=>void;onSignOut:()=>void;onEditingChange?:(state:ProfileEditingState)=>void}) {
+export function Profile({api,onSaved,onSignOut,onEditingChange,onUsage,onHelp}:{api:Api;onSaved:()=>void;onSignOut:()=>void;onEditingChange?:(state:ProfileEditingState)=>void;onUsage?:()=>void;onHelp?:()=>void}) {
   const[draft,setDraft]=useState<Draft>(()=>({username:api.profile?.username??'',displayName:api.profile?.displayName??'',bio:api.profile?.bio??''}));
   const[busy,setBusy]=useState<'save'|'blocked'|'unblock'|null>(null),[notice,setNotice]=useState(''),[blocked,setBlocked]=useState<CommunityBlockedUser[]|null>(null);
   const draftRef=useRef(draft),baseline=useRef(normalized(draft)),requestBusy=useRef(false),operation=useRef<'save'|'blocked'|'unblock'|null>(null),lifetime=useRef<Scope|null>(null);
@@ -65,6 +65,7 @@ export function Profile({api,onSaved,onSignOut,onEditingChange}:{api:Api;onSaved
       <button className="primary" disabled={!!busy||!dirty}>{busy==='save'?'Saving…':'Save profile'}</button>
     </form>
     <div className="profile-actions"><button disabled={!!busy} onClick={()=>void manageBlocked()}>{busy==='blocked'?'Loading…':'Blocked users'}</button><button disabled={busy==='save'} onClick={onSignOut}>Sign out</button></div>
+    {onUsage||onHelp?<section className="profile-links" aria-label="Account tools">{onUsage?<button disabled={busy==='save'} onClick={onUsage}><span>Storage &amp; usage</span><span className="caption">Your clips and beta capacity</span></button>:null}{onHelp?<button disabled={busy==='save'} onClick={onHelp}><span>Help &amp; requests</span><span className="caption">Private support and account deletion</span></button>:null}</section>:null}
     {blocked?<section className="blocked"><h2>Blocked users</h2>{blocked.length?blocked.map(user=><div key={user.userId}><span>@{user.username||user.displayName}</span><button disabled={!!busy} onClick={()=>void unblock(user.userId)}>Unblock</button></div>):<p>No blocked users.</p>}</section>:null}
     <section className="install-help"><h2>Keep Klipp on your home screen</h2><p>iPhone: open in Safari, tap Share, then Add to Home Screen. Android: open the browser menu and choose Install app or Add to home screen.</p></section>
   </main>;

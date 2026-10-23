@@ -2,7 +2,7 @@
 import {createRoot} from 'react-dom/client';
 import {App} from '../src/App';
 import type {Api} from '../src/lib/service';
-import type {CommunityBlockedUser,CommunityClip,CommunityComment,CommunityCursor,CommunityProfile,CommunityUser} from '../src/lib/models';
+import type {CommunityBlockedUser,CommunityClip,CommunityComment,CommunityCursor,CommunityProfile,CommunityUser,CommunityUsage,CommunitySupportRequest,CommunityReport,SupportCategory,CommunityPage} from '../src/lib/models';
 import '../src/styles.css';
 
 const me='11111111-1111-4111-8111-111111111111';
@@ -45,6 +45,15 @@ class FixtureApi implements Api {
   async deleteClip(id:string,signal?:AbortSignal){const clip=await this.getClip(id,signal);if(clip.ownerId!==me)throw new Error('Only your own clip can be removed.');this.clips=this.clips.filter(item=>item.id!==id);this.comments=this.comments.filter(item=>item.clipId!==id);}
   async getPlaybackUrl(id:string,signal?:AbortSignal){await this.getClip(id,signal);this.playbackRequests.push(id);return videoUrl;}
   async getPosterUrl(id:string,signal?:AbortSignal){await this.getClip(id,signal);return this.defaultPoster;}
+  async getUsage(signal?:AbortSignal):Promise<CommunityUsage>{this.check(signal);const mine=this.clips.filter(clip=>clip.ownerId===me);return{me:{slotsUsed:mine.length,slotsLimit:5,published:mine.length,uploading:0,deleting:0,storedBytes:mine.reduce((sum,clip)=>sum+clip.byteSize,0)},beta:{slotsUsed:this.clips.length,slotsLimit:40,reservedBytes:0,storageBytes:this.clips.reduce((sum,clip)=>sum+clip.byteSize,0),storageLimitBytes:1024**3,unknownStorageObjects:0},limits:{maxVideoBytes:16*1024**2,maxDurationSeconds:60,warningPercent:80},operator:false,checkedAt:new Date().toISOString(),operations:null};}
+  private support:CommunitySupportRequest[]=[];
+  async getSupportRequests(signal?:AbortSignal){this.check(signal);return structuredClone(this.support);}
+  async submitSupport(category:SupportCategory,body:string,signal?:AbortSignal){this.check(signal);const request:CommunitySupportRequest={id:crypto.randomUUID(),category,body,status:'open',createdAt:new Date().toISOString(),updatedAt:new Date().toISOString(),reply:''};this.support.unshift(request);return {...request};}
+  async getOperatorReports(_cursor:CommunityCursor|null=null,signal?:AbortSignal):Promise<CommunityPage<CommunityReport>>{this.check(signal);throw new Error('Only Klipp moderators can open this section.');}
+  async reviewClip(_id:string,_action:'hide'|'keep',_note:string,signal?:AbortSignal):Promise<void>{this.check(signal);throw new Error('Only Klipp moderators can open this section.');}
+  async getOperatorSupport(_cursor:CommunityCursor|null=null,signal?:AbortSignal):Promise<CommunityPage<CommunitySupportRequest>>{this.check(signal);throw new Error('Only Klipp moderators can open this section.');}
+  async replySupport(_id:string,_reply:string,_status:'open'|'resolved',signal?:AbortSignal):Promise<CommunitySupportRequest>{this.check(signal);throw new Error('Only Klipp moderators can open this section.');}
+  async deleteAccount(confirmation:string,signal?:AbortSignal){this.check(signal);if(confirmation!==this.profile?.username)throw new Error('Type your username to confirm.');this.clips=this.clips.filter(clip=>clip.ownerId!==me);this.comments=this.comments.filter(comment=>comment.ownerId!==me);await this.signOut(signal);}
   snapshot(){return structuredClone({clips:this.clips,comments:this.comments,blocked:[...this.blocked],reports:this.reports,profile:this.profile,playbackRequests:this.playbackRequests});}
 }
 
@@ -55,4 +64,4 @@ const api=new FixtureApi(URL.createObjectURL(poster),new URLSearchParams(locatio
 declare global{interface Window{__klippQA:{api:FixtureApi;snapshot:()=>ReturnType<FixtureApi['snapshot']>};__klippQASetup?:(api:FixtureApi)=>void}}
 window.__klippQA={api,snapshot:()=>api.snapshot()};
 window.__klippQASetup?.(api);
-createRoot(document.getElementById('root')!).render(<App api={api} fixture/>);
+createRoot(document.getElementById('root')!).render(<App api={api} fixture operationsEnabled={new URLSearchParams(location.search).get('operations')==='1'}/>);

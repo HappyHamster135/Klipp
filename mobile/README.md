@@ -15,7 +15,7 @@ pnpm configure
 pnpm dev
 ```
 
-`pnpm configure` copies only the public project URL and `sb_publishable_` key from the ignored `backend/community.json` into the ignored `mobile/.env.local`; additional fields are refused. Never put a service-role key, database password, email-provider key or session token into a `VITE_` variable, because Vite embeds it in browser JavaScript.
+`pnpm configure` copies only the public project URL, `sb_publishable_` key and optional `mediaApiUrl` from the ignored `backend/community.json` into the ignored `mobile/.env.local`; other fields are refused. Never put a service-role key, database password, email-provider key or session token into a `VITE_` variable, because Vite embeds it in browser JavaScript.
 
 If the desktop configuration is unavailable, create `mobile/.env.local`:
 
@@ -23,6 +23,10 @@ If the desktop configuration is unavailable, create `mobile/.env.local`:
 VITE_SUPABASE_URL=https://YOUR_PROJECT_REF.supabase.co
 VITE_SUPABASE_PUBLISHABLE_KEY=sb_publishable_YOUR_PUBLIC_KEY
 ```
+
+For a verified home media host, publishers also set `VITE_MEDIA_API_URL` to its HTTPS origin (for example `https://media.shlipp.com`), or add the same origin as `mediaApiUrl` in the desktop publisher configuration before running `pnpm configure`. Add no path, token or trailing query. Keep this unset until that host, backups and external HTTPS have passed their checks; an unavailable home host never silently redirects a clip into Supabase Storage. Accounts, profiles and feed metadata remain in Supabase. Existing clips keep their original Supabase playback path; clips marked `storage_provider: home` use the configured host’s short-lived video and poster links. Desktop uploads stream directly to that host. Browsers still have no upload transport or file picker.
+
+The paused usage, moderation and private-support screens are preserved behind `operationsEnabled: false` by default, with their code loaded only if explicitly enabled. Production configuration does not enable them. Enable them in source only after their separate backend and account-cleanup paths have been deployed and verified; this hosting change does not deploy those features.
 
 The development server binds to `127.0.0.1`. A phone cannot reach the PC through its own `localhost`; use the deployed HTTPS site for phone checks.
 
@@ -77,6 +81,6 @@ Record pass/failure and the failing step for each device/browser. No email code,
 
 GitHub Pages serves public app files for this public repository on GitHub Free; the existing Supabase Free project handles accounts, protected metadata and private clips. No paid encoding server, new domain or app-store account is needed. Provider quotas still apply. [GitHub Pages availability](https://docs.github.com/en/pages/getting-started-with-github-pages/what-is-github-pages).
 
-The [mobile workflow](../.github/workflows/mobile-pages.yml) runs only manually. Configure the public repository variables `KLIPP_SUPABASE_URL` and `KLIPP_SUPABASE_PUBLISHABLE_KEY`. With **deploy unchecked**, it builds a review ZIP and SHA-256 file. With **deploy checked** on reviewed `main`, it deploys to the already-configured Pages site. It does not enable Pages, change DNS, build Windows installers or create releases. Official actions are pinned to verified commit SHAs; only the deployment job receives Pages write/OIDC permissions. Rebuild after changing public configuration.
+The [mobile workflow](../.github/workflows/mobile-pages.yml) runs only manually. Configure the public repository variables `KLIPP_SUPABASE_URL` and `KLIPP_SUPABASE_PUBLISHABLE_KEY`; set optional `KLIPP_MEDIA_API_URL` only when the home host is ready. With **deploy unchecked**, it builds a review ZIP and SHA-256 file. With **deploy checked** on reviewed `main`, it deploys to the already-configured Pages site. It does not enable Pages, change DNS, build Windows installers or create releases. Official actions are pinned to verified commit SHAs; only the deployment job receives Pages write/OIDC permissions. Rebuild after changing public configuration.
 
 The service worker caches only icons and the manifest. It does not cache accounts, email-code responses, API data, signed links or videos. See [tests/README.md](tests/README.md) for local fixture checks and [design/IMPLEMENTATION.md](design/IMPLEMENTATION.md) for results and physical-device limitations. The published beta is a web app, not an app-store release.

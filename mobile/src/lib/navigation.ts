@@ -1,6 +1,6 @@
 import {useCallback,useEffect,useRef,useState} from 'react';
 
-export type AppPage='media'|'profile';
+export type AppPage='media'|'profile'|'usage'|'help'|'manage';
 export interface AppRoute {page:AppPage;watchId:string|null}
 export type LeaveRoute=(next:AppRoute)=>boolean|Promise<boolean>;
 const home:AppRoute={page:'media',watchId:null};
@@ -8,12 +8,12 @@ const clipId=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** Fragments contain navigation only: never interpret a token, URL or arbitrary path. */
 export function parseRoute(hash:string):AppRoute {
-  if(hash==='#profile')return{page:'profile',watchId:null};
+  if(hash==='#profile'||hash==='#usage'||hash==='#help'||hash==='#manage')return{page:hash.slice(1) as Exclude<AppPage,'media'>,watchId:null};
   const id=hash.startsWith('#watch/')?hash.slice(7):'';
   return clipId.test(id)?{page:'media',watchId:id.toLowerCase()}:{...home};
 }
 export function routeHash(route:AppRoute):string {
-  if(route.page==='profile')return'#profile';
+  if(route.page!=='media')return`#${route.page}`;
   return route.watchId&&clipId.test(route.watchId)?`#watch/${route.watchId.toLowerCase()}`:'#media';
 }
 interface NavigationHost {

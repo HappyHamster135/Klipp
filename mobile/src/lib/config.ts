@@ -2,8 +2,8 @@ import { CommunityError, type CommunityConfig, type StorageLike } from './models
 
 /** Only public publisher configuration belongs in the browser bundle. */
 export function createConfig(config: CommunityConfig): CommunityConfig;
-export function createConfig(projectUrl: string, publishableKey: string): CommunityConfig;
-export function createConfig(input: string | CommunityConfig, publicKey?: string): CommunityConfig {
+export function createConfig(projectUrl: string, publishableKey: string, mediaApiUrl?: string): CommunityConfig;
+export function createConfig(input: string | CommunityConfig, publicKey?: string, mediaUrl?: string): CommunityConfig {
   try {
     const projectUrl = typeof input === 'string' ? input : input.projectUrl;
     const publishableKey = typeof input === 'string' ? publicKey! : input.publishableKey;
@@ -11,7 +11,16 @@ export function createConfig(input: string | CommunityConfig, publicKey?: string
     const key = publishableKey.trim();
     if (url.protocol !== 'https:' || url.pathname !== '/' || url.search || url.hash || url.username || url.password
       || url.hostname.endsWith('.invalid') || !isPublicKey(key)) throw new Error();
-    return Object.freeze({ projectUrl: url.origin, publishableKey: key });
+    const home = typeof input === 'string' ? mediaUrl : input.mediaApiUrl;
+    let mediaApiUrl: string | undefined;
+    if (home?.trim()) {
+      const media = new URL(home.trim());
+      if (media.protocol !== 'https:' || media.pathname !== '/' || media.search || media.hash || media.username || media.password
+        || media.hostname.endsWith('.invalid')) throw new Error();
+      mediaApiUrl = media.origin;
+    }
+    return Object.freeze({ projectUrl: url.origin, publishableKey: key, ...(mediaApiUrl ? { mediaApiUrl } : {}),
+      ...(typeof input !== 'string' && input.operationsEnabled === true ? { operationsEnabled: true } : {}) });
   } catch {
     throw new CommunityError('not_configured', 'Online Media has not been connected for this build.');
   }

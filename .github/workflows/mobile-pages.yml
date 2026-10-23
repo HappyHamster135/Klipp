@@ -29,6 +29,7 @@ jobs:
     env:
       VITE_SUPABASE_URL: ${{ vars.KLIPP_SUPABASE_URL }}
       VITE_SUPABASE_PUBLISHABLE_KEY: ${{ vars.KLIPP_SUPABASE_PUBLISHABLE_KEY }}
+      VITE_MEDIA_API_URL: ${{ vars.KLIPP_MEDIA_API_URL }}
     steps:
       - name: Check out source without persisting credentials
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -49,9 +50,16 @@ jobs:
           node --input-type=module <<'NODE'
           const url = process.env.VITE_SUPABASE_URL ?? '';
           const key = process.env.VITE_SUPABASE_PUBLISHABLE_KEY ?? '';
+          const media = process.env.VITE_MEDIA_API_URL ?? '';
           if (!/^https:\/\/[a-z0-9-]+\.supabase\.co$/.test(url) || !/^sb_publishable_[A-Za-z0-9_-]{11,}$/.test(key)) {
             console.error('Set the KLIPP_SUPABASE_URL and KLIPP_SUPABASE_PUBLISHABLE_KEY repository variables. Only public project configuration is accepted.');
             process.exit(1);
+          }
+          if (media) {
+            const origin = new URL(media);
+            if (origin.protocol !== 'https:' || origin.pathname !== '/' || origin.search || origin.hash || origin.username || origin.password || origin.hostname.endsWith('.invalid')) {
+              console.error('KLIPP_MEDIA_API_URL must contain only the reviewed HTTPS media origin.'); process.exit(1);
+            }
           }
           console.log('Public mobile configuration validated.');
           NODE

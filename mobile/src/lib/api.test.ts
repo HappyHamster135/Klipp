@@ -22,8 +22,8 @@ function memoryStorage(): StorageLike & { values: Map<string, string> } {
   const values = new Map<string, string>();
   return { values, getItem: key => values.get(key) ?? null, setItem: (key, value) => { values.set(key, value); }, removeItem: key => { values.delete(key); } };
 }
-interface Captured { path: string; method: string; headers: Headers; body: unknown; signal: AbortSignal | null | undefined }
-function fixture(storageAdapter?: StorageLike) {
+interface Captured { path: string; method: string; headers: Headers; body: unknown; signal: AbortSignal | null | undefined; origin: string; redirect: RequestRedirect | undefined }
+function fixture(storageAdapter?: StorageLike, selectedConfig = config) {
   const requests: Captured[] = [];
   const storage = memoryStorage();
   let reply: (request: Captured) => Response | Promise<Response> = request => {
@@ -35,10 +35,10 @@ function fixture(storageAdapter?: StorageLike) {
   const fetcher = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = new URL(input instanceof Request ? input.url : String(input));
     const request: Captured = { path: url.pathname + url.search, method: init?.method ?? 'GET', headers: new Headers(init?.headers),
-      body: typeof init?.body === 'string' ? JSON.parse(init.body) : init?.body, signal: init?.signal };
+      body: typeof init?.body === 'string' ? JSON.parse(init.body) : init?.body, signal: init?.signal, origin: url.origin, redirect: init?.redirect };
     requests.push(request); return reply(request);
   }) as typeof fetch;
-  const api = new CommunityApi(config, { storage: storageAdapter ?? storage, fetch: fetcher }); instances.push(api);
+  const api = new CommunityApi(selectedConfig, { storage: storageAdapter ?? storage, fetch: fetcher }); instances.push(api);
   return { api, requests, storage, set reply(value: typeof reply) { reply = value; }, signIn: () => api.verifyEmailCode('player@example.com', '123456') };
 }
 function cleanupReply(request: Captured): Response {
@@ -348,5 +348,93 @@ describe('viewer-only Media and owned clip cleanup', () => {
     const f = fixture(); await f.signIn(); f.reply = request => request.path.endsWith('community_remove_clip')
       ? json({ id: clipId, owner_id: owner, status: 'deleting', username: null }) : cleanupReply(request);
     await f.api.deleteClip(clipId); expect(f.requests.at(-1)?.path).toBe('/rest/v1/rpc/community_finish_delete');
+  });
+});
+
+describe('home-hosted media alongside existing clips', () => {
+  const homeConfig = createConfig({...config, mediaApiUrl: 'https://media.example.com'});
+  function homeLinks(overrides:Record<string,unknown>={}) {
+    const now=Math.floor(Date.now()/1000);
+    return { video_url:`https://media.example.com/v1/assets/${owner}/${clipId}/video?expires=${now+300}&signature=${'a'.repeat(64)}`,
+      poster_url:`https://media.example.com/v1/assets/${owner}/${clipId}/poster?expires=${now+120}&signature=${'b'.repeat(64)}`,
+      expires_at:new Date((now+120)*1000).toISOString(),...overrides };
+  }
+  it('validates an optional home origin without changing default operations availability',()=>{
+    expect(homeConfig.mediaApiUrl).toBe('https://media.example.com');
+    expect(homeConfig.operationsEnabled).toBeUndefined();
+    for(const mediaApiUrl of ['http://media.example.com','https://player@media.example.com','https://media.example.com/api','https://media.example.com/?key=x'])
+      expect(()=>createConfig({...config,mediaApiUrl})).toThrow(CommunityError);
+  });
+  it('signs only the configured home asset with bearer auth and forbids redirects',async()=>{
+    const f=fixture(undefined,homeConfig);await f.signIn();
+    f.reply=request=>request.path.endsWith('community_get_clip')?json(clip({storage_provider:'home'})):json(homeLinks());
+    const url=await f.api.getPlaybackUrl(clipId);
+    expect(new URL(url).pathname).toBe(`/v1/assets/${owner}/${clipId}/video`);
+    const request=f.requests.at(-1)!;
+    expect(request.path).toBe(`/v1/clips/${clipId}/playback`);expect(request.origin).toBe(homeConfig.mediaApiUrl);
+    expect(request.headers.get('authorization')).toBe('Bearer access-secret');expect(request.headers.get('apikey')).toBeNull();
+    expect(request.redirect).toBe('error');expect(request.body).toEqual({});
+    expect(new URL(await f.api.getPosterUrl(clipId)).pathname).toBe(`/v1/assets/${owner}/${clipId}/poster`);
+  });
+  it('retains legacy signing when a home origin is configured',async()=>{
+    const f=fixture(undefined,homeConfig);await f.signIn();
+    f.reply=request=>request.path.endsWith('community_get_clip')?json(clip()):json({signedURL:`/object/sign/community-videos/${owner}/${clipId}/video.mp4?token=legacy`});
+    expect(await f.api.getPlaybackUrl(clipId)).toContain(`${config.projectUrl}/storage/v1/object/sign/`);
+    expect(f.requests.at(-1)?.origin).toBe(config.projectUrl);
+  });
+  it.each(['https://evil.example.com','http://media.example.com','https://player@media.example.com'])('rejects a home asset from an untrusted origin %s',async origin=>{
+    const f=fixture(undefined,homeConfig);await f.signIn();const links=homeLinks();
+    f.reply=request=>request.path.endsWith('community_get_clip')?json(clip({storage_provider:'home'})):json({...links,video_url:String(links.video_url).replace('https://media.example.com',origin)});
+    await expect(f.api.getPlaybackUrl(clipId)).rejects.toMatchObject({code:'unavailable'});
+  });
+  it.each(['&extra=1','&signature=duplicate'])('rejects unexpected or duplicate signing fields %s',async suffix=>{
+    const f=fixture(undefined,homeConfig);await f.signIn();const links=homeLinks();
+    f.reply=request=>request.path.endsWith('community_get_clip')?json(clip({storage_provider:'home'})):json({...links,video_url:links.video_url+suffix});
+    await expect(f.api.getPlaybackUrl(clipId)).rejects.toMatchObject({code:'unavailable'});
+  });
+  it('rejects expired or unexpectedly long-lived home links',async()=>{
+    const f=fixture(undefined,homeConfig);await f.signIn();
+    for(const offset of [-1,10000]){
+      const links=homeLinks(),expiry=Math.floor(Date.now()/1000)+offset;
+      f.reply=request=>request.path.endsWith('community_get_clip')?json(clip({storage_provider:'home'})):json({...links,video_url:links.video_url.replace(/expires=\d+/,`expires=${expiry}`)});
+      await expect(f.api.getPlaybackUrl(clipId)).rejects.toMatchObject({code:'unavailable'});
+    }
+  });
+  it('fails closed for unknown providers or a home clip without a configured endpoint',async()=>{
+    const f=fixture();await f.signIn();f.reply=()=>json(clip({storage_provider:'home'}));
+    await expect(f.api.getPlaybackUrl(clipId)).rejects.toMatchObject({code:'media_not_configured'});
+    expect(f.requests.at(-1)?.path).toBe('/rest/v1/rpc/community_get_clip');
+    f.reply=()=>json([clip({storage_provider:'arbitrary'})]);await expect(f.api.getFeed()).rejects.toMatchObject({code:'unavailable'});
+  });
+  it('deletes home assets through the authenticated host and checks its acknowledgement',async()=>{
+    const f=fixture(undefined,homeConfig);await f.signIn();
+    f.reply=request=>request.path.endsWith('community_remove_clip')?json(clip({status:'deleting',storage_provider:'home'})):json({id:clipId,deleted:true});
+    await f.api.deleteClip(clipId);
+    expect(f.requests.slice(-2).map(request=>request.path)).toEqual(['/rest/v1/rpc/community_remove_clip',`/v1/clips/${clipId}`]);
+    expect(f.requests.at(-1)?.method).toBe('DELETE');expect(f.requests.at(-1)?.headers.get('apikey')).toBeNull();
+    f.reply=request=>request.path.endsWith('community_remove_clip')?json(clip({status:'deleting',storage_provider:'home'})):json({id:owner,deleted:true});
+    await expect(f.api.deleteClip(clipId)).rejects.toMatchObject({code:'unavailable'});
+  });
+  it('does not switch to legacy storage when home hosting is offline',async()=>{
+    const f=fixture(undefined,homeConfig);await f.signIn();f.reply=request=>request.path.endsWith('community_get_clip')?json(clip({storage_provider:'home'})):json({},503);
+    await expect(f.api.getPlaybackUrl(clipId)).rejects.toMatchObject({code:'offline'});
+    expect(f.requests.some(request=>request.path.startsWith('/storage/'))).toBe(false);
+  });
+  it.each(['uploads_paused','backup_required'])('explains paused hosting without displaying private server details: %s',async code=>{
+    const f=fixture(undefined,homeConfig);await f.signIn();f.reply=request=>request.path.endsWith('community_get_clip')?json(clip({storage_provider:'home'})):json({code,message:'private provider detail'},503);
+    await expect(f.api.getPlaybackUrl(clipId)).rejects.toMatchObject({code:'hosting_unavailable',message:'Uploads are temporarily paused while clip storage is being prepared. Please try again later.'});
+  });
+  it('rejects a malformed signed link as an unavailable clip',async()=>{
+    const f=fixture(undefined,homeConfig);await f.signIn();f.reply=request=>request.path.endsWith('community_get_clip')?json(clip({storage_provider:'home'})):json(homeLinks({video_url:'not a URL'}));
+    await expect(f.api.getPlaybackUrl(clipId)).rejects.toMatchObject({code:'unavailable'});
+  });
+  it('never returns a late home playback link after sign-out',async()=>{
+    const f=fixture(undefined,homeConfig);await f.signIn();let resolve!:(value:Response)=>void,started!:()=>void;const beginning=new Promise<void>(done=>{started=done;});
+    f.reply=request=>request.path.endsWith('community_get_clip')?json(clip({storage_provider:'home'})):request.path.endsWith('/playback')?new Promise<Response>(done=>{resolve=done;started();}):json({});
+    const pending=f.api.getPlaybackUrl(clipId);await beginning;const signout=f.api.signOut();resolve(json(homeLinks()));
+    await expect(pending).rejects.toMatchObject({name:'AbortError'});await signout;expect(f.api.user).toBeNull();
+  });
+  it('keeps browser upload capabilities absent when home hosting is configured',()=>{
+    const f=fixture(undefined,homeConfig);expect('uploadClip' in f.api).toBe(false);expect('uploadTransport' in f.api).toBe(false);
   });
 });

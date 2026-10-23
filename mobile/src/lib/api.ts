@@ -4,6 +4,7 @@ import {
   cancelled, CommunityError, mediaLimits, unavailable, type CommunityBlockedUser, type CommunityClip,
   type CommunityComment, type CommunityConfig, type CommunityCursor, type CommunityPage, type CommunityProfile,
   type CommunityUser, type StorageLike,
+  type CommunityUsage, type CommunitySupportRequest, type CommunityReport, type SupportCategory, type ProviderUsageMetric,
 } from './models';
 
 type Context = { generation: number; userId: string | null; signal: AbortSignal; wroteSession?: boolean; dispose(): void };
@@ -34,7 +35,7 @@ export class CommunityApi {
   private unsubscribe: () => void;
 
   constructor(config: CommunityConfig, options: CommunityApiOptions = {}) {
-    this.config = createConfig(config.projectUrl, config.publishableKey);
+    this.config = createConfig(config);
     this.storage = options.storage ?? browserSessionStorage(options.rememberDevice ?? false);
     this.storageKey = `klipp-community-${new URL(this.config.projectUrl).host}-auth`;
     this.requestFetch = options.fetch ?? globalThis.fetch.bind(globalThis);
@@ -256,6 +257,60 @@ export class CommunityApi {
   getPlaybackUrl(id: string, signal?: AbortSignal): Promise<string> { return this.assetUrl(id, false, signal); }
   getPosterUrl(id: string, signal?: AbortSignal): Promise<string> { return this.assetUrl(id, true, signal); }
 
+  getUsage(signal?: AbortSignal): Promise<CommunityUsage> {
+    return this.identity(async context => parseUsage(await this.rpc('community_usage', {}, context)), signal);
+  }
+  getSupportRequests(signal?: AbortSignal): Promise<CommunitySupportRequest[]> {
+    return this.identity(async context => array(await this.rpc('community_support_requests', {}, context), 100).map(value => parseSupport(value)), signal);
+  }
+  submitSupport(category: SupportCategory, body: string, signal?: AbortSignal): Promise<CommunitySupportRequest> {
+    if (!['help', 'privacy', 'deletion'].includes(category)) throw new CommunityError('invalid_request', 'Choose a request category.');
+    body = validateText(body, 10, 2000, 'invalid_request', 'Write a message of 10–2,000 characters.', true);
+    return this.identity(async context => parseSupport(await this.rpc('community_submit_support', { p_category: category, p_body: body }, context)), signal);
+  }
+  getOperatorReports(cursor: CommunityCursor | null = null, signal?: AbortSignal): Promise<CommunityPage<CommunityReport>> {
+    validateCursor(cursor);
+    return this.identity(async context => page(array(await this.rpc('community_operator_reports', {
+      p_limit: 26, p_before: cursor?.createdAt ?? null, p_before_id: cursor?.id ?? null,
+    }, context), 26).map(parseReport), 25, cursor), signal);
+  }
+  reviewClip(id: string, action: 'hide' | 'keep', note: string, signal?: AbortSignal): Promise<void> {
+    id = uuid(id);
+    if (!['hide', 'keep'].includes(action)) throw new CommunityError('invalid_review', 'Choose a review action.');
+    note = validateText(note, 0, 500, 'invalid_review', 'Keep the review note to 500 characters.', true);
+    return this.identity(async context => {
+      const row = object(await this.rpc('community_operator_review', { p_clip_id: id, p_action: action, p_note: note }, context));
+      if (row.reviewed !== true || row.hidden !== (action === 'hide')) throw unavailable();
+    }, signal);
+  }
+  getOperatorSupport(cursor: CommunityCursor | null = null, signal?: AbortSignal): Promise<CommunityPage<CommunitySupportRequest>> {
+    validateCursor(cursor);
+    return this.identity(async context => page(array(await this.rpc('community_operator_support', {
+      p_limit: 26, p_before: cursor?.createdAt ?? null, p_before_id: cursor?.id ?? null,
+    }, context), 26).map(value => parseSupport(value, true)), 25, cursor), signal);
+  }
+  replySupport(id: string, reply: string, status: 'open' | 'resolved', signal?: AbortSignal): Promise<CommunitySupportRequest> {
+    id = uuid(id);
+    if (!['open', 'resolved'].includes(status)) throw new CommunityError('invalid_request', 'Choose a request status.');
+    reply = validateText(reply, 1, 2000, 'invalid_reply', 'Write a reply of 1–2,000 characters.', true);
+    return this.identity(async context => {
+      const request = parseSupport(await this.rpc('community_operator_reply', { p_request_id: id, p_reply: reply, p_status: status }, context), true);
+      if (request.id !== id || request.status !== status) throw unavailable();
+      return request;
+    }, signal);
+  }
+  async deleteAccount(confirmation: string, signal?: AbortSignal): Promise<void> {
+    const expected = this.currentProfile?.username ?? 'DELETE';
+    if (confirmation !== expected) throw new CommunityError('confirmation_required', 'Type your username exactly to confirm account deletion.');
+    await this.identity(async context => {
+      requireTrue(await this.json('functions/v1/community-delete-account', 'POST', { confirmation }, context), 'deleted');
+    }, signal);
+    // Only the acknowledged deletion clears identity. A cleanup failure remains retryable.
+    this.fence();
+    await this.clearStoredSession();
+    await this.enqueue(async () => { await this.client.auth.signOut({ scope: 'local' }); });
+  }
+
   dispose(): void {
     this.disposed = true; this.fence(); this.unsubscribe(); this.listeners.clear();
     void this.client.auth.dispose();
@@ -266,6 +321,10 @@ export class CommunityApi {
     return this.identity(async context => {
       const clip = await this.getClipCore(id, context);
       if (clip.status !== 'published') throw new CommunityError('clip_unavailable', 'This clip is not available to play.');
+      if (clip.storageProvider === 'home') {
+        const row = object(await this.homeJson(`v1/clips/${id}/playback`, 'POST', {}, context));
+        return this.homeAssetUrl(row, clip, poster);
+      }
       const bucket = poster ? 'community-posters' : 'community-videos';
       const path = assetPath(clip.ownerId, id, poster);
       const row = object(await this.json(`storage/v1/object/sign/${bucket}/${path}`, 'POST', { expiresIn: poster ? 120 : 300 }, context));
@@ -288,6 +347,11 @@ export class CommunityApi {
     if (row.status === 'deleted') return;
     if (row.status !== 'deleting' || uuid(row.owner_id) !== context.userId) throw unavailable();
     validatePaths(row, context.userId!, id);
+    if (storageProvider(row) === 'home') {
+      const removed = object(await this.homeJson(`v1/clips/${id}`, 'DELETE', undefined, context));
+      if (uuid(removed.id) !== id || removed.deleted !== true) throw unavailable();
+      return;
+    }
     let failure: unknown;
     for (const poster of [false, true]) {
       try { await this.json(`storage/v1/object/${poster ? 'community-posters' : 'community-videos'}`, 'DELETE',
@@ -298,6 +362,41 @@ export class CommunityApi {
     requireTrue(await this.rpc('community_finish_delete', { p_clip_id: id }, context), 'deleted');
   }
   private rpc(name: string, body: object, context: Context): Promise<unknown> { return this.json(`rest/v1/rpc/${name}`, 'POST', body, context); }
+  private mediaOrigin(): string {
+    if (!this.config.mediaApiUrl) throw new CommunityError('media_not_configured', 'Clip hosting has not been connected for this build. Please reopen Klipp after it updates.');
+    return this.config.mediaApiUrl;
+  }
+  private homeAssetUrl(row: Record<string, unknown>, clip: CommunityClip, poster: boolean): string {
+    const origin = this.mediaOrigin(), signed = text(row[poster ? 'poster_url' : 'video_url'], 4096);
+    let url: URL;
+    try { url = new URL(signed); } catch { throw unavailable(); }
+    const now = Date.now() / 1000, responseExpiry = Date.parse(time(row.expires_at)) / 1000;
+    const pairs = [...url.searchParams], expires = url.searchParams.get('expires') ?? '', signature = url.searchParams.get('signature') ?? '';
+    if (url.origin !== origin || url.protocol !== 'https:' || url.username || url.password || url.hash
+      || url.pathname !== `/v1/assets/${clip.ownerId}/${clip.id}/${poster ? 'poster' : 'video'}`
+      || /[\u0000-\u0020\u007f]/.test(signed) || pairs.length !== 2 || !/^\d{1,12}$/.test(expires) || !/^[a-f0-9]{64}$/.test(signature)
+      || Number(expires) <= now || Number(expires) > now + 360 || responseExpiry <= now || responseExpiry > now + 360) throw unavailable();
+    return url.href;
+  }
+  private async homeJson(path: string, method: string, body: object | undefined, context: Context): Promise<unknown> {
+    this.assert(context);
+    const origin = this.mediaOrigin(), token = await this.token(context), deadline = linkedSignal([context.signal], 20000);
+    try {
+      const response = await this.requestFetch(`${origin}/${path}`, { method,
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: body === undefined ? undefined : JSON.stringify(body), signal: deadline.signal, redirect: 'error', cache: 'no-store', credentials: 'omit',
+      });
+      if (response.status === 404) throw new CommunityError('clip_unavailable', 'This clip is no longer available.');
+      if (response.status === 507) throw new CommunityError('storage_full', 'Clip storage is full. Please try again later.');
+      const result = await responseJson(response, 512 * 1024, deadline.signal, 'rest/v1/rpc/community_home_media');
+      this.assert(context); return result;
+    } catch (error) {
+      if (context.signal.aborted || !this.isCurrent(context)) throw cancelled();
+      if (deadline.signal.aborted) throw new CommunityError('timeout', 'Clip hosting took too long to respond. Please try again.');
+      if (error instanceof CommunityError) throw error;
+      throw new CommunityError('offline', 'Clip hosting is temporarily unavailable. Please try again shortly.');
+    } finally { deadline.dispose(); }
+  }
   private async json(path: string, method: string, body: object | undefined, context: Context, extraHeaders: Record<string, string> = {}): Promise<unknown> {
     this.assert(context);
     const token = await this.token(context);
@@ -472,11 +571,60 @@ function parseClip(value: unknown, viewer: string): CommunityClip {
   return { id, ownerId, username: row.username === null ? '' : text(row.username, 24), displayName: text(row.display_name, 40),
     title: text(row.title, 120), description: text(row.description, 500, true), durationSeconds: row.duration_seconds,
     byteSize, createdAt: time(row.created_at), likeCount: integer(row.like_count), commentCount: integer(row.comment_count),
-    likedByMe: row.liked_by_me, status: row.status as CommunityClip['status'] };
+    likedByMe: row.liked_by_me, status: row.status as CommunityClip['status'], storageProvider: storageProvider(row) };
+}
+function storageProvider(row: Record<string, unknown>): 'supabase' | 'home' {
+  const provider = row.storage_provider ?? 'supabase';
+  if (provider !== 'supabase' && provider !== 'home') throw unavailable();
+  return provider;
 }
 function parseComment(value: unknown): CommunityComment {
   const row = object(value); return { id: uuid(row.id), clipId: uuid(row.clip_id), ownerId: uuid(row.owner_id), username: text(row.username, 24),
     displayName: text(row.display_name, 40), body: text(row.body, 500), createdAt: time(row.created_at) };
+}
+function parseSupport(value: unknown, operator = false): CommunitySupportRequest {
+  const row = object(value);
+  if (!['help', 'privacy', 'deletion'].includes(String(row.category)) || !['open', 'resolved'].includes(String(row.status))) throw unavailable();
+  return { id: uuid(row.id), category: row.category as SupportCategory, body: text(row.body, 2000),
+    status: row.status as CommunitySupportRequest['status'], createdAt: time(row.created_at), reply: row.reply === null ? '' : text(row.reply, 2000, true),
+    updatedAt: time(row.updated_at), ...(operator ? { ownerId: uuid(row.owner_id), username: row.username === null ? '' : text(row.username, 24, true) } : {}) };
+}
+function parseReport(value: unknown): CommunityReport {
+  const row = object(value);
+  if (!['open', 'resolved'].includes(String(row.status)) || typeof row.hidden !== 'boolean') throw unavailable();
+  return { id: uuid(row.id), clipId: uuid(row.clip_id), reporterId: uuid(row.reporter_id), reason: text(row.reason, 500),
+    status: row.status as CommunityReport['status'], createdAt: time(row.created_at), title: text(row.title, 120),
+    ownerUsername: row.owner_username === null ? '' : text(row.owner_username, 24, true), reporterUsername: row.reporter_username === null ? '' : text(row.reporter_username, 24, true),
+    hidden: row.hidden, reviewNote: row.review_note === null ? '' : text(row.review_note, 500, true), reviewedAt: row.reviewed_at === null ? null : time(row.reviewed_at) };
+}
+function metric(value: unknown): ProviderUsageMetric {
+  const row = object(value); const limit = integer(row.limit); if (!limit) throw unavailable();
+  const result = { used: row.used === null ? null : integer(row.used), limit,
+    periodStart: row.period_start === null ? null : time(row.period_start), periodEnd: row.period_end === null ? null : time(row.period_end),
+    observedAt: row.observed_at === null ? null : time(row.observed_at), source: row.source === null ? null : text(row.source, 200) };
+  if (result.used !== null && (!result.periodStart || !result.periodEnd || !result.observedAt || !result.source)
+    || result.periodStart && result.periodEnd && Date.parse(result.periodEnd) <= Date.parse(result.periodStart)) throw unavailable();
+  return result;
+}
+function parseUsage(value: unknown): CommunityUsage {
+  const row = object(value), me = object(row.me), beta = object(row.beta), limits = object(row.limits);
+  if (typeof row.operator !== 'boolean' || row.operator !== (row.operations !== null)) throw unavailable();
+  const result: CommunityUsage = { me: { slotsUsed: integer(me.slots_used), slotsLimit: integer(me.slots_limit), published: integer(me.published), uploading: integer(me.uploading), deleting: integer(me.deleting), storedBytes: integer(me.stored_bytes) },
+    beta: { slotsUsed: integer(beta.slots_used), slotsLimit: integer(beta.slots_limit), reservedBytes: integer(beta.reserved_bytes), storageBytes: integer(beta.storage_bytes), storageLimitBytes: integer(beta.storage_limit_bytes), unknownStorageObjects: integer(beta.unknown_storage_objects) },
+    limits: { maxVideoBytes: integer(limits.max_video_bytes), maxDurationSeconds: integer(limits.max_duration_seconds), warningPercent: integer(limits.warning_percent, 100) },
+    operator: row.operator, checkedAt: time(row.checked_at), operations: null };
+  if (!result.me.slotsLimit || !result.beta.slotsLimit || !result.beta.storageLimitBytes || !result.limits.warningPercent || !result.limits.maxVideoBytes || !result.limits.maxDurationSeconds
+    || result.me.slotsUsed !== result.me.published + result.me.uploading + result.me.deleting) throw unavailable();
+  if (row.operations !== null) {
+    const operations = object(row.operations), provider = object(operations.provider_usage);
+    result.operations = { registeredUsers: integer(operations.registered_users), databaseBytes: integer(operations.database_bytes), databaseLimitBytes: integer(operations.database_limit_bytes),
+      openReports: integer(operations.open_reports), openSupport: integer(operations.open_support), providerUsage: {
+        cachedEgress: metric(provider.cached_egress), uncachedEgress: metric(provider.uncached_egress), monthlyActiveUsers: metric(provider.monthly_active_users),
+        emailDaily: metric(provider.email_daily), emailMonthly: metric(provider.email_monthly),
+      } };
+    if (!result.operations.databaseLimitBytes) throw unavailable();
+  }
+  return result;
 }
 function validatePaths(row: Record<string, unknown>, owner: string, id: string): void {
   if (row.video_path != null && row.video_path !== assetPath(owner, id, false) || row.poster_path != null && row.poster_path !== assetPath(owner, id, true)) throw unavailable();
@@ -522,9 +670,22 @@ function safeError(value: unknown, path = ''): CommunityError {
     KM007: ['clip_unavailable', 'This clip or profile is no longer available.'], KM008: ['rate_limited', 'Please wait a moment before trying again.'],
     KM009: [path.endsWith('community_block_user') ? 'block_limit' : path.endsWith('community_report_clip') ? 'report_limit' : 'comment_limit', 'This beta feature has reached its limit.'],
     KM010: ['cleanup_pending', 'The clip is hidden. Retry deleting it from My uploads to finish cleanup.'], KM011: ['access_denied', 'Your account cannot change this clip or comment.'],
+    KM015: ['upload_not_ready', 'The clip has not finished uploading. Please try again.'], KM016: ['hosting_unavailable', 'Clip hosting is getting ready. Please try again shortly.'],
+    uploads_paused: ['hosting_unavailable', 'Uploads are temporarily paused while clip storage is being prepared. Please try again later.'],
+    backup_required: ['hosting_unavailable', 'Uploads are temporarily paused while clip storage is being prepared. Please try again later.'],
+    upload_capacity: ['upload_limit', 'The available upload slots are in use. Remove a shared clip and try again.'],
+    profile_required: ['profile_required', 'Choose a username in your profile before sharing clips.'],
+    upload_incomplete: ['upload_not_ready', 'The upload did not finish. Please upload the clip again.'],
+    upload_closed: ['upload_not_ready', 'The upload did not finish. Please upload the clip again.'],
+    desktop_upload_required: ['desktop_upload_required', 'Upload clips from Klipp on your PC.'],
+    cleanup_required: ['cleanup_pending', 'This clip still needs cleanup. Retry removing it from My uploads.'],
+    KO001: ['operator_required', 'Only Klipp moderators can open this section.'], KO002: ['invalid_request', 'Check the request details and try again.'],
+    KO003: ['request_limit', 'This beta request limit has been reached. Please try again later.'], KO004: ['deletion_pending', 'Account cleanup is in progress. Please retry account deletion to finish.'],
     signup_disabled: ['signup_disabled', 'New accounts are not available yet.'], email_provider_disabled: ['email_disabled', 'Email sign-in is not available yet.'],
   };
   if (messages[code]) return new CommunityError(...messages[code]);
+  if (path.endsWith('community_home_media') && [502, 503, 504].includes(Number(row.status)))
+    return new CommunityError('offline', 'Clip hosting is temporarily unavailable. Please try again shortly.');
   if (row.status === 403) return new CommunityError('access_denied', 'Your account cannot access this Media feature.');
   if (row.name === 'AuthRetryableFetchError' || value instanceof TypeError) return new CommunityError('offline', 'Could not connect to Media. Check your connection and try again.');
   return unavailable();
