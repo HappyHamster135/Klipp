@@ -1,0 +1,47 @@
+name: Media server security checks
+
+on:
+  pull_request:
+    paths:
+      - 'backend/Klipp.MediaServer/**'
+      - 'backend/Klipp.MediaServer.Tests/**'
+      - '.github/workflows/media-server-checks.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'backend/Klipp.MediaServer/**'
+      - 'backend/Klipp.MediaServer.Tests/**'
+      - '.github/workflows/media-server-checks.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: media-server-checks-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  security-checks:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      DOTNET_NOLOGO: 'true'
+      DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+    steps:
+      - name: Check out source without persisting credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install the existing pinned .NET SDK
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: '10.0.301'
+      - name: Install distro media tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends ffmpeg
+      - name: Run media authentication, upload, playback and storage checks
+        run: >-
+          dotnet run --project backend/Klipp.MediaServer.Tests/Klipp.MediaServer.Tests.csproj
+          --configuration Release -- /usr/bin/ffprobe /usr/bin/ffmpeg
