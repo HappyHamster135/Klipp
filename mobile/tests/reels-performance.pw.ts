@@ -180,12 +180,12 @@ test('returning from the background waits for a tap and resumes the preserved po
   await page.evaluate(()=>{Object.defineProperty(document,'hidden',{configurable:true,value:true});document.dispatchEvent(new Event('visibilitychange'));window.dispatchEvent(new Event('pagehide'));});
   await expect(player(page)).toHaveCount(0);const requestCount=mediaIds(page).length;
   await page.evaluate(()=>{Object.defineProperty(document,'hidden',{configurable:true,value:false});document.dispatchEvent(new Event('visibilitychange'));window.dispatchEvent(new Event('pageshow'));});
-  await expect(page.getByText('Tap to continue',{exact:true})).toBeVisible();await idle(page);await expect(player(page)).toHaveCount(0);expect(mediaIds(page)).toHaveLength(requestCount);
+  await expect(page.getByText('Tap to continue',{exact:true})).toBeVisible();await idle(page);await expect(player(page)).toHaveCount(0);const backgroundRequests=mediaIds(page).length-requestCount;expect(backgroundRequests).toBe(0);
   const starts=await page.evaluate(()=>window.__reelPerf.starts.length);
   await item(page,first).getByRole('button',{name:'Play clip',exact:true}).click();await playing(page);
   await expect.poll(()=>page.evaluate(()=>window.__reelPerf.starts.length)).toBeGreaterThan(starts);
   const resumedAt=await page.evaluate(index=>window.__reelPerf.starts[index],starts);expect(resumedAt).toBeCloseTo(1.2,1);await expect(player(page)).toHaveCount(1);
-  await info.attach('background-resume-first-frame',{body:JSON.stringify({saved_time_seconds:1.2,first_playing_time_seconds:resumedAt,background_media_requests:mediaIds(page).length-requestCount}),contentType:'application/json'});
+  await info.attach('background-resume-first-frame',{body:JSON.stringify({saved_time_seconds:1.2,first_playing_time_seconds:resumedAt,background_media_requests:backgroundRequests}),contentType:'application/json'});
 });
 
 test('resizing during a held swipe defers anchoring until the destination settles',async({page})=>{
