@@ -28,6 +28,7 @@ try {
     $result = & $creator -OutputPath $empty -ProjectUrl '' -PublishableKey '' -MediaApiUrl ''
     Check (!$result.Configured -and !(Test-Path -LiteralPath $empty)) 'capture-only creates no configuration'
     Reject { & $creator -OutputPath $empty -ProjectUrl '' -PublishableKey '' -MediaApiUrl '' -RequireOnlineConfiguration } 'official candidates cannot silently lose account configuration'
+    Reject { & $creator -OutputPath (Join-Path $testRoot 'official-missing-media.json') -ProjectUrl $url -PublishableKey $publicKey -MediaApiUrl '' -RequireOnlineConfiguration } 'official candidates require the home upload origin'
     foreach ($bad in @(
         @{ ProjectUrl = $url; PublishableKey = ''; MediaApiUrl = '' },
         @{ ProjectUrl = ''; PublishableKey = $publicKey; MediaApiUrl = '' },
@@ -46,7 +47,7 @@ try {
     $fields = Get-Content -Raw -LiteralPath $legacy | ConvertFrom-Json
     Check ($result.Configured -and !$result.HomeMediaConfigured -and @($fields.PSObject.Properties).Count -eq 2) 'optional home host omitted'
     $homeConfigPath = Join-Path $testRoot 'home.json'
-    $result = & $creator -OutputPath $homeConfigPath -ProjectUrl $url -PublishableKey $publicKey -MediaApiUrl 'https://media.example.com/'
+    $result = & $creator -OutputPath $homeConfigPath -ProjectUrl $url -PublishableKey $publicKey -MediaApiUrl 'https://media.example.com/' -RequireOnlineConfiguration
     $fields = Get-Content -Raw -LiteralPath $homeConfigPath | ConvertFrom-Json
     Check ($result.HomeMediaConfigured -and @($fields.PSObject.Properties).Count -eq 3 -and $fields.mediaApiUrl -ceq 'https://media.example.com') 'home origin normalized without extra fields'
     Reject { & $creator -OutputPath $homeConfigPath -ProjectUrl $url -PublishableKey $publicKey } 'never overwrite an existing publisher configuration'

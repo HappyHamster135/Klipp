@@ -24,6 +24,9 @@ if ($ProjectUrl -cnotmatch '^https://[a-z0-9-]+\.supabase\.co$' -or
     throw 'Set both KLIPP_SUPABASE_URL and KLIPP_SUPABASE_PUBLISHABLE_KEY to the public project values. Secret and service-role keys are not accepted.'
 }
 $configuration = [ordered]@{ projectUrl = $ProjectUrl; publishableKey = $PublishableKey }
+if ($RequireOnlineConfiguration -and !$MediaApiUrl) {
+    throw 'Official Windows candidates require KLIPP_MEDIA_API_URL. The retired cloud upload route cannot replace the home media service.'
+}
 if ($MediaApiUrl) {
     $mediaUri = $null
     if ($MediaApiUrl.Length -gt 2048 -or ![Uri]::TryCreate($MediaApiUrl, [UriKind]::Absolute, [ref]$mediaUri) -or
