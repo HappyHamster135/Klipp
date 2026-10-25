@@ -7,6 +7,10 @@ const health=new WeakMap<Page,string[]>();
 declare global{interface Window{__reelsQA?:{release?:()=>void;returned?:boolean;shares?:ShareData[]}}}
 
 test.beforeEach(async({page})=>{
+  // This interaction/recovery suite uses the constrained-network policy so
+  // optional link warming cannot affect its exact active-source assertions.
+  // reels-performance.pw.ts separately covers normal-network warming budgets.
+  await page.addInitScript(()=>Object.defineProperty(navigator,'connection',{configurable:true,value:{saveData:false,effectiveType:'2g',addEventListener(){},removeEventListener(){}}}));
   const errors:string[]=[];health.set(page,errors);
   page.on('pageerror',error=>errors.push(error.message));
   page.on('console',message=>{if(message.type()==='error'&&!message.text().includes('favicon.ico'))errors.push(message.text());});
@@ -117,11 +121,11 @@ test('the end card reaches older pages without mounting a page of video decoders
   await expect(video(page)).toHaveCount(1);
 });
 
-test('backgrounding pauses decoding and leaving Media releases the active video',async({page})=>{
+test('backgrounding releases decoding and leaving Media keeps the source detached',async({page})=>{
   await open(page);
   await video(page).evaluate(async element=>{const player=element as HTMLVideoElement;player.muted=true;await player.play();});
   await page.evaluate(()=>{Object.defineProperty(document,'hidden',{configurable:true,value:true});document.dispatchEvent(new Event('visibilitychange'));});
-  await expect.poll(()=>video(page).evaluate(element=>(element as HTMLVideoElement).paused)).toBe(true);
+  await expect(video(page)).toHaveCount(0);
   await page.evaluate(()=>{Object.defineProperty(document,'hidden',{configurable:true,value:false});});
   await page.getByRole('navigation',{name:'Main navigation'}).getByRole('button',{name:'Profile',exact:true}).click();
   await expect(page.getByRole('heading',{name:'Your profile',exact:true})).toBeVisible();await expect(page.locator('video')).toHaveCount(0);

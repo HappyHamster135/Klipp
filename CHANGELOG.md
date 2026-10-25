@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- Wait for phone swipes to settle before loading the destination clip, and pause playback during the gesture.
+- Prepare one upcoming playback link without downloading another video. Briefly reuse adjacent links to reduce loading delays.
+- Add Save data for tap-to-play, skip background preparation on slow connections, and cancel video loading when the app is hidden.
+- Restore the saved position after returning to the feed, defer viewport resizing during swipes, and seek once when the slider is released.
+- Keep mobile uploads disabled and use the existing free hosting services.
+
 ## 1.0.12 — 2026-10-25
 
 - Watch Media videos in true fullscreen on Windows. Use the video button, double-click or F; Escape returns to the same playback position.

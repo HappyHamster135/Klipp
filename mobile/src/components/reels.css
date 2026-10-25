@@ -7,6 +7,9 @@
   .reels-page .tabs>button{padding-block:10px;min-height:48px;font-size:14px}
   .reels-page #clip-feed{position:relative;outline-offset:-3px}
   .reels-page #clip-feed>.caption{padding:12px 16px}
+  .reels-shell{position:relative}
+  .reel-data-mode{position:absolute;top:4px;right:10px;z-index:5;min-height:44px;padding:6px 9px;gap:5px;border:1px solid #ffffff24;border-radius:6px;background:#10141ad9;color:#e6e8eb;font-size:11px;touch-action:manipulation}
+  .reel-data-mode[aria-pressed=true]{color:#c5d9ef;border-color:#9cbde080;background:#243548ed}
   .reels-feed{position:relative;height:var(--reels-height,calc(100dvh - 186px));min-height:180px;overflow-y:auto;overflow-x:hidden;scroll-snap-type:y mandatory;overscroll-behavior-y:contain;scrollbar-width:none;background:#080a0c;touch-action:pan-y;isolation:isolate}
   .reels-feed::-webkit-scrollbar{display:none}
   .reels-feed:focus-visible{outline-offset:-3px}
@@ -18,6 +21,7 @@
   .reel-play-symbol{display:grid;place-items:center;width:72px;height:72px;border-radius:50%;background:#0b101bc9;color:#fff;border:1px solid #ffffff32;padding-left:4px}
   .reel-idle{display:grid;place-items:center;color:#717b88}
   .reel-loading{position:absolute;left:50%;top:45%;transform:translate(-50%,-50%);padding:8px 12px;background:#10141ad9;border:1px solid #ffffff24;border-radius:6px;font-size:13px;pointer-events:none;color:#e6e8eb}
+  .reel-load-hint{position:absolute;top:calc(50% + 50px);left:50%;transform:translateX(-50%);white-space:nowrap;color:#c0cad6;font-size:12px;pointer-events:none}
   .reel-play-fallback{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);background:#263649ed;z-index:3;min-height:44px}
   .reel-error{position:absolute;inset:0;padding:32px 72px 120px 24px;display:flex;align-items:center;justify-content:center;gap:16px;flex-direction:column;background:#10141ae8;text-align:center;z-index:2}
   .reel-error button{flex-shrink:0}

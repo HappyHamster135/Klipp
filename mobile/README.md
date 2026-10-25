@@ -6,7 +6,11 @@ The free beta address is **[happyhamster135.github.io/Klipp/](https://happyhamst
 
 Phones use a vertical, swipe-to-watch Media feed, including landscape on touch screens. Only the active clip owns a video decoder or requests playback media. Tap to pause, use the sound button to unmute, and seek with the bottom slider. Likes, comments, sharing and clip actions stay alongside the video. Comments open in a sheet that preserves the paused player and position, including when the keyboard changes the viewport. Desktop browsers retain the grid and offer fullscreen, double-click and F/Escape without replacing the playing video.
 
-Reels and the detailed Watch/comments view are separate lazy-loaded bundles. Playback progress updates refs rather than rerendering the feed. Backgrounding or leaving the feed pauses and releases video resources. No phone upload route or file picker is added.
+Reels and the detailed Watch/comments view are separate lazy-loaded bundles. Playback progress updates refs rather than rerendering the feed. Swipes pause playback and wait for scrolling to settle before requesting the clip where you land, with native scroll snapping and a fallback for older browsers. Viewport changes wait until the swipe finishes. Dragging the seek slider commits one seek on release rather than seeking every finger movement.
+
+The next clip's small playback-link response is prepared after 450 ms of stable playback; it never downloads an offscreen video or creates another decoder. This preparation is disabled while swiping, paused, offline, hidden, in a dialog, or on reported slow/data-saving connections. At most three adjacent playback links are retained in memory for up to 30 seconds, capped before their expiry, and cleared on account/lifetime changes. Home media remains private/no-store: this saves authorization round trips, not a promised video-byte cache.
+
+**Save data** switches to tap-to-play and disables next-link preparation. The preference stays on this browser; it defaults on when the browser reports Save-Data. Turning it on releases the current video and remembers its position. Backgrounding or leaving the feed cancels pending loads and releases video resources; returning requires a tap and restores the position. No phone upload route, file picker or paid service is added.
 
 ## Run locally
 
