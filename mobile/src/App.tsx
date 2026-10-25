@@ -13,7 +13,7 @@ const UsageDashboard=lazy(()=>import('./components/Usage').then(module=>({defaul
 const Operations=lazy(()=>import('./components/Operations').then(module=>({default:module.Operations})));
 const Support=lazy(()=>import('./components/Support').then(module=>({default:module.Support})));
 
-export function App({api,remember=false,onRemember=()=>{},fixture=false,operationsEnabled=false}:{api:Api;remember?:boolean;onRemember?:(value:boolean)=>void;fixture?:boolean;operationsEnabled?:boolean}) {
+export function App({api,remember=false,onRemember=()=>{},fixture=false,operationsEnabled=false,feedLayout='auto'}:{api:Api;remember?:boolean;onRemember?:(value:boolean)=>void;fixture?:boolean;operationsEnabled?:boolean;feedLayout?:'auto'|'browse'}) {
   const [account,setAccount]=useState(()=>({api,user:api.user,profile:api.profile}));
   const [restoration,setRestoration]=useState(()=>({api,done:false,pending:true,error:'',attempt:0})),[restoreRetry,setRestoreRetry]=useState(0);
   const restoreLock=useRef(false);
@@ -109,7 +109,7 @@ export function App({api,remember=false,onRemember=()=>{},fixture=false,operatio
     window.addEventListener('beforeunload',warn);return()=>window.removeEventListener('beforeunload',warn);
   },[profileEditing.dirty,profileEditing.busy]);
   function navigate(next:AppPage){if(!!current.user&&!profileReady)return;void navigation.navigate({page:next,watchId:null}).then(moved=>{if(moved){setNotice('');window.scrollTo({top:0});}});}
-  function watch(id:string|null){if(id===null)navigation.backToMedia();else void navigation.navigate({page:'media',watchId:id});}
+  const watch=useCallback((id:string|null,replace=false)=>{if(id===null)navigation.backToMedia();else void navigation.navigate({page:'media',watchId:id},{replace});},[navigation.backToMedia,navigation.navigate]);
   function retryRestore(){if(restoreLock.current||api.user)return;restoreLock.current=true;setRestoreRetry(value=>value+1);}
   async function signOut(){
     if(signingOut.current)return;
@@ -132,6 +132,6 @@ export function App({api,remember=false,onRemember=()=>{},fixture=false,operatio
   else if(page==='profile'||!complete&&page!=='usage'||!toolsEnabled&&page!=='media')content=<Profile key={userId} api={api} onSaved={()=>{setAccount({api,user:api.user,profile:api.profile});setFeedVersion(value=>value+1);}} onSignOut={()=>void signOut()} onEditingChange={updateEditing} onUsage={toolsEnabled?()=>navigate('usage'):undefined} onHelp={toolsEnabled?()=>navigate('help'):undefined} toolsError={operationsEnabled&&capabilityCurrent?capability.error:''} onRetryTools={()=>setCapabilityRetry(value=>value+1)}/>;
   else if(toolsEnabled&&page==='usage')content=<UsageDashboard key={userId} api={api} onBack={()=>navigate('profile')} onManage={()=>navigate('manage')} onManageClips={()=>navigate('media')}/>;
   else if(operator&&page==='manage')content=<Operations key={userId} api={api} onBack={()=>navigate('usage')} onOpenClip={id=>watch(id)} onEditingChange={updateEditing}/>;
-  else content=<Feed api={api} version={feedVersion} watchId={watchId} onWatchChange={watch}/>;
+  else content=<Feed api={api} version={feedVersion} watchId={watchId} onWatchChange={watch} layout={feedLayout}/>;
   return <div className="app-shell"><header className="app-header"><a className="brand" href="#media" onClick={event=>{event.preventDefault();navigate('media');}}><img src="./icons/klipp.svg" width="29" height="29" alt=""/>Klipp</a>{current.user?<button className="avatar" disabled={!profileReady||profileEditing.busy} onClick={()=>navigate('profile')} aria-label="Your profile">{(current.profile?.displayName||'K')[0].toUpperCase()}</button>:null}</header>{fixture?<div className="fixture-banner">Local test data · no online changes</div>:null}{!online?<Notice>You’re offline. Connect to the internet to use Media.</Notice>:null}{navigation.uploadNotice?<Notice onClose={navigation.dismissUploadNotice}>Upload clips from Klipp on your PC.</Notice>:null}{notice?<Notice onClose={()=>setNotice('')}>{notice}</Notice>:null}<Suspense fallback={<main className="loading" role="status">Opening account tools…</main>}>{content}</Suspense>{current.user?<nav className="bottom-nav" aria-label="Main navigation"><button aria-current={page==='media'?'page':undefined} disabled={!profileReady||profileEditing.busy} onClick={()=>navigate('media')}><Clapperboard/>Media</button><button aria-current={page!=='media'?'page':undefined} disabled={!profileReady||profileEditing.busy} onClick={()=>navigate('profile')}><UserRound/>Profile</button></nav>:null}<footer className="app-footer">Klipp · <a href="https://github.com/HappyHamster135/Klipp/blob/main/docs/PRIVACY.md" target="_blank" rel="noopener noreferrer">Privacy</a></footer>{leaveProfile?<Dialog title={leaveKind==='profile'?'Discard profile changes?':'Discard your message?'} onClose={()=>finishLeave(false)}><p>Your changes haven’t been saved. Discard them to continue.</p><div className="dialog-actions"><button onClick={()=>finishLeave(false)}>Keep editing</button><button className="danger" onClick={()=>finishLeave(true)}>Discard changes</button></div></Dialog>:null}</div>;
 }

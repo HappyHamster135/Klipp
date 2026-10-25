@@ -4,6 +4,10 @@ Klipp mobile is an installable React/Vite web app for Android, iPhone and deskto
 
 The free beta address is **[happyhamster135.github.io/Klipp/](https://happyhamster135.github.io/Klipp/)**. Recording, editing, exporting and the local Library in the Windows app continue to work without an account. Online Media requires a verified, permanent account and a completed username.
 
+Phones use a vertical, swipe-to-watch Media feed, including landscape on touch screens. Only the active clip owns a video decoder or requests playback media. Tap to pause, use the sound button to unmute, and seek with the bottom slider. Likes, comments, sharing and clip actions stay alongside the video. Comments open in a sheet that preserves the paused player and position, including when the keyboard changes the viewport. Desktop browsers retain the grid and offer fullscreen, double-click and F/Escape without replacing the playing video.
+
+Reels and the detailed Watch/comments view are separate lazy-loaded bundles. Playback progress updates refs rather than rerendering the feed. Backgrounding or leaving the feed pauses and releases video resources. No phone upload route or file picker is added.
+
 ## Run locally
 
 Use Node.js 24.19.0 and **pnpm 11.25.0**, pinned in `package.json`. From the repository root:

@@ -69,4 +69,7 @@ const api=new FixtureApi(URL.createObjectURL(poster),new URLSearchParams(locatio
 declare global{interface Window{__klippQA:{api:FixtureApi;snapshot:()=>ReturnType<FixtureApi['snapshot']>};__klippQASetup?:(api:FixtureApi)=>void}}
 window.__klippQA={api,snapshot:()=>api.snapshot()};
 window.__klippQASetup?.(api);
-createRoot(document.getElementById('root')!).render(<App api={api} fixture operationsEnabled={new URLSearchParams(location.search).get('operations')==='1'}/>);
+// Existing recovery suites exercise the explicit browse surface; ?reels=1 uses
+// the same responsive layout default as the published app, with synthetic data.
+const fixtureQuery=new URLSearchParams(location.search);
+createRoot(document.getElementById('root')!).render(<App api={api} fixture feedLayout={fixtureQuery.has('reels')?'auto':'browse'} operationsEnabled={fixtureQuery.get('operations')==='1'}/>);

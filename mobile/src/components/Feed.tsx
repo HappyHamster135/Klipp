@@ -1,11 +1,14 @@
-import {useEffect,useRef,useState,type KeyboardEvent} from 'react';
+import {lazy,Suspense,useEffect,useRef,useState,type KeyboardEvent} from 'react';
 import {ArrowLeft,Play,RefreshCw,Trash2,Flag,UserRoundX} from 'lucide-react';
 import type {Api} from '../lib/service';
 import {messageFor,timeLabel} from '../lib/service';
 import {CommunityError,type CommunityClip,type CommunityCursor} from '../lib/models';
 import {Dialog,Empty,Notice} from './Primitives';
-import {Watch} from './Watch';
 import {ClipActions} from './ClipActions';
+
+const Watch=lazy(()=>import('./Watch').then(module=>({default:module.Watch})));
+const Reels=lazy(()=>import('./Reels').then(module=>({default:module.Reels})));
+const phoneQuery='(max-width:700px), (pointer:coarse) and (max-height:600px)';
 
 function Poster({api,clip,generation}:{api:Api;clip:CommunityClip;generation:string}) {
   const ref=useRef<HTMLDivElement>(null),failure=useRef<(url:string)=>void>(()=>{});
@@ -43,7 +46,10 @@ function Poster({api,clip,generation}:{api:Api;clip:CommunityClip;generation:str
 
 type FeedState={api:Api;mine:boolean;cursor:CommunityCursor|null;items:CommunityClip[];next:CommunityCursor|null;loading:boolean;loaded:boolean;error:string};
 type FeedLifetime={api:Api;actor:string|null;active:boolean};
-export function Feed({api,version,watchId,onWatchChange}:{api:Api;version:number;watchId:string|null;onWatchChange:(id:string|null)=>void}){
+export function Feed({api,version,watchId,onWatchChange,layout='auto'}:{api:Api;version:number;watchId:string|null;onWatchChange:(id:string|null,replace?:boolean)=>void;layout?:'auto'|'browse'}){
+  const [phoneViewport,setPhoneViewport]=useState(()=>window.matchMedia(phoneQuery).matches);
+  const phone=layout!=='browse'&&phoneViewport;
+  const [reelCommentsId,setReelCommentsId]=useState<string|null>(null);
   const [mine,setMine]=useState(false),[history,setHistory]=useState<(CommunityCursor|null)[]>([null]),[page,setPage]=useState(0),[refresh,setRefresh]=useState(0);
   const [notice,setNotice]=useState(''),[selected,setSelected]=useState<CommunityClip|null>(null);
   const [action,setAction]=useState<{clip:CommunityClip;type:'menu'|'delete'|'report'|'block'}|null>(null),[reason,setReason]=useState(''),[busy,setBusy]=useState(false);
@@ -57,10 +63,14 @@ export function Feed({api,version,watchId,onWatchChange}:{api:Api;version:number
   const sameScope=feed.api===api&&feed.mine===mine&&feed.cursor===cursor;
   const items=sameScope?feed.items:[],next=sameScope?feed.next:null,loading=!sameScope||feed.loading;
   const error=sameScope?feed.error:'',loaded=sameScope&&feed.loaded;
-  const watching=selected?.id===watchId?selected:null;
+  const watching=selected?.id===watchId?selected:phone?items.find(clip=>clip.id===watchId)??null:null;
+  const reelItems=watching&&!items.some(clip=>clip.id===watching.id)?[watching,...items]:items;
+  const reelComments=reelItems.find(clip=>clip.id===reelCommentsId)??null;
   const browseScroll=useRef(0),wasWatching=useRef(false),browseOpener=useRef<HTMLButtonElement|null>(null),clickedControl=useRef<HTMLButtonElement|null>(null);
   const browse=useRef<HTMLElement>(null),feedPanel=useRef<HTMLDivElement>(null),pageVisit=useRef({api,mine,page}),pageFocus=useRef(false);
   const watchError=watchLoad.api===api&&watchLoad.id===watchId?watchLoad.error:'';
+  useEffect(()=>{const media=window.matchMedia(phoneQuery),changed=()=>setPhoneViewport(media.matches);media.addEventListener('change',changed);return()=>media.removeEventListener('change',changed);},[]);
+  useEffect(()=>{if(!phone)setReelCommentsId(null);},[phone]);
   useEffect(()=>{
     const scope:FeedLifetime={api,actor:api.user?.id??null,active:true};lifetime.current=scope;
     mutations.current={epoch:0,clips:new Map(),blocked:new Map()};
@@ -70,13 +80,16 @@ export function Feed({api,version,watchId,onWatchChange}:{api:Api;version:number
   useEffect(()=>{
     if(!watchId){setSelected(null);return;}
     if(selected?.id===watchId)return;
+    const existing=items.find(clip=>clip.id===watchId);
+    if(phone&&existing){setSelected(existing);return;}
     const abort=new AbortController();
     setWatchLoad({api,id:watchId,error:''});
     void api.getClip(watchId,abort.signal).then(clip=>{if(clip.moderationHidden)throw new CommunityError('clip_unavailable','This clip is hidden from Media.');if(!abort.signal.aborted)setSelected(clip);})
       .catch(error=>{if(!abort.signal.aborted)setWatchLoad({api,id:watchId,error:messageFor(error)});});
     return()=>abort.abort();
-  },[api,watchId,watchRetry]);
+  },[api,watchId,watchRetry,phone]);
   useEffect(()=>{
+    if(phone)return;
     if(watchId){wasWatching.current=true;return;}
     if(!wasWatching.current)return;
     wasWatching.current=false;
@@ -86,12 +99,13 @@ export function Feed({api,version,watchId,onWatchChange}:{api:Api;version:number
       window.scrollTo({top:browseScroll.current});
     });
     return()=>cancelAnimationFrame(frame);
-  },[watchId]);
+  },[watchId,phone]);
   useEffect(()=>{
     const previous=pageVisit.current;
     if(previous.api!==api||previous.mine!==mine)pageFocus.current=false;
     else if(previous.page!==page)pageFocus.current=true;
     pageVisit.current={api,mine,page};
+    if(phone){pageFocus.current=false;return;}
     if(!pageFocus.current||loading)return;
     pageFocus.current=false;
     const frame=requestAnimationFrame(()=>{
@@ -99,7 +113,7 @@ export function Feed({api,version,watchId,onWatchChange}:{api:Api;version:number
       browse.current?.scrollIntoView({block:'start'});
     });
     return()=>cancelAnimationFrame(frame);
-  },[api,mine,page,loading]);
+  },[api,mine,page,loading,phone]);
   useEffect(()=>{
     const abort=new AbortController(),epoch=mutations.current.epoch;
     setFeed(previous=>previous.api===api&&previous.mine===mine&&previous.cursor===cursor
@@ -138,7 +152,9 @@ export function Feed({api,version,watchId,onWatchChange}:{api:Api;version:number
     finally{if(current(scope)){actionLock.current=false;setBusy(false);}}
   }
   function select(clip:CommunityClip){if(clip.status!=='published'||clip.moderationHidden)return;if(!watchId){browseScroll.current=window.scrollY;browseOpener.current=clickedControl.current;}setSelected(clip);onWatchChange(clip.id);window.scrollTo({top:0});}
-  function switchTab(value:boolean){if(mine===value)return;setMine(value);setHistory([null]);setPage(0);}
+  function switchTab(value:boolean){if(mine===value)return;if(phone){setReelCommentsId(null);onWatchChange(null,true);}setMine(value);setHistory([null]);setPage(0);}
+  function activeReel(id:string){if(!reelItems.some(item=>item.id===id)||id===watchId)return;onWatchChange(id,true);}
+  function nextPage(){if(!next)return;setHistory(list=>[...list.slice(0,page+1),next]);setPage(page+1);if(phone)onWatchChange(null,true);}
   function openActions(clip:CommunityClip){setActionError('');setReason('');setAction({clip,type:'menu'});}
   function closeActions(){if(!dialogRequest.current){setAction(null);setReason('');setActionError('');}}
   function tabKey(event:KeyboardEvent<HTMLButtonElement>){
@@ -169,10 +185,10 @@ export function Feed({api,version,watchId,onWatchChange}:{api:Api;version:number
     }catch(error){if(current(scope))setActionError(messageFor(error));}
     finally{if(current(scope)){actionLock.current=false;dialogRequest.current=false;setBusy(false);}}
   }
-  return <main className={watching?'media-page viewing':'media-page'}>
+  return <main className={phone?'media-page reels-page':watching?'media-page viewing':'media-page'}>
     <div className="page-title"><div><h1>Media</h1><p className="caption">Upload from Klipp on PC. Watch and connect here.</p></div></div>
     {notice?<Notice onClose={()=>setNotice('')}>{notice}</Notice>:null}
-    {watching?<Watch key={watching.id} api={api} clip={watching} onBack={()=>onWatchChange(null)} onChanged={updateClip} onLike={()=>void like(watching)} onMore={()=>openActions(watching)} busy={busy}/>:watchId?
+    {!phone&&watching?<Suspense fallback={<div className="video-loading" role="status">Opening clip…</div>}><Watch key={watching.id} api={api} clip={watching} onBack={()=>onWatchChange(null)} onChanged={updateClip} onLike={()=>void like(watching)} onMore={()=>openActions(watching)} busy={busy}/></Suspense>:watchId&&!watching?
       <section className="watch"><button className="back" onClick={()=>onWatchChange(null)}><ArrowLeft size={18}/>Back to clips</button><div className="watch-player">{watchError?<div className="playback-error" role="alert"><h2>Clip could not open</h2><p>{watchError}</p><button onClick={()=>setWatchRetry(value=>value+1)}>Retry clip</button></div>:<div className="video-loading" role="status">Opening clip...</div>}</div></section>:null}
     <section ref={browse} className="browse" aria-label="Browse clips">
       <div className="feed-toolbar">
@@ -186,16 +202,17 @@ export function Feed({api,version,watchId,onWatchChange}:{api:Api;version:number
         {loading?<p className="caption" role="status">Loading clips...</p>:null}
         {error?<div className="feed-error" role="alert"><div><h2>{loaded?'Could not refresh clips':'Could not load clips'}</h2><p>{error}{loaded&&items.length?' Your current clips are still shown.':''}</p></div><button onClick={()=>setRefresh(value=>value+1)}>Retry clips</button></div>:null}
         {!loading&&loaded&&!error&&!items.length?<Empty title={mine?'No uploads yet':'No clips shared yet'}><p>Upload clips from Klipp on your PC.</p></Empty>:null}
-        <div className="feed-grid">{items.map(clip=><article className={watching?.id===clip.id?'clip-card selected':'clip-card'} key={clip.id} onClickCapture={event=>{const target=(event.target as Element).closest('button');if(target)clickedControl.current=target;}}>
+        {phone?(reelItems.length&&loaded&&(!watchId||watching)?<Suspense fallback={<div className="loading" role="status">Opening video feed…</div>}><Reels key={`${mine}:${page}`} api={api} items={reelItems} initialId={watchId} suspended={!!action||!!reelCommentsId} busy={busy} page={page} onLike={clip=>void like(clip)} onComments={clip=>setReelCommentsId(clip.id)} onMore={openActions} onActiveChange={activeReel} onNext={next&&!loading?nextPage:undefined} onPrevious={page>0&&!loading?()=>{setPage(page-1);onWatchChange(null,true);}:undefined}/></Suspense>:null):<div className="feed-grid">{items.map(clip=><article className={watching?.id===clip.id?'clip-card selected':'clip-card'} key={clip.id} onClickCapture={event=>{const target=(event.target as Element).closest('button');if(target)clickedControl.current=target;}}>
           <button className="poster-button" aria-label={`Watch ${clip.title}`} disabled={clip.status!=='published'||clip.moderationHidden} onClick={()=>select(clip)}><Poster api={api} clip={clip} generation={`${version}:${refresh}`}/></button>
           <div className="clip-meta"><button className="clip-title" onClick={()=>select(clip)} disabled={clip.status!=='published'||clip.moderationHidden}>{clip.title}</button><p className="author">@{clip.username||clip.displayName}<time dateTime={clip.createdAt}>{new Date(clip.createdAt).toLocaleDateString(undefined,{month:'short',day:'numeric'})}</time></p>
             {clip.moderationHidden?<p className="caption">Hidden by moderation. You can still delete your shared clip.</p>:null}
             {clip.status!=='published'?<p className="caption">{clip.status==='deleting'?'Deletion incomplete. Use Delete again to finish cleanup.':'Upload incomplete. Delete it to free this slot.'}</p>:null}
             <ClipActions clip={clip} onLike={()=>void like(clip)} onComments={()=>select(clip)} onMore={()=>openActions(clip)} busy={busy}/>
           </div>
-        </article>)}</div>
-        {items.length||page>0?<div className="pagination"><button disabled={loading||page===0} onClick={()=>setPage(page-1)}>Newer clips</button><span className="caption">Page {page+1}</span><button disabled={loading||!next} onClick={()=>{if(!next)return;setHistory(list=>[...list.slice(0,page+1),next]);setPage(page+1);}}>Older clips</button></div>:null}
+        </article>)}</div>}
+        {!phone&&(items.length||page>0)?<div className="pagination"><button disabled={loading||page===0} onClick={()=>setPage(page-1)}>Newer clips</button><span className="caption">Page {page+1}</span><button disabled={loading||!next} onClick={nextPage}>Older clips</button></div>:null}
       </div>
     </section>
+    {phone&&reelComments?<Dialog title="Comments" onClose={()=>setReelCommentsId(null)}><Suspense fallback={<p role="status">Loading comments…</p>}><Watch key={reelComments.id} presentation="comments" api={api} clip={reelComments} onBack={()=>setReelCommentsId(null)} onLike={()=>void like(reelComments)} onMore={()=>openActions(reelComments)} onChanged={updateClip} busy={busy}/></Suspense></Dialog>:null}
 {action?<Dialog title={action.type==='menu'?'Clip actions':action.type==='delete'?'Delete shared clip?':action.type==='block'?'Block this user?':'Report clip'} onClose={closeActions}>{actionError?<Notice>{actionError}</Notice>:null}{action.type==='menu'?<div className="action-menu">{action.clip.ownerId===api.user?.id?<button onClick={()=>setAction({...action,type:'delete'})}><Trash2 size={18}/>Delete shared clip</button>:<><button onClick={()=>setAction({...action,type:'report'})}><Flag size={18}/>Report clip</button><button onClick={()=>setAction({...action,type:'block'})}><UserRoundX size={18}/>Block @{action.clip.username}</button></>}</div>:<><p>{action.type==='delete'?'This removes the shared video and its comments. Your original recording stays on your device.':action.type==='block'?'You won’t see each other’s content. You can unblock this user in your profile.':'Tell us why this clip should be reviewed.'}</p>{action.type==='report'?<label>Reason<textarea disabled={dialogRequest.current} value={reason} onChange={event=>setReason(event.target.value)} maxLength={500} rows={4}/></label>:null}<div className="dialog-actions"><button disabled={dialogRequest.current} onClick={closeActions}>Cancel</button><button className={action.type==='delete'?'danger':'primary'} disabled={busy||(action.type==='report'&&!reason.trim())} onClick={()=>void applyAction()}>{dialogRequest.current?'Please wait…':action.type==='delete'?'Delete shared clip':action.type==='block'?'Block user':'Send report'}</button></div></>}</Dialog>:null}</main>;
 }
