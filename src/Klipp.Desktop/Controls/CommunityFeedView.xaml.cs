@@ -50,10 +50,15 @@ public sealed partial class CommunityFeedView : UserControl, IDisposable
     private bool _postingComment;
     private bool _uploading;
     private bool _feedFailed;
-    private bool _expanded;
+    private MediaPlayerElement? _onlinePlayer;
+    private bool _fullscreen;
     private bool _playbackEnded;
     private bool _playbackLoading;
     private bool _managingBlocked;
+    private bool _videoHosted;
+    private bool _fullscreenWhenReady;
+    private readonly DispatcherTimer _fullscreenChromeTimer = new() { Interval = TimeSpan.FromMilliseconds(250) };
+    private DateTime _fullscreenActivity;
 
     public ObservableCollection<CommunityFeedClipItem> Clips { get; } = [];
     public ObservableCollection<CommunityCommentItem> Comments { get; } = [];
@@ -61,6 +66,8 @@ public sealed partial class CommunityFeedView : UserControl, IDisposable
     public event EventHandler? ProfileRequired;
     public event EventHandler? IdentityChanged;
     public event EventHandler? BusyChanged;
+    public event EventHandler<PlayerFullscreenRequestEventArgs>? FullscreenRequested;
+    public event EventHandler<CommunityPlaybackHostEventArgs>? PlaybackHostChanged;
     public bool IsBusy => _networkOperations > 0 || _player is not null || _uploading;
     public bool IsActive => _active;
     public bool IsUploading => _uploading;
@@ -68,6 +75,7 @@ public sealed partial class CommunityFeedView : UserControl, IDisposable
     public CommunityFeedView()
     {
         InitializeComponent();
+        _fullscreenChromeTimer.Tick += OnFullscreenChromeTick;
         Loaded += OnFeedLoaded;
         Unloaded += OnFeedUnloaded;
         UpdateControls();
@@ -383,7 +391,7 @@ public sealed partial class CommunityFeedView : UserControl, IDisposable
     {
         if (sender is not FrameworkElement { Tag: CommunityFeedClipItem item }) return;
         if (_selected?.Clip.Id != item.Clip.Id) await SelectClipAsync(item, play: false);
-        _expanded = false;
+        ExitFullscreen();
         UpdateWatchLayout();
         CommentInput.Focus(FocusState.Programmatic);
     }
@@ -410,7 +418,6 @@ public sealed partial class CommunityFeedView : UserControl, IDisposable
         WatchPanel.Visibility = Visibility.Visible;
         CommentsStateText.Text = "Loading comments…";
         CommentsStateText.Visibility = Visibility.Visible;
-        if (!play) _expanded = false;
         UpdateWatchLayout();
         UpdateControls();
         BringWatchIntoView(item.Clip.Id, version);
@@ -424,7 +431,7 @@ public sealed partial class CommunityFeedView : UserControl, IDisposable
         DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () =>
         {
             if (SelectionIsCurrent(clipId, version))
-                OnlinePlayer.StartBringIntoView(new BringIntoViewOptions
+                OnlineVideoAnchor.StartBringIntoView(new BringIntoViewOptions
                 {
                     AnimationDesired = false, VerticalAlignmentRatio = 0, VerticalOffset = 12
                 });
@@ -454,20 +461,27 @@ public sealed partial class CommunityFeedView : UserControl, IDisposable
         WatchPlayButton.IsEnabled = false;
         var started = await RunMediaAsync(async cancellation =>
         {
+            EnsureVideoHost();
             var uri = await _accounts!.GetClipPlaybackUriAsync(item.Clip.Id, cancellation);
             if (!SelectionIsCurrent(item.Clip.Id, version)) return;
             StopPlayer();
             _player = new MediaPlayer { AutoPlay = false, Volume = 0.8 };
-            _player.CommandManager.IsEnabled = false;
+            // Built-in transport controls require the player's command manager.
             _player.MediaFailed += OnOnlineMediaFailed;
             _player.MediaEnded += OnOnlineMediaEnded;
             _player.PlaybackSession.PlaybackStateChanged += OnOnlinePlaybackStateChanged;
+            _player.PlaybackSession.SeekCompleted += OnOnlineSeekCompleted;
             _source = MediaSource.CreateFromUri(uri);
-            OnlinePlayer.SetMediaPlayer(_player);
+            _onlinePlayer!.SetMediaPlayer(_player);
             _player.Source = _source;
             WatchPoster.Visibility = Visibility.Collapsed;
             WatchPlayButton.Visibility = Visibility.Collapsed;
             _player.Play();
+            if (_fullscreenWhenReady)
+            {
+                _fullscreenWhenReady = false;
+                ToggleFullscreen();
+            }
             RaiseBusyChanged();
         }, token);
         if (SelectionIsCurrent(item.Clip.Id, version))
@@ -476,6 +490,7 @@ public sealed partial class CommunityFeedView : UserControl, IDisposable
             WatchPlayButton.IsEnabled = true;
             if (!started)
             {
+                _fullscreenWhenReady = false;
                 StopPlayer();
                 WatchPoster.Visibility = Visibility.Visible;
                 WatchPlayButton.Content = "Retry playback";
@@ -492,7 +507,7 @@ public sealed partial class CommunityFeedView : UserControl, IDisposable
         {
             try
             {
-                if (_playbackEnded) _player.PlaybackSession.Position = TimeSpan.Zero;
+                if (_playbackEnded && PlaybackAtEnd(_player.PlaybackSession)) _player.PlaybackSession.Position = TimeSpan.Zero;
                 _player.Play();
                 _playbackEnded = false;
                 WatchPlayButton.Visibility = Visibility.Collapsed;
@@ -513,6 +528,7 @@ public sealed partial class CommunityFeedView : UserControl, IDisposable
         DispatcherQueue.TryEnqueue(() =>
         {
             if (!CanUseMedia || _selected is null || version != _selectionVersion || !ReferenceEquals(_player, sender)) return;
+            if (!PlaybackAtEnd(sender.PlaybackSession)) return;
             _playbackEnded = true;
             WatchPlayButton.Content = "Replay clip";
             WatchPlayButton.IsEnabled = true;
@@ -528,6 +544,24 @@ public sealed partial class CommunityFeedView : UserControl, IDisposable
             if (_playbackEnded && sender.PlaybackState == MediaPlaybackState.Playing)
             {
                 _playbackEnded = false;
+                WatchPlayButton.Visibility = Visibility.Collapsed;
+            }
+        });
+    }
+
+    private static bool PlaybackAtEnd(MediaPlaybackSession session) =>
+        session.NaturalDuration > TimeSpan.Zero && session.Position + TimeSpan.FromMilliseconds(80) >= session.NaturalDuration;
+
+    private void OnOnlineSeekCompleted(MediaPlaybackSession sender, object args)
+    {
+        var version = _selectionVersion;
+        DispatcherQueue.TryEnqueue(() =>
+        {
+            if (!CanUseMedia || version != _selectionVersion || _player is null || !ReferenceEquals(_player.PlaybackSession, sender)) return;
+            if (_playbackEnded && !PlaybackAtEnd(sender))
+            {
+                _playbackEnded = false;
+                WatchPlayButton.Content = "Play clip";
                 WatchPlayButton.Visibility = Visibility.Collapsed;
             }
         });
@@ -551,6 +585,7 @@ public sealed partial class CommunityFeedView : UserControl, IDisposable
 
     private void StopPlayer()
     {
+        ExitFullscreen();
         try
         {
             if (_player is not null)
@@ -558,10 +593,11 @@ public sealed partial class CommunityFeedView : UserControl, IDisposable
                 _player.MediaFailed -= OnOnlineMediaFailed;
                 _player.MediaEnded -= OnOnlineMediaEnded;
                 _player.PlaybackSession.PlaybackStateChanged -= OnOnlinePlaybackStateChanged;
+                _player.PlaybackSession.SeekCompleted -= OnOnlineSeekCompleted;
                 _player.Pause();
                 _player.Source = null;
             }
-            OnlinePlayer.SetMediaPlayer(null);
+            _onlinePlayer?.SetMediaPlayer(null);
         }
         catch (Exception) { }
         try { _source?.Dispose(); } catch (Exception) { }
@@ -579,6 +615,7 @@ public sealed partial class CommunityFeedView : UserControl, IDisposable
         _selectionLifetime?.Dispose();
         _selectionLifetime = null;
         StopPlayer();
+        ReleaseVideoHost();
         _selected = null;
         foreach (var card in Clips) card.IsSelected = false;
         Comments.Clear();
@@ -587,10 +624,10 @@ public sealed partial class CommunityFeedView : UserControl, IDisposable
         _commentsLoading = false;
         _postingComment = false;
         _playbackLoading = false;
+        _fullscreenWhenReady = false;
         if (hidePanel) WatchPanel.Visibility = Visibility.Collapsed;
         WatchPoster.Source = null;
         WatchPlayButton.IsEnabled = true;
-        if (hidePanel) _expanded = false;
         UpdateWatchLayout();
     }
 
@@ -603,26 +640,162 @@ public sealed partial class CommunityFeedView : UserControl, IDisposable
     private void OnPlayerDoubleTapped(object sender, DoubleTappedRoutedEventArgs e)
     {
         if (_player is null) return;
-        ToggleExpandedVideo();
+        for (var source = e.OriginalSource as DependencyObject; source is not null && !ReferenceEquals(source, _onlinePlayer); source = VisualTreeHelper.GetParent(source))
+            if (source is Microsoft.UI.Xaml.Controls.Primitives.ButtonBase or Microsoft.UI.Xaml.Controls.Primitives.RangeBase) return;
+        ToggleFullscreen();
         e.Handled = true;
     }
 
-    private void OnExpandVideoClicked(object sender, RoutedEventArgs e) => ToggleExpandedVideo();
-
-    private void ToggleExpandedVideo()
+    private async void OnExpandVideoClicked(object sender, RoutedEventArgs e)
     {
-        _expanded = !_expanded;
-        UpdateWatchLayout();
+        if (_playbackLoading && _player is null)
+        {
+            _fullscreenWhenReady = true;
+            return;
+        }
+        var clipId = _selected?.Clip.Id;
+        if (_player is null) await PlaySelectedAsync();
+        if (_player is not null && _selected?.Clip.Id == clipId) ToggleFullscreen();
     }
+
+    private void ToggleFullscreen()
+    {
+        if (!CanUseMedia || _player is null) return;
+        SetFullscreen(!_fullscreen);
+    }
+
+    public void ExitFullscreen()
+    {
+        SetFullscreen(false);
+    }
+
+    private void SetFullscreen(bool fullscreen)
+    {
+        if (_fullscreen == fullscreen) return;
+        _fullscreen = fullscreen;
+        FullscreenRequested?.Invoke(this, new PlayerFullscreenRequestEventArgs(fullscreen));
+        if (_fullscreen)
+        {
+            ExitFullscreenButton.Content = "Exit fullscreen";
+            Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(ExitFullscreenButton, "Exit fullscreen video");
+            ShowFullscreenChrome();
+            _onlinePlayer?.Focus(FocusState.Programmatic);
+        }
+        else
+        {
+            _fullscreenChromeTimer.Stop();
+            ExitFullscreenButton.Visibility = Visibility.Visible;
+            ExitFullscreenButton.Content = "Fullscreen";
+            Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(ExitFullscreenButton, "Fullscreen video");
+            OnlineVideoSurface.SetCursorHidden(false);
+        }
+        if (!_fullscreen && !_disposed && _active && _selected is not null)
+        {
+            DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () =>
+            {
+                if (_active && !_disposed && _selected is not null && !_fullscreen)
+                    ExitFullscreenButton.Focus(FocusState.Programmatic);
+            });
+        }
+    }
+
+    public bool HandlePlaybackKey(VirtualKey key, bool repeated = false)
+    {
+        if (!_active || _disposed || _selected is null) return false;
+        if (key == VirtualKey.Escape && _fullscreen)
+        {
+            ExitFullscreen();
+            return true;
+        }
+        if (key != VirtualKey.F || _player is null || HasShortcutModifier()) return false;
+        // Text entry and native control shortcuts retain their normal behavior.
+        var focused = XamlRoot is null ? null : FocusManager.GetFocusedElement(XamlRoot);
+        if (!_fullscreen && (focused is TextBox or PasswordBox or RichEditBox or ComboBox)) return false;
+        if (repeated) return true;
+        ToggleFullscreen();
+        return true;
+    }
+
+    private static bool HasShortcutModifier() =>
+        ((Microsoft.UI.Input.InputKeyboardSource.GetKeyStateForCurrentThread(VirtualKey.Control) |
+          Microsoft.UI.Input.InputKeyboardSource.GetKeyStateForCurrentThread(VirtualKey.Menu) |
+          Microsoft.UI.Input.InputKeyboardSource.GetKeyStateForCurrentThread(VirtualKey.Shift)) &
+         Windows.UI.Core.CoreVirtualKeyStates.Down) != 0;
 
     private void OnFeedKeyDown(object sender, KeyRoutedEventArgs e)
     {
-        if (e.Key == VirtualKey.Escape && _expanded)
+        if (!e.Handled && HandlePlaybackKey(e.Key, e.KeyStatus.WasKeyDown)) e.Handled = true;
+    }
+
+    private void EnsureVideoHost()
+    {
+        if (_videoHosted) return;
+        var request = new CommunityPlaybackHostEventArgs(OnlineVideoAnchor, OnlineVideoSurface, attach: true);
+        PlaybackHostChanged?.Invoke(this, request);
+        _videoHosted = request.Handled;
+        if (_onlinePlayer is null)
         {
-            _expanded = false;
-            UpdateWatchLayout();
-            e.Handled = true;
+            // Construct the native presenter only after its final host is in the
+            // live root. An element templated in the scroller can retain stale
+            // compositor bounds after moving to the playback canvas.
+            _onlinePlayer = new MediaPlayerElement
+            {
+                AutoPlay = false, AreTransportControlsEnabled = true,
+                Stretch = Stretch.Uniform, IsTabStop = true,
+                HorizontalAlignment = HorizontalAlignment.Stretch,
+                VerticalAlignment = VerticalAlignment.Stretch,
+                TransportControls = new MediaTransportControls { IsZoomButtonVisible = false, IsZoomEnabled = false }
+            };
+            Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(_onlinePlayer, "Shared clip video");
+            _onlinePlayer.DoubleTapped += OnPlayerDoubleTapped;
+            OnlinePlayerHost.Children.Add(_onlinePlayer);
+            ResizeOnlinePlayer(OnlineVideoSurface.ActualWidth, OnlineVideoSurface.ActualHeight);
         }
+    }
+
+    private void ReleaseVideoHost()
+    {
+        if (_onlinePlayer is not null)
+        {
+            _onlinePlayer.DoubleTapped -= OnPlayerDoubleTapped;
+            OnlinePlayerHost.Children.Remove(_onlinePlayer);
+            _onlinePlayer = null;
+        }
+        if (!_videoHosted) return;
+        PlaybackHostChanged?.Invoke(this, new CommunityPlaybackHostEventArgs(OnlineVideoAnchor, OnlineVideoSurface, attach: false));
+        _videoHosted = false;
+    }
+
+    private void OnVideoSurfaceSizeChanged(object sender, SizeChangedEventArgs args) => ResizeOnlinePlayer(args.NewSize.Width, args.NewSize.Height);
+
+    private void ResizeOnlinePlayer(double width, double height)
+    {
+        if (_onlinePlayer is null || width <= 0 || height <= 0) return;
+        if (Math.Abs(_onlinePlayer.Width - width) > 0.01 || !double.IsFinite(_onlinePlayer.Width)) _onlinePlayer.Width = width;
+        if (Math.Abs(_onlinePlayer.Height - height) > 0.01 || !double.IsFinite(_onlinePlayer.Height)) _onlinePlayer.Height = height;
+    }
+    private void OnFullscreenPointerMoved(object sender, PointerRoutedEventArgs args) => ShowFullscreenChrome();
+
+    private void ShowFullscreenChrome()
+    {
+        if (!_fullscreen) return;
+        _fullscreenActivity = DateTime.UtcNow;
+        if (ExitFullscreenButton.Visibility != Visibility.Visible) ExitFullscreenButton.Visibility = Visibility.Visible;
+        OnlineVideoSurface.SetCursorHidden(false);
+        if (!_fullscreenChromeTimer.IsEnabled) _fullscreenChromeTimer.Start();
+    }
+
+    private void OnFullscreenChromeTick(object? sender, object args)
+    {
+        if (!_fullscreen)
+        {
+            _fullscreenChromeTimer.Stop();
+            return;
+        }
+        if (DateTime.UtcNow - _fullscreenActivity < TimeSpan.FromSeconds(1.2) || ExitFullscreenButton.FocusState != FocusState.Unfocused) return;
+        ExitFullscreenButton.Visibility = Visibility.Collapsed;
+        OnlineVideoSurface.SetCursorHidden(true);
+        _fullscreenChromeTimer.Stop();
     }
 
     private async Task LoadCommentsAsync(bool older)
@@ -973,6 +1146,7 @@ public sealed partial class CommunityFeedView : UserControl, IDisposable
 
     private void OnFeedUnloaded(object sender, RoutedEventArgs e)
     {
+        ExitFullscreen();
         if (_layoutRoot is not null) _layoutRoot.Changed -= OnLayoutRootChanged;
         _layoutRoot = null;
     }
@@ -993,20 +1167,19 @@ public sealed partial class CommunityFeedView : UserControl, IDisposable
     {
         var width = WatchContent.ActualWidth;
         var narrow = width < 980;
-        var videoWidth = narrow || _expanded ? width : width - 312;
+        var videoWidth = narrow ? width : width - 312;
         var narrowHeader = videoWidth < 600;
         Grid.SetRow(WatchActionsPanel, narrowHeader ? 1 : 0);
         Grid.SetColumn(WatchActionsPanel, narrowHeader ? 0 : 1);
         Grid.SetColumnSpan(WatchActionsPanel, narrowHeader ? 2 : 1);
         WatchActionsPanel.HorizontalAlignment = HorizontalAlignment.Left;
-        WatchCommentsColumn.Width = narrow || _expanded ? new GridLength(0) : new GridLength(292);
+        WatchCommentsColumn.Width = narrow ? new GridLength(0) : new GridLength(292);
         Grid.SetColumn(CommentsPanel, narrow ? 0 : 1);
         Grid.SetRow(CommentsPanel, narrow ? 1 : 0);
-        CommentsPanel.Visibility = _expanded ? Visibility.Collapsed : Visibility.Visible;
-        ExpandVideoButton.Content = _expanded ? "Reduce" : "Expand";
+        CommentsPanel.Visibility = Visibility.Visible;
         var viewportMaximum = Math.Max(180, (XamlRoot?.Size.Height ?? 740) - 280);
-        OnlinePlayer.Height = Math.Clamp(videoWidth * 9 / 16, 180, Math.Min(_expanded ? 680 : 540, viewportMaximum));
-        CommentsScroll.MaxHeight = narrow ? 220 : Math.Clamp(OnlinePlayer.Height - 120, 180, 340);
+        OnlineVideoAnchor.Height = Math.Clamp(videoWidth * 9 / 16, 180, Math.Min(540, viewportMaximum));
+        CommentsScroll.MaxHeight = narrow ? 220 : Math.Clamp(OnlineVideoAnchor.Height - 120, 180, 340);
     }
 
     private void ShowNotice(string message, InfoBarSeverity severity)
@@ -1025,11 +1198,22 @@ public sealed partial class CommunityFeedView : UserControl, IDisposable
         if (_disposed) return;
         Deactivate(clear: true);
         OnFeedUnloaded(this, new RoutedEventArgs());
+        if (_onlinePlayer is not null) _onlinePlayer.DoubleTapped -= OnPlayerDoubleTapped;
+        _fullscreenChromeTimer.Stop();
+        _fullscreenChromeTimer.Tick -= OnFullscreenChromeTick;
         _disposed = true;
         _viewLifetime?.Dispose();
         _pageLifetime?.Dispose();
         // A canceled upload owns and disposes its linked cancellation source after cleanup.
     }
+}
+
+public sealed class CommunityPlaybackHostEventArgs(Grid anchor, FrameworkElement surface, bool attach) : EventArgs
+{
+    public Grid Anchor { get; } = anchor;
+    public FrameworkElement Surface { get; } = surface;
+    public bool Attach { get; } = attach;
+    public bool Handled { get; set; }
 }
 
 public sealed class CommunityFeedClipItem : INotifyPropertyChanged

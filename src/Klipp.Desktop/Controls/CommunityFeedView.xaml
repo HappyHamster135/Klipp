@@ -40,13 +40,14 @@
                     <Grid.ColumnDefinitions><ColumnDefinition x:Name="WatchVideoColumn" Width="*" /><ColumnDefinition x:Name="WatchCommentsColumn" Width="292" /></Grid.ColumnDefinitions>
                     <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
                     <StackPanel x:Name="WatchVideoPanel" Spacing="10">
-                        <Border Background="Black" CornerRadius="6">
-                            <Grid>
-                                <MediaPlayerElement x:Name="OnlinePlayer" Height="340" AutoPlay="False" AreTransportControlsEnabled="True" Stretch="Uniform" DoubleTapped="OnPlayerDoubleTapped" />
+                        <Grid x:Name="OnlineVideoAnchor" Height="340" Background="Black">
+                            <local:PlaybackCursorGrid x:Name="OnlineVideoSurface" Background="Black" PointerMoved="OnFullscreenPointerMoved" PointerEntered="OnFullscreenPointerMoved" SizeChanged="OnVideoSurfaceSizeChanged">
+                                <Grid x:Name="OnlinePlayerHost" />
                                 <Image x:Name="WatchPoster" Stretch="Uniform" IsHitTestVisible="False" />
                                 <Button x:Name="WatchPlayButton" Content="Play clip" Click="OnSelectedPlayClicked" HorizontalAlignment="Center" VerticalAlignment="Center" Height="36" />
-                            </Grid>
-                        </Border>
+                                <Button x:Name="ExitFullscreenButton" Content="Fullscreen" Click="OnExpandVideoClicked" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="12" Height="36" AutomationProperties.Name="Fullscreen video" ToolTipService.ToolTip="Fullscreen (F). Press Escape to return." />
+                            </local:PlaybackCursorGrid>
+                        </Grid>
                         <Grid x:Name="WatchHeader" ColumnSpacing="12" RowSpacing="9">
                             <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
                             <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
@@ -56,7 +57,7 @@
                             </StackPanel>
                             <StackPanel x:Name="WatchActionsPanel" Grid.Column="1" Orientation="Horizontal" Spacing="6" VerticalAlignment="Top">
                                 <Button x:Name="WatchLikeButton" Content="Like" Click="OnWatchLikeClicked" Height="32" />
-                                <Button x:Name="ExpandVideoButton" Content="Expand" Click="OnExpandVideoClicked" Height="32" />
+                                <Button x:Name="ExpandVideoButton" Content="Fullscreen" Click="OnExpandVideoClicked" Height="32" AutomationProperties.Name="Fullscreen video" ToolTipService.ToolTip="Fullscreen (F). Double-click the video, or press Escape to return." />
                                 <Button Content="&#xE711;" FontFamily="Segoe MDL2 Assets" Click="OnCloseWatchClicked" Height="32" Width="32" Padding="0" AutomationProperties.Name="Close video" ToolTipService.ToolTip="Close video" />
                             </StackPanel>
                         </Grid>

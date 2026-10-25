@@ -39,6 +39,9 @@ public sealed partial class CommunityView : UserControl, IDisposable
     public event EventHandler? AccountChanged;
     public event EventHandler? BusyChanged;
     public event EventHandler? UploadRequested;
+    public event EventHandler<PlayerFullscreenRequestEventArgs>? FullscreenRequested;
+    public event EventHandler<CommunityPlaybackHostEventArgs>? PlaybackHostChanged;
+    public event EventHandler? PlaybackLayoutChanged;
     public bool IsBusy => _busy || _operationsDialog is not null || (_feedView?.IsBusy ?? false);
     public bool IsSignedIn => _accounts.IsSignedIn;
     public bool HasCompleteProfile => _accounts.IsSignedIn && _accounts.Profile?.IsComplete == true;
@@ -46,12 +49,23 @@ public sealed partial class CommunityView : UserControl, IDisposable
         ? _accounts.Profile?.DisplayName ?? "My account"
         : "Sign in";
 
+    public bool HandlePlaybackKey(VirtualKey key, bool repeated = false) => _active && !_disposed && _feedView?.HandlePlaybackKey(key, repeated) == true;
+    public void ExitFullscreen() => _feedView?.ExitFullscreen();
+    public bool ScrollMediaWheel(int delta, uint lines)
+    {
+        if (!_active || _disposed) return false;
+        var distance = lines == uint.MaxValue ? Math.Max(16, CommunityScroller.ViewportHeight) : lines * 16d;
+        var offset = Math.Clamp(CommunityScroller.VerticalOffset - delta / 120d * distance, 0, CommunityScroller.ScrollableHeight);
+        return CommunityScroller.ChangeView(null, offset, null, disableAnimation: true);
+    }
+
     public CommunityView()
     {
         var configuration = CommunityConfigurationService.Load();
         _httpClient = new HttpClient(new HttpClientHandler { AllowAutoRedirect = false }) { Timeout = Timeout.InfiniteTimeSpan };
         _accounts = new CommunityAccountService(configuration, _httpClient, new CommunitySessionStore(configuration));
         InitializeComponent();
+        CommunityScroller.ViewChanged += (_, _) => PlaybackLayoutChanged?.Invoke(this, EventArgs.Empty);
         _resendTimer.Tick += (_, _) => UpdateResendButton();
         Render();
     }
@@ -428,6 +442,8 @@ public sealed partial class CommunityView : UserControl, IDisposable
                 SyncAccountMediaControls();
                 BusyChanged?.Invoke(this, EventArgs.Empty);
             };
+            _feedView.FullscreenRequested += (_, args) => FullscreenRequested?.Invoke(this, args);
+            _feedView.PlaybackHostChanged += (_, args) => PlaybackHostChanged?.Invoke(this, args);
             FeedHost.Children.Add(_feedView);
         }
         await _feedView.ActivateAsync();

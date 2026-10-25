@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.0.12 — 2026-10-25
+
+- Watch Media videos in true fullscreen on Windows. Use the video button, double-click or F; Escape returns to the same playback position.
+- Swipe through the phone Media feed one clip at a time, with sound, seeking, likes, sharing and a comments sheet over the video.
+- Reduce background downloads and video memory use with one active phone player, deferred viewer bundles and progress updates that do not rerender the feed.
+- Keep paused positions when returning to clips, opening comments or rotating a phone. Protect the active clip when its keyboard changes the screen size.
+- Restore native Windows pause and seek controls, clear the replay overlay after seeking back, and preserve the window and scroll position after fullscreen.
+- Keep uploads PC-only, automatic updates enabled and signing disabled.
+
 ## 1.0.11 — 2026-10-23
 
 - Add optional accounts, profiles and a private Media feed with clips, likes, comments, reports and blocking. Recording and editing remain available without an account.

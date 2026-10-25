@@ -29,6 +29,11 @@ public sealed partial class MainWindow
             args.Handled = true;
             return;
         }
+        if (_communityView?.HandlePlaybackKey(args.Key, args.KeyStatus.WasKeyDown) == true)
+        {
+            args.Handled = true;
+            return;
+        }
         // The detached transport still belongs to its card. Fullscreen shortcuts
         // also work if focus returns to a library field while chrome is hidden.
         if (_fullscreenInlineCard?.HandleFullscreenPlaybackKey(args.Key) == true ||
@@ -71,7 +76,7 @@ public sealed partial class MainWindow
 
     private void OnInlinePreviewPointerWheelChanged(object sender, PointerRoutedEventArgs args)
     {
-        if (args.Handled || _hostedInlineCard is null || _fullscreenInlineCard is not null ||
+        if (args.Handled || _hostedInlineCard is null && _communityPlaybackSurface is null || _fullscreenInlineCard is not null || _communityFullscreen ||
             (args.KeyModifiers & (Windows.System.VirtualKeyModifiers.Control | Windows.System.VirtualKeyModifiers.Shift)) != 0) return;
         var properties = args.GetCurrentPoint(InlineFullscreenHost).Properties;
         if (properties.IsHorizontalMouseWheel || properties.MouseWheelDelta == 0) return;
@@ -79,6 +84,11 @@ public sealed partial class MainWindow
         // wheel gestures scrolling the library, using the Windows preference.
         if (!GetInlineWheelScrollLines(0x0068, 0, out var lines, 0)) lines = 3;
         if (lines == 0) return;
+        if (_communityPlaybackSurface is not null)
+        {
+            args.Handled = _communityView?.ScrollMediaWheel(properties.MouseWheelDelta, lines) == true;
+            return;
+        }
         var distance = lines == uint.MaxValue ? Math.Max(16, ClipsScroller.ViewportHeight) : lines * 16d;
         var offset = Math.Clamp(ClipsScroller.VerticalOffset - properties.MouseWheelDelta / 120d * distance,
             0, ClipsScroller.ScrollableHeight);
